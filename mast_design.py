@@ -2,90 +2,105 @@ import cadquery as cq
 import math
 from cadquery import Location, Color
 
+# REMINDER: +X is right, +Y is forwards, +Z is up!
+# The mast faces left (+X), the lap is to the left of the mast.
+
 # Design Parameters based on actual specifications
 T_SLOT_SIZE = 20.0  # 20x20mm aluminum t-slot extrusion
 LEADSCREW_DIA = 8.0  # T8 leadscrew diameter
-LEADSCREW_PITCH = 2.0  # 2mm pitch
 
 # MGN9H Linear Rail Specifications
 RAIL_WIDTH = 9.0
 RAIL_HEIGHT = 6.5
-CARRIAGE_WIDTH = 20.0
-CARRIAGE_LENGTH = 39.9
-CARRIAGE_HEIGHT = 8.0
+RAIL_CARRIAGE_WIDTH = 20.0
+RAIL_CARRIAGE_LENGTH = 39.9
+RAIL_CARRIAGE_HEIGHT = 8.0
 RAIL_TOTAL_HEIGHT = 10.0  # Total rail+carriage height
-CARRIAGE_CLEARANCE = 2.0  # Below carriage
-BALL_DIA = 3.0
+RAIL_CARRIAGE_CLEARANCE = 2.0  # Below carriage
 MOUNTING_HOLE_LR_SPACING = 15.0  # Left/right spacing
 MOUNTING_HOLE_UD_SPACING = 16.0  # Up/down spacing
 
-# Leadscrew Nut Specifications
+# Leadscrew Specifications
 NUT_DIA = 22.0
 NUT_THICKNESS = 3.5
 NUT_HOLE_DIA = 3.5
 NUT_HOLE_RADIUS = 8.0  # Distance from center to hole
+# Distance from mast surface to center of leadscrew, includes clearance
+SCREW_DISTANCE_FROM_MAST = RAIL_TOTAL_HEIGHT + NUT_DIA / 2 + 5.0
 
 # Bearing Specifications
-BEARING_OD = 15.0  # For hinge system
-BEARING_ID = 8.0   # Inner diameter
-BEARING_WIDTH = 7.0
+# Standard bearings in 15 mm OD don't exist.
+# Use 624 bearings (4x13x5 mm) with a sleeve to get to 15 mm diameter.
+BEARING_OD = 13.0  # For hinge system
+BEARING_ID = 4.0   # Inner diameter
+BEARING_WIDTH = 5.0
 
 # New realistic dimensions
-RAIL_LENGTH = 250.0
-LEADSCREW_LENGTH = 400.0
+RAIL_LENGTH = 400.0
+LEADSCREW_LENGTH = 450.0
 T_SLOT_LENGTH = 450.0
 
+
 def make_t_slot_extrusion(length=T_SLOT_LENGTH):
-    '''Accurate 20x20 T-slot profile with slots on all sides - fixed co-planar'''
-    shell = cq.Workplane("XZ").box(T_SLOT_SIZE, length, T_SLOT_SIZE)
-    # Top slot
-    shell = shell.faces(">Z").workplane().rect(10, 6).cutBlind(-1.5)
-    # Bottom slot
-    shell = shell.faces("<Z").workplane().rect(10, 6).cutBlind(-1.5)
-    # Right side slot
-    shell = shell.faces(">Y").workplane().rect(6, 10).cutBlind(-1.5)
-    # Left side slot
-    shell = shell.faces("<Y").workplane().rect(6, 10).cutBlind(-1.5)
-    profile = shell.edges("|Z or |X or |Y").fillet(0.1)
+    # Accurate 20x20 T-slot profile with slots on all sides.
+    # Aligned to +Z, starting at origin.
+    shell = cq.Workplane("XY").box(T_SLOT_SIZE, T_SLOT_SIZE, length, centered=(True, True, False))
+    profile = shell.edges("|Z").chamfer(3)
+    profile.faces(">X").tag("SpineFront")
     return profile
 
+
 def make_mgn9_rail(length=RAIL_LENGTH):
-    '''MGN9 rail profile with mounting holes'''
-    rail = cq.Workplane("XY").box(RAIL_WIDTH, length, RAIL_HEIGHT)
-    rail = rail.edges(">Z").fillet(0.8)
-    # Mounting holes every 30mm
+    # MGN9 rail profile with mounting holes
+    # Created from origin, going to +Y. Reorient in assembly.
     num_holes = int(length / 30) + 1
-    hole_positions = [(RAIL_WIDTH/2 + i*30, 0) for i in range(num_holes)]
-    rail = rail.faces(">Z").workplane().pushPoints(hole_positions).circle(3.2/2).cutThruAll()
+    hole_positions = [(0, -i*30) for i in range(num_holes)]
+    
+    rail = (cq.Workplane("XY")
+            .box(RAIL_WIDTH, length, RAIL_HEIGHT, centered=(True, False, False))
+            .edges(">Z")
+            .fillet(0.8)
+            .faces("<Z")
+            .workplane()
+            .pushPoints(hole_positions)
+            .circle(3.2/2)
+            .cutThruAll())
+    rail.faces(">Z").tag("RailTop")
+    rail.faces("<Z").tag("RailBottom")
     return rail
 
+
 def make_mgn9_carriage():
-    '''MGN9H carriage'''
-    carriage = cq.Workplane("XY").box(CARRIAGE_WIDTH, CARRIAGE_LENGTH, CARRIAGE_HEIGHT).translate((0, 0, RAIL_HEIGHT/2 + CARRIAGE_HEIGHT/2 - CARRIAGE_CLEARANCE))
-    carriage = carriage.edges("|Z").fillet(0.1)
+    # MGN9H carriage
+    # Created from origin, going to +Y, top is +Z.
+    carriage = (cq.Workplane("XY")
+                .box(RAIL_CARRIAGE_WIDTH, RAIL_CARRIAGE_LENGTH, RAIL_CARRIAGE_HEIGHT, centered=(True, True, False))
+                .translate((0, 0, RAIL_CARRIAGE_CLEARANCE))
+                .edges("|Z")
+                .fillet(1.0))
     return carriage
 
+
 def make_pillow_block():
-    '''Pillow block bearing mount for T8 leadscrew (608ZZ recess)'''
-    block = cq.Workplane("XY").box(28, 32, 16)
-    # Shaft hole
-    block = block.faces("<Z").workplane().circle(LEADSCREW_DIA/2 + 0.2).cutThruAll()
-    # Bearing recess
-    block = block.faces(">Z").workplane(offset=8).circle(BEARING_OD/2).cutBlind(-14)
-    # Mounting tabs with M4 holes
-    tabs = (cq.Workplane("XY").box(22, 12, 6).translate((0, -16, -5))
-            .faces(">Z").workplane().pushPoints([(-9, 0), (9, 0)]).circle(4.2/2).cutThruAll())
-    block = block.union(tabs)
-    block = block.edges().fillet(0.1)
+    # Pillow block bearing mount for T8 leadscrew (608ZZ recess)
+    block = (cq.Workplane("XY")
+             .box(28, 32, 16)
+             # Shaft hole
+             .faces("<Z").workplane().circle(LEADSCREW_DIA/2 + 0.2).cutThruAll()
+             # Bearing recess
+             .faces(">Z").workplane(offset=8).circle(BEARING_OD/2).cutBlind(-14)
+             .edges().fillet(0.1))
     return block
 
+
 def make_t8_shaft(length=LEADSCREW_LENGTH):
-    '''T8 leadscrew shaft visualization'''
-    shaft = cq.Workplane("XY").cylinder(length, LEADSCREW_DIA/2).translate((0, -15, 225))
+    # T8 leadscrew shaft visualization
+    shaft = cq.Workplane("XY").cylinder(length, LEADSCREW_DIA/2, centered=(True, True, False))
     return shaft
 
+
 def make_t8_nut():
-    '''T8 leadscrew nut with flange and mounting holes'''
+    # T8 leadscrew nut with flange and mounting holes
     nut_body = cq.Workplane("XY").cylinder(15, 11).translate((0, 0, 1.75))
     flange = cq.Workplane("XY").circle(11).extrude(NUT_THICKNESS).translate((0, 0, 3.5))
     angles = [0, 90, 180, 270]
@@ -95,8 +110,9 @@ def make_t8_nut():
     nut = nut.edges().fillet(0.1)
     return nut
 
+
 def make_quill_hinge():
-    '''Improved quill hinge with bearing recess (0.5mm tol bushing)'''
+    # Improved quill hinge with bearing recess (0.5mm tol bushing)
     hinge = cq.Workplane("XY").box(35, 22, 12)
     hinge = hinge.faces("<Z").workplane().circle(BEARING_OD/2).cutThruAll()
     hinge = hinge.faces(">Z").workplane(offset=10).circle(BEARING_ID/2 + 0.5).cutBlind(-12)  # Bushing tol
@@ -105,14 +121,6 @@ def make_quill_hinge():
     hinge = hinge.edges().fillet(0.1)
     return hinge
 
-def make_linear_rail_mount():
-    '''Updated rail mount with fillets'''
-    result = cq.Workplane("XY").box(60, 30, 8)
-    result = result.faces("<Z").workplane(offset=-4).rect(RAIL_WIDTH + 2, RAIL_HEIGHT + 2).cutBlind(-8)
-    hole_positions = [(-7.5, 0), (7.5, 0), (0, -8), (0, 8)]
-    result = result.faces(">Z").workplane().pushPoints(hole_positions).circle(1.65).cutBlind(-8)
-    result = result.edges().fillet(0.1)
-    return result
 
 def make_base_plate():
     '''Triangular base with 3 M6 leveler feet + central t-slot clamp'''
@@ -125,42 +133,50 @@ def make_base_plate():
     base = plate.union(clamp)
     return base
 
+
 def make_assembly():
-    '''Improved realistic assembly with colors'''
-    assembly = cq.Assembly()
-    assembly.add(make_t_slot_extrusion(), name='extrusion', loc=Location((0, 0, 0)), color=Color('lightgray'))
-    assembly.add(make_linear_rail_mount(), name='rail_mount', loc=Location((0, 0, 0)), color=Color('gray'))
-    assembly.add(make_mgn9_rail(), name='rail', loc=Location((0, 1, 6)), color=Color('green'))
-    assembly.add(make_pillow_block(), name='bottom_bearing', loc=Location((0, -28, 5)), color=Color('red'))
-    assembly.add(make_pillow_block(), name='top_bearing', loc=Location((0, -28, 220)), color=Color('red'))
-    assembly.add(make_mgn9_carriage(), name='carriage1', loc=Location((0, 12, 110)), color=Color('yellow'))
-    assembly.add(make_mgn9_carriage(), name='carriage2', loc=Location((0, 12, 110 + 8)), color=Color('yellow'))  # Dual UD
-    assembly.add(make_t8_shaft(), name='leadscrew', loc=Location((0, 0, 0)), color=Color('blue'))
-    assembly.add(make_t8_nut(), name='nut', loc=Location((0, -15, 110)), color=Color('orange'))
-    assembly.add(make_quill_hinge(), name='hinge', loc=Location((0, 25, 110)), color=Color('purple'))
-    assembly.add(make_base_plate(), name='base', loc=Location((0, 0, -10)), color=Color('black'))
+    rail = make_mgn9_rail()
+    carriage1 = make_mgn9_carriage()
+    
+    carriage1Axis = carriage1.faces("<Z").translate((0, 0, RAIL_HEIGHT - RAIL_CARRIAGE_CLEARANCE)).val()
+    
+    # Assembly with colors, for easy identification of parts.
+    assembly = (cq.Assembly()
+                .add(make_t_slot_extrusion(), name='extrusion', loc=Location((0, 0, 0)), color=Color('lightgray'))
+                .add(rail, name='rail', color=Color('green'))
+                .add(make_pillow_block(), name='bottom_bearing', loc=Location((25, -28, 20)), color=Color('red'))
+                .add(make_pillow_block(), name='top_bearing', loc=Location((25, -28, 430)), color=Color('red'))
+                .add(carriage1, name='carriage1', loc=Location((25, 0, 110)), color=Color('yellow'))
+                .add(make_mgn9_carriage(), name='carriage2', loc=Location((25, 0, 130)), color=Color('yellow'))  # Dual spaced
+                .add(make_t8_shaft(), name='leadscrew', loc=Location((25, -15, 20)), color=Color('blue'))
+                .add(make_t8_nut(), name='nut', loc=Location((25, -15, 110)), color=Color('orange'))
+                .add(make_quill_hinge(), name='hinge', loc=Location((35, 0, 110)), color=Color('purple'))
+                .add(make_base_plate(), name='base', loc=Location((0, 0, -10)), color=Color('black'))
+                
+                # Constrain extrusion to so it doesn't move.
+                .constrain('extrusion', 'Fixed')
+                
+                # Constrain rail to extrusion
+                .constrain('rail?RailBottom', 'extrusion?SpineFront', 'Plane')
+                # Plane constraint allows rotation along plane, correct with another constraint
+                .constrain('rail@faces@<Y', 'extrusion@faces@<Z', 'Axis')
+    
+                .constrain('carriage1', carriage1Axis, 'rail', rail.faces(tag="RailTop").val(), 'Plane')
+                .constrain('carriage1@faces@<Y', 'rail@faces@<Y', 'Axis')
+                )
+    
+    assembly.solve()
     return assembly
+
 
 def export_all_parts():
     '''Export all parts and assembly'''
     print("Exporting improved parts...")
     try:
-        cq.exporters.export(make_t_slot_extrusion().translate((100, 0, 0)), 't_slot_extrusion.stl')
-        print("T-slot extrusion exported")
-        cq.exporters.export(make_mgn9_rail(), 'mgn9_rail.stl')
-        print("MGN9 rail exported")
-        cq.exporters.export(make_mgn9_carriage(), 'mgn9_carriage.stl')
-        print("MGN9 carriage exported")
         cq.exporters.export(make_pillow_block(), 'pillow_block.stl')
         print("Pillow block exported")
-        cq.exporters.export(make_t8_shaft(100), 't8_shaft.stl')  # Short for export
-        print("T8 shaft exported")
-        cq.exporters.export(make_t8_nut(), 't8_nut.stl')
-        print("T8 nut exported")
         cq.exporters.export(make_quill_hinge(), 'quill_hinge.stl')
         print("Quill hinge exported")
-        cq.exporters.export(make_linear_rail_mount(), 'linear_rail_mount.stl')
-        print("Linear rail mount exported")
         cq.exporters.export(make_base_plate(), 'base_plate.stl')
         print("Base plate exported")
         assembly = make_assembly()
@@ -171,6 +187,7 @@ def export_all_parts():
     except Exception as e:
         print(f"Error: {e}")
         return False
+
 
 if __name__ == "__main__":
     success = export_all_parts()
