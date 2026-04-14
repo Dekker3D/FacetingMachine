@@ -42,8 +42,11 @@ T_SLOT_LENGTH = 450.0
 
 
 def make_t_slot_extrusion(length=T_SLOT_LENGTH):
-    # Accurate 20x20 T-slot profile with slots on all sides.
-    # Aligned to +Z, starting at origin.
+    """20x20 T-slot profile.
+    
+    Aligned to +Z, starting at origin.
+    """
+    
     shell = cq.Workplane("XY").box(T_SLOT_SIZE, T_SLOT_SIZE, length, centered=(True, True, False))
     profile = shell.edges("|Z").chamfer(3)
     profile.faces(">X").tag("SpineFront")
@@ -51,8 +54,11 @@ def make_t_slot_extrusion(length=T_SLOT_LENGTH):
 
 
 def make_mgn9_rail(length=RAIL_LENGTH):
-    # MGN9 rail profile with mounting holes
-    # Created from origin, going to +Y. Reorient in assembly.
+    """MGN9 rail profile
+    
+    Created from origin, going to +Y. Reorient in assembly.
+    """
+    
     num_holes = int(length / 30) + 1
     hole_positions = [(0, -i*30) for i in range(num_holes)]
     
@@ -71,8 +77,10 @@ def make_mgn9_rail(length=RAIL_LENGTH):
 
 
 def make_mgn9_carriage():
-    # MGN9H carriage
-    # Created from origin, going to +Y, top is +Z.
+    """MGN9H carriage
+    
+    Created from origin, going to +Y, top is +Z.
+    """
     carriage = (cq.Workplane("XY")
                 .box(RAIL_CARRIAGE_WIDTH, RAIL_CARRIAGE_LENGTH, RAIL_CARRIAGE_HEIGHT, centered=(True, True, False))
                 .translate((0, 0, RAIL_CARRIAGE_CLEARANCE))
@@ -82,7 +90,7 @@ def make_mgn9_carriage():
 
 
 def make_pillow_block():
-    # Pillow block bearing mount for T8 leadscrew (608ZZ recess)
+    """Pillow block bearing mount for T8 leadscrew (608ZZ recess)"""
     block = (cq.Workplane("XY")
              .box(28, 32, 16)
              # Shaft hole
@@ -94,13 +102,13 @@ def make_pillow_block():
 
 
 def make_t8_shaft(length=LEADSCREW_LENGTH):
-    # T8 leadscrew shaft visualization
+    """T8 leadscrew shaft visualization"""
     shaft = cq.Workplane("XY").cylinder(length, LEADSCREW_DIA/2, centered=(True, True, False))
     return shaft
 
 
 def make_t8_nut():
-    # T8 leadscrew nut with flange and mounting holes
+    """T8 leadscrew nut with flange and mounting holes"""
     nut_body = cq.Workplane("XY").cylinder(15, 11).translate((0, 0, 1.75))
     flange = cq.Workplane("XY").circle(11).extrude(NUT_THICKNESS).translate((0, 0, 3.5))
     angles = [0, 90, 180, 270]
@@ -112,7 +120,7 @@ def make_t8_nut():
 
 
 def make_quill_hinge():
-    # Improved quill hinge with bearing recess (0.5mm tol bushing)
+    """Improved quill hinge with bearing recess (0.5mm tol bushing)"""
     hinge = cq.Workplane("XY").box(35, 22, 12)
     hinge = hinge.faces("<Z").workplane().circle(BEARING_OD/2).cutThruAll()
     hinge = hinge.faces(">Z").workplane(offset=10).circle(BEARING_ID/2 + 0.5).cutBlind(-12)  # Bushing tol
@@ -123,7 +131,7 @@ def make_quill_hinge():
 
 
 def make_base_plate():
-    '''Triangular base with 3 M6 leveler feet + central t-slot clamp'''
+    """Triangular base with 3 M6 leveler feet + central t-slot clamp"""
     plate = cq.Workplane("XY").circle(100).extrude(10)
     # 3 feet holes at 60mm equilateral
     feet_pos = [(0, 0), (60*math.cos(math.radians(120)), 60*math.sin(math.radians(120))), (60*math.cos(math.radians(240)), 60*math.sin(math.radians(240)))]
@@ -135,6 +143,7 @@ def make_base_plate():
 
 
 def make_assembly():
+    """Assemble the mast components with colors for visualization."""
     rail = make_mgn9_rail()
     carriage1 = make_mgn9_carriage()
     
@@ -170,7 +179,7 @@ def make_assembly():
 
 
 def export_all_parts():
-    '''Export all parts and assembly'''
+    """Export all parts and assembly"""
     print("Exporting improved parts...")
     try:
         cq.exporters.export(make_pillow_block(), 'pillow_block.stl')
