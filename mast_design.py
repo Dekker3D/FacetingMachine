@@ -204,8 +204,8 @@ if __name__ == "__main__":
         print("Design complete!")
     else:
         print("Design failed - need different approach")
-else:
-    # If not __main__, then we're in CQ-Editor. Show the assembly.
+elif __name__ == "__cq_main__":
+    # We're in CQ-Editor. Show the assembly.
     # show_object is a valid CQ-Editor function.
     result = make_assembly()
     show_object(result)
