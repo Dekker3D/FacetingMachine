@@ -2,61 +2,49 @@ import bom_part_data as bom
 import cadquery as cq
 
 
-class part:
+class Part:
     """Base class for all parts."""
-    cached_obj: cq.Workplane = None
-    part: bom.PartMetadata = None
+    _cached_obj: cq.Workplane = None
+    metadata: bom.PartMetadata = None
 
-    def get_object(self) -> cq.Workplane:
+    @classmethod
+    def get_object(cls) -> cq.Workplane:
         """Returns a cadquery object representing this part."""
-        if self.cached_obj is None:
-            self.cached_obj = self._create_object()
-        return self.cached_obj
+        if cls._cached_obj is None:
+            cls._cached_obj = cls._create_object()
+        return cls._cached_obj
 
-    def _create_object(self) -> cq.Workplane:
+    @classmethod
+    def _create_object(cls) -> cq.Workplane:
         """Creates a cadquery object representing this part."""
         raise NotImplementedError()
 
 
-class bearing_generic(part):
-    def width(self):
-        raise NotImplementedError()
+class BearingGeneric(Part):
+    WIDTH = 0.0
+    ID = 0.0
+    OD = 0.0
 
-    def ID(self):
-        raise NotImplementedError()
-
-    def OD(self):
-        raise NotImplementedError()
-
-    def _create_object(self):
-        return cq.Workplane("XY").circle(self.OD()/2).extrude(self.width()).edges().fillet(1.0)
-
-
-class bearing_608zz(bearing_generic):
-    part = bom.PartMetadata(
-        name="608ZZ Bearing"
-    )
-
-    def width(self):
-        return 7.0
-
-    def ID(self):
-        return 8.0
-
-    def OD(self):
-        return 22.0
+    @classmethod
+    def _create_object(cls):
+        return (
+            cq.Workplane("XY")
+            .circle(cls.OD / 2)
+            .extrude(cls.WIDTH)
+            .edges()
+            .fillet(1.0)
+        )
 
 
-class bearing_624zz(bearing_generic):
-    part = bom.PartMetadata(
-        name="624ZZ Bearing"
-    )
+class Bearing608ZZ(BearingGeneric):
+    metadata = bom.PartMetadata(name="608ZZ Bearing")
+    WIDTH = 7.0
+    ID = 8.0
+    OD = 22.0
 
-    def width(self):
-        return 5.0
 
-    def ID(self):
-        return 4.0
-
-    def OD(self):
-        return 13.0
+class Bearing624ZZ(BearingGeneric):
+    metadata = bom.PartMetadata(name="624ZZ Bearing")
+    WIDTH = 5.0
+    ID = 4.0
+    OD = 13.0
