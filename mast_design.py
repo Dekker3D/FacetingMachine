@@ -199,30 +199,34 @@ def make_t8_nut():
     return nut
 
 
-def make_quill_carriage(orient_for_assembly=True):
-    """
-    Vertical carriage with bearing hinge for quill holder.
-    Designed to fit on MGN9 carriage.
-    """
-    hinge = (cq.Workplane("XY")
-             .box(RAIL_CARRIAGE_WIDTH, QUILL_HOLDER_X - RAIL_SURFACE_X, RAIL_CARRIAGE_LENGTH + RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
-             .translate((0, 0, 0)))
-    hinge = (
-        hinge.faces("<Z")
-        .workplane(offset=0)
-        .move(0, -(LEADSCREW_X - RAIL_SURFACE_X))
-        .hole(10.2 + 1.0)
+class QuillCarriage:
+    """Class representing the quill carriage with hinge for the quill holder."""
 
-        .faces("<Z")
-        .workplane(offset=0)
-        .move(0, -(LEADSCREW_X - RAIL_SURFACE_X))
-        .hole(NUT_DIA + 1.0, 1.5 + NUT_THICKNESS)
-    )
-    if orient_for_assembly:
-        return (hinge
-                .rotate((0, 0, 0), (0, 0, 1), -90))
-    else:
-        return hinge
+    @classmethod
+    def make(cls, orient_for_assembly=True):
+        """
+        Vertical carriage with bearing hinge for quill holder.
+        Designed to fit on MGN9 carriage.
+        """
+        hinge = (cq.Workplane("XY")
+                 .box(RAIL_CARRIAGE_WIDTH, QUILL_HOLDER_X - RAIL_SURFACE_X, RAIL_CARRIAGE_LENGTH + RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
+                 .translate((0, 0, 0)))
+        hinge = (
+            hinge.faces("<Z")
+            .workplane(offset=0)
+            .move(0, -(LEADSCREW_X - RAIL_SURFACE_X))
+            .hole(10.2 + 1.0)
+
+            .faces("<Z")
+            .workplane(offset=0)
+            .move(0, -(LEADSCREW_X - RAIL_SURFACE_X))
+            .hole(NUT_DIA + 1.0, 1.5 + NUT_THICKNESS)
+        )
+        if orient_for_assembly:
+            return (hinge
+                    .rotate((0, 0, 0), (0, 0, 1), -90))
+        else:
+            return hinge
 
 
 def make_base_plate():
@@ -245,66 +249,70 @@ def make_base_plate():
     return base
 
 
-def make_assembly():
-    """Assemble the mast components with colors for visualization."""
-    assembly = (
-        cq.Assembly()
-        .add(
-            make_t_slot_extrusion(),
-            name="extrusion",
-            loc=Location((0, 0, 0)),
-            color=Color("lightgray"),
+class MastAssembly:
+    """Class representing the entire mast assembly with all components."""
+    
+    @classmethod
+    def make_assembly(cls):
+        """Assemble the mast components with colors for visualization."""
+        assembly = (
+            cq.Assembly()
+            .add(
+                make_t_slot_extrusion(),
+                name="extrusion",
+                loc=Location((0, 0, 0)),
+                color=Color("lightgray"),
+            )
+            .add(
+                make_mgn9_rail(),
+                name="rail",
+                loc=Location((RAIL_X, 0, RAIL_START_Y)),
+                color=Color("green"))
+            .add(
+                make_pillow_block(),
+                name="bottom_bearing",
+                loc=Location((10, 0, 0)),
+                color=Color("red"),
+            )
+            .add(
+                make_pillow_block(),
+                name="top_bearing",
+                loc=Location((10, 0, 400)),
+                color=Color("red"),
+            )
+            .add(
+                make_mgn9_carriage(True),
+                name="carriage1",
+                loc=Location((10, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT + RAIL_CARRIAGE_Y_OFFSET)),
+                color=Color("yellow"),
+            )
+            .add(
+                make_t8_shaft(),
+                name="leadscrew",
+                loc=Location((LEADSCREW_X, 0, 0)),
+                color=Color("blue"),
+            )
+            .add(
+                make_t8_nut(),
+                name="nut",
+                loc=Location((LEADSCREW_X, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT + QUILL_CARRIAGE_NUT_DEPTH)),
+                color=Color("orange"),
+            )
+            .add(
+                QuillCarriage.make(),
+                name="hinge",
+                loc=Location((RAIL_SURFACE_X, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT)),
+                color=Color("purple"),
+            )
+            .add(
+                make_base_plate(),
+                name="base",
+                loc=Location((0, 0, -10)),
+                color=Color("black"),
+            )
         )
-        .add(
-            make_mgn9_rail(),
-            name="rail",
-            loc=Location((RAIL_X, 0, RAIL_START_Y)),
-            color=Color("green"))
-        .add(
-            make_pillow_block(),
-            name="bottom_bearing",
-            loc=Location((10, 0, 0)),
-            color=Color("red"),
-        )
-        .add(
-            make_pillow_block(),
-            name="top_bearing",
-            loc=Location((10, 0, 400)),
-            color=Color("red"),
-        )
-        .add(
-            make_mgn9_carriage(True),
-            name="carriage1",
-            loc=Location((10, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT + RAIL_CARRIAGE_Y_OFFSET)),
-            color=Color("yellow"),
-        )
-        .add(
-            make_t8_shaft(),
-            name="leadscrew",
-            loc=Location((LEADSCREW_X, 0, 0)),
-            color=Color("blue"),
-        )
-        .add(
-            make_t8_nut(),
-            name="nut",
-            loc=Location((LEADSCREW_X, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT + QUILL_CARRIAGE_NUT_DEPTH)),
-            color=Color("orange"),
-        )
-        .add(
-            make_quill_carriage(),
-            name="hinge",
-            loc=Location((RAIL_SURFACE_X, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT)),
-            color=Color("purple"),
-        )
-        .add(
-            make_base_plate(),
-            name="base",
-            loc=Location((0, 0, -10)),
-            color=Color("black"),
-        )
-    )
 
-    return assembly
+        return assembly
 
 
 def export_all_parts():
