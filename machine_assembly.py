@@ -1,7 +1,8 @@
 from lap_assembly import LapAssembly
 from mast_design import MastAssembly
 import cadquery as cq
-from cadquery import Location, Color
+from cadquery import Location
+from machine import MachineConfig as cfg
 
 
 class MachineAssembly:
@@ -17,13 +18,11 @@ class MachineAssembly:
                 LapAssembly.make_assembly(),
                 name="lap_assembly",
                 loc=Location((100, 0, 0)),
-                color=Color("red"),
             )
             .add(
                 MastAssembly.make_assembly(),
                 name="mast_assembly",
                 loc=Location((-100, 0, 0)),
-                color=Color("green"),
             )
         )
 
@@ -33,5 +32,6 @@ class MachineAssembly:
 if __name__ == "__cq_main__":
     # We're in CQ-Editor. Show the assembly.
     # show_object is a valid CQ-Editor function.
+    cfg.validate()  # Validate the configuration before building.
     result = MachineAssembly().make_assembly()
     show_object(result)

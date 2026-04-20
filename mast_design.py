@@ -1,6 +1,8 @@
 import cadquery as cq
 import math
 from cadquery import Location, Color
+from quill_assembly import QuillAssembly
+from machine import MachineConfig as cfg
 
 # REMINDER: +X is right, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.
@@ -35,7 +37,6 @@ BEARING_OD = 13.0  # For hinge system
 BEARING_ID = 4.0  # Inner diameter
 BEARING_WIDTH = 5.0
 
-# New realistic dimensions
 RAIL_LENGTH = 400.0
 LEADSCREW_LENGTH = 450.0
 T_SLOT_LENGTH = 450.0
@@ -251,7 +252,7 @@ def make_base_plate():
 
 class MastAssembly:
     """Class representing the entire mast assembly with all components."""
-    
+
     @classmethod
     def make_assembly(cls):
         """Assemble the mast components with colors for visualization."""
@@ -305,6 +306,11 @@ class MastAssembly:
                 color=Color("purple"),
             )
             .add(
+                QuillAssembly.make_assembly(),
+                name="quill_assembly",
+                loc=Location((QUILL_HOLDER_X, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT)),
+            )
+            .add(
                 make_base_plate(),
                 name="base",
                 loc=Location((0, 0, -10)),
@@ -321,11 +327,11 @@ def export_all_parts():
     try:
         cq.exporters.export(make_pillow_block(), "pillow_block.stl")
         print("Pillow block exported")
-        cq.exporters.export(make_quill_carriage(), "quill_hinge.stl")
+        cq.exporters.export(QuillCarriage.make(), "quill_hinge.stl")
         print("Quill hinge exported")
         cq.exporters.export(make_base_plate(), "base_plate.stl")
         print("Base plate exported")
-        assembly = make_assembly()
+        assembly = QuillAssembly.make_assembly()
         cq.exporters.export(assembly.toCompound(), "mast_assembly.stl")
         print("Improved assembly exported")
         print("All parts exported successfully!")
@@ -336,6 +342,7 @@ def export_all_parts():
 
 
 if __name__ == "__main__":
+    cfg.validate()  # Validate the configuration before building.
     success = export_all_parts()
     if success:
         print("Design complete!")
@@ -344,5 +351,6 @@ if __name__ == "__main__":
 elif __name__ == "__cq_main__":
     # We're in CQ-Editor. Show the assembly.
     # show_object is a valid CQ-Editor function.
-    result = make_assembly()
+    cfg.validate()  # Validate the configuration before building.
+    result = QuillAssembly.make_assembly()
     show_object(result)
