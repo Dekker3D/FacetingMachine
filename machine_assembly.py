@@ -1,5 +1,6 @@
 from lap_assembly import LapAssembly
 from mast_design import MastAssembly
+from frame_assembly import FrameAssembly
 import cadquery as cq
 from cadquery import Location
 from machine import MachineConfig as cfg
@@ -15,14 +16,19 @@ class MachineAssembly:
         assembly = (
             cq.Assembly()
             .add(
+                FrameAssembly.make_assembly(),
+                name="frame_assembly",
+                loc=Location((0, 0, 0)),
+            )
+            .add(
                 LapAssembly.make_assembly(),
                 name="lap_assembly",
-                loc=Location((100, 0, 0)),
+                loc=Location((cfg.frame_length() / 2 - cfg.lap_pos_from_side(), 0, 20)),
             )
             .add(
                 MastAssembly.make_assembly(),
                 name="mast_assembly",
-                loc=Location((-100, 0, 0)),
+                loc=Location((-cfg.frame_length() / 2 + 50, 0, 20)),
             )
         )
 

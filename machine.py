@@ -1,3 +1,6 @@
+import math
+
+
 class MachineConfig:
     """Configuration for the machine."""
 
@@ -45,6 +48,34 @@ class MachineConfig:
     QH_SWING_JOINT_THICKNESS = 5.0
     # Thickness of the pitch joint.
     QH_PITCH_JOINT_THICKNESS = 8.0
+
+    # Frame
+    # Spacing. Basically attach at 4 points around the lap.
+    # Round to 20 mm increments for ease with 2020 extrusions.
+
+    @classmethod
+    def sg_screw_spacing(cls):
+        return math.ceil(cls.sg_OD() * math.sqrt(0.5) / 20) * 20
+
+    @classmethod
+    def frame_width(cls):
+        return cls.sg_screw_spacing() + 20.0  # So that the middle of the 2020 matches the screw spacing.
+    
+    @classmethod
+    def mast_space(cls):
+        return 200.0  # Horizontal space for mast and its horizontal travel.
+
+    @classmethod
+    def frame_length(cls):
+        return math.ceil((cls.frame_width() / 2 + cls.sg_OD() / 2 + cls.mast_space()) / 20) * 20
+
+    @classmethod
+    def lap_pos_from_side(cls):
+        return cls.frame_width() / 2
+
+    @classmethod
+    def lap_space_from_side(cls):
+        return cls.lap_pos_from_side() + cls.sg_OD() / 2
 
     @classmethod
     def validate(cls):

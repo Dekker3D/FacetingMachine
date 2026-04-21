@@ -230,26 +230,6 @@ class QuillCarriage:
             return hinge
 
 
-def make_base_plate():
-    """Triangular base with 3 M6 leveler feet + central t-slot clamp"""
-    plate = cq.Workplane("XY").circle(100).extrude(10)
-    # 3 feet holes at 60mm equilateral
-    feet_pos = [
-        (0, 0),
-        (60 * math.cos(math.radians(120)), 60 * math.sin(math.radians(120))),
-        (60 * math.cos(math.radians(240)), 60 * math.sin(math.radians(240))),
-    ]
-    plate = (
-        plate.faces(">Z").workplane().pushPoints(feet_pos).circle(6.2 / 2).cutThruAll()
-    )
-    # Central clamp for t-slot bottom
-    clamp = (
-        cq.Workplane("XY").box(25, 25, 15).translate((0, 0, 5)).edges("|Z").fillet(0.1)
-    )
-    base = plate.union(clamp)
-    return base
-
-
 class MastAssembly:
     """Class representing the entire mast assembly with all components."""
 
@@ -309,12 +289,6 @@ class MastAssembly:
                 QuillAssembly.make_assembly(),
                 name="quill_assembly",
                 loc=Location((QUILL_HOLDER_X, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT)),
-            )
-            .add(
-                make_base_plate(),
-                name="base",
-                loc=Location((0, 0, -10)),
-                color=Color("black"),
             )
         )
 
