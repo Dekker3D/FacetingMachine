@@ -55,17 +55,34 @@ class MastCarriage:
                         cfg.MAST_CARRIAGE_THICKNESS + cfg.FRAME_RAIL_DIA / 2 - 1,
                         centered=(True, True, False)
                         )
+
+                    # Rail slots
                     .faces(">X")
-                    .workplane(centerOption="ProjectedOrigin")
-                    .moveTo(cfg.frame_rail_width() / 2, -1)
+                    .workplane(origin=(0, 0, rail_Z))
+                    .moveTo(cfg.frame_rail_width() / 2, 0)
                     .hole(cfg.FRAME_RAIL_DIA)
-                    .moveTo(-cfg.frame_rail_width() / 2, -1)
+                    .moveTo(-cfg.frame_rail_width() / 2, 0)
                     .hole(cfg.FRAME_RAIL_DIA)
+
+                    # Structure to hold mast.
+                    .faces(">Z")
+                    .workplane(origin=(0, 0, 20))
+                    .box(50, 50, 50, centered=(True, True, False))
                     )
 
+        cutoutPoints = [
+            (-10, -10),
+            (10, -10),
+            (40, -40),
+            (40, 40),
+            (10, 10),
+            (-10, 10)
+        ]
         carriage = carriage.cut(
-            cq.Workplane("XY", origin=(cfg.MAST_CARRIAGE_LENGTH / 2 - 10, 0, 20))
-            .box(cfg.MAST_CARRIAGE_LENGTH, 20.0, 20.0, centered=(True, True, False))
+            cq.Workplane("XY", origin=(0, 0, 20))
+            .polyline(cutoutPoints)
+            .close()
+            .extrude(100.0)
         )
 
         return carriage

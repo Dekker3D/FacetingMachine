@@ -55,7 +55,7 @@ class MachineConfig:
     # Space between frame and rail.
     FRAME_RAIL_SPACING = 10.0
     MAST_VIS_X = 100.0
-    MAST_CARRIAGE_LENGTH = 50.0
+    MAST_CARRIAGE_LENGTH = 80.0
     MAST_CARRIAGE_CLEARANCE = 2.0
     MAST_CARRIAGE_THICKNESS = 10.0
     # Desired space for mast and its horizontal travel.
