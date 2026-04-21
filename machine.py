@@ -50,9 +50,19 @@ class MachineConfig:
     QH_PITCH_JOINT_THICKNESS = 8.0
 
     # Frame
+    # Rails for the mast. Smooth rods, really.
+    FRAME_RAIL_DIA = 8.0
+    # Space between frame and rail.
+    FRAME_RAIL_SPACING = 10.0
+    MAST_VIS_X = 100.0
+    MAST_CARRIAGE_LENGTH = 50.0
+    MAST_CARRIAGE_CLEARANCE = 2.0
+    MAST_CARRIAGE_THICKNESS = 10.0
+    # Desired space for mast and its horizontal travel.
+    MAST_DESIRED_SPACE = 250.0
+
     # Spacing. Basically attach at 4 points around the lap.
     # Round to 20 mm increments for ease with 2020 extrusions.
-
     @classmethod
     def sg_screw_spacing(cls):
         return math.ceil(cls.sg_OD() * math.sqrt(0.5) / 20) * 20
@@ -60,22 +70,30 @@ class MachineConfig:
     @classmethod
     def frame_width(cls):
         return cls.sg_screw_spacing() + 20.0  # So that the middle of the 2020 matches the screw spacing.
-    
+
+    @classmethod
+    def frame_width_internal(cls):
+        return cls.frame_width() - 40.0
+
+    @classmethod
+    def frame_rail_width(cls):
+        return cls.frame_width_internal() - cls.FRAME_RAIL_DIA - cls.FRAME_RAIL_SPACING * 2
+
     @classmethod
     def mast_space(cls):
-        return 200.0  # Horizontal space for mast and its horizontal travel.
+        return cls.frame_length() - cls.lap_space_from_left() - 20
 
     @classmethod
     def frame_length(cls):
-        return math.ceil((cls.frame_width() / 2 + cls.sg_OD() / 2 + cls.mast_space()) / 20) * 20
+        return math.ceil((cls.frame_width() / 2 + cls.sg_OD() / 2 + cls.MAST_DESIRED_SPACE + 20) / 20) * 20
 
     @classmethod
-    def lap_pos_from_side(cls):
+    def lap_pos_from_left(cls):
         return cls.frame_width() / 2
 
     @classmethod
-    def lap_space_from_side(cls):
-        return cls.lap_pos_from_side() + cls.sg_OD() / 2
+    def lap_space_from_left(cls):
+        return cls.lap_pos_from_left() + cls.sg_OD() / 2
 
     @classmethod
     def validate(cls):

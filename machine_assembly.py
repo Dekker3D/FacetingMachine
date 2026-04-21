@@ -23,12 +23,12 @@ class MachineAssembly:
             .add(
                 LapAssembly.make_assembly(),
                 name="lap_assembly",
-                loc=Location((cfg.frame_length() / 2 - cfg.lap_pos_from_side(), 0, 20)),
+                loc=Location((cfg.frame_length() / 2 - cfg.lap_pos_from_left(), 0, 20)),
             )
             .add(
                 MastAssembly.make_assembly(),
                 name="mast_assembly",
-                loc=Location((-cfg.frame_length() / 2 + 50, 0, 20)),
+                loc=Location((-cfg.frame_length() / 2 + cfg.MAST_VIS_X, 0, 20)),
             )
         )
 
