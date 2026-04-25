@@ -13,14 +13,16 @@ class FrameExtrusions:
                  .box(20, 20, cfg.frame_width(), centered=(True, False, True))
                  .moveTo(-cfg.frame_length() / 2 + 10, 0)
                  .box(20, 20, cfg.frame_width(), centered=(True, False, True))
+                 .chamfer(1.0)
                  )
 
         frame = frame.union(
             cq.Workplane("YZ")
             .moveTo(cfg.frame_width() / 2 - 10, 0)
-            .box(20, 20, cfg.frame_length() - 20, centered=(True, False, True))
+            .box(20, 20, cfg.frame_length() - 40, centered=(True, False, True))
             .moveTo(-cfg.frame_width() / 2 + 10, 0)
-            .box(20, 20, cfg.frame_length() - 20, centered=(True, False, True))
+            .box(20, 20, cfg.frame_length() - 40, centered=(True, False, True))
+            .chamfer(1.0)
             )
 
         return frame

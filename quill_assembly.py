@@ -4,6 +4,20 @@ from machine import MachineConfig as cfg
 import bought_bits as bb
 
 
+class QuillTilt:
+    """Represents the part of the quill that tilts up and down."""
+
+    def make(self):
+        """Create the quill tilt."""
+
+        tilt = (
+            cq.Workplane("XY")
+            .box(10, 10, 10)
+            )
+
+        return tilt
+
+
 class QuillHolder:
     """
     Class representing the quill holder.
@@ -71,12 +85,23 @@ class QuillAssembly:
     def make_assembly(cls):
         """Create the entire quill assembly."""
 
+        qh = QuillHolder()
+        qt_X = qh.pitch_joint_X_offset()
+        qt_Z = qh.pitch_joint_Z_offset()
+
         assembly = (
             cq.Assembly()
             .add(
-                QuillHolder().make(),
+                qh.make(),
                 name="quill_holder",
                 loc=Location((0, 0, 0)),
+                color=cq.Color("orange")
+            )
+            .add(
+                QuillTilt().make(),
+                name="quill_tilt",
+                loc=Location((qt_X, 0, qt_Z)),
+                color=cq.Color("green")
             )
         )
 
