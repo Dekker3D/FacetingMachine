@@ -3,13 +3,10 @@ import math
 from cadquery import Location, Color
 from quill_assembly import QuillAssembly
 from machine import MachineConfig as cfg
+import bought_bits as bb
 
 # REMINDER: +X is right, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.
-
-# Design Parameters based on actual specifications
-T_SLOT_SIZE = 20.0  # 20x20mm aluminum t-slot extrusion
-LEADSCREW_DIA = 8.0  # T8 leadscrew diameter
 
 # MGN9H Linear Rail Specifications
 RAIL_WIDTH = 9.0
@@ -30,13 +27,6 @@ NUT_HOLE_RADIUS = 8.0  # Distance from center to hole
 # Distance from mast surface to center of leadscrew, includes clearance
 SCREW_DISTANCE_FROM_MAST = RAIL_TOTAL_HEIGHT + NUT_DIA / 2 + 5.0
 
-# Bearing Specifications
-# Standard bearings in 15 mm OD don't exist.
-# Use 624 bearings (4x13x5 mm) with a sleeve to get to 15 mm diameter.
-BEARING_OD = 13.0  # For hinge system
-BEARING_ID = 4.0  # Inner diameter
-BEARING_WIDTH = 5.0
-
 RAIL_LENGTH = 400.0
 LEADSCREW_LENGTH = 450.0
 T_SLOT_LENGTH = 450.0
@@ -44,7 +34,7 @@ T_SLOT_LENGTH = 450.0
 QUILL_CARRIAGE_JOINT_DIA = 25
 QUILL_CARRIAGE_JOINT_LENGTH = 80
 
-RAIL_X = T_SLOT_SIZE / 2
+RAIL_X = cfg.MAST_EXT_THICKNESS / 2
 RAIL_SURFACE_X = RAIL_TOTAL_HEIGHT + RAIL_X
 LEADSCREW_RAIL_SPACING = NUT_DIA / 2 + 5.0
 LEADSCREW_X = LEADSCREW_RAIL_SPACING + RAIL_SURFACE_X
@@ -62,14 +52,14 @@ RAIL_CARRIAGE_Y_OFFSET = 10.0 + QUILL_CARRIAGE_NUT_DEPTH
 QUILL_CARRIAGE_DISPLAY_HEIGHT = RAIL_START_Y + 100.0  # Height of the quill carriage for visualization.
 
 
-def make_t_slot_extrusion(length=T_SLOT_LENGTH):
+def make_mast_spine(length=T_SLOT_LENGTH):
     """20x20 T-slot profile.
 
     Aligned to +Z, starting at origin.
     """
 
     shell = cq.Workplane("XY").box(
-        T_SLOT_SIZE, T_SLOT_SIZE, length, centered=(True, True, False)
+        cfg.MAST_EXT_THICKNESS, cfg.MAST_EXT_WIDTH, length, centered=(True, True, False)
     )
     profile = shell.edges("|Z").chamfer(3)
     profile.faces(">X").tag("SpineFront")
@@ -135,37 +125,89 @@ def make_mgn9_carriage(orient_for_assembly=True):
         return carriage
 
 
-def make_pillow_block(orient_for_assembly=True):
-    """Pillow block bearing mount for T8 leadscrew (608ZZ recess)"""
-    block = (
-        cq.Workplane("XY")
-        .box(20, LEADSCREW_X - RAIL_X, BEARING_WIDTH + 5.0 + 10.0, centered=(True, False, False))
-        .faces(">Z")
-        .workplane(offset=-(BEARING_WIDTH + 5.0))
-        .move(0, LEADSCREW_X - RAIL_X)
-        .cylinder(BEARING_WIDTH + 5.0, BEARING_OD / 2 + 4, centered=(True, True, False))
-        # Shaft hole
-        .faces(">Z")
-        .workplane()
-        .move(0, LEADSCREW_X - RAIL_X)
-        .hole(LEADSCREW_DIA + 0.4)
-        # Bearing recess
-        .faces(">Z")
-        .workplane()
-        .move(0, LEADSCREW_X - RAIL_X)
-        .hole(BEARING_OD, BEARING_WIDTH)
-    )
-    if orient_for_assembly:
-        return (block
-                .rotate((0, 0, 0), (0, 0, 1), -90))
-    else:
-        return block
+class LeadscrewBearingHolder:
+    """Bearing holder for T8 leadscrew (608ZZ recess)"""
+
+    LEADSCREW_HOLE_SPACE = 4.0
+    BOLT_HOLE_LENGTH = 8.0
+    BOLT_HOLE_DIA = 5.0
+    BOLT_HEAD_DIA = 10.0
+    BOLT_HEAD_HEIGHT = BOLT_HEAD_DIA / 2 + 5.0
+
+    def leadscrew_dist(self):
+        return LEADSCREW_X - RAIL_X
+
+    def diagonal_length(self):
+        # Don't need to go diagonal all the way to the mast.
+        return self.leadscrew_dist() - self.BOLT_HOLE_LENGTH
+
+    def diagonal_height(self):
+        # Keep some space for bolt head.
+        return max(self.diagonal_length(), self.BOLT_HEAD_HEIGHT + self.BOLT_HEAD_DIA / 2)
+
+    def cylinder_height(self):
+        return bb.Bearing608ZZ.WIDTH + 5.0
+
+    def total_height(self):
+        return self.diagonal_height() + self.cylinder_height()
+
+    def make(self, orient_for_assembly=True):
+        ls_dist = LEADSCREW_X - RAIL_X
+        b_w = bb.Bearing608ZZ.WIDTH
+        b_od = bb.Bearing608ZZ.OD
+
+        block_shape_pts = [
+            (0, 0),
+            (ls_dist - self.diagonal_length(), 0),
+            (ls_dist, self.diagonal_height()),
+            (ls_dist, self.diagonal_height() + self.cylinder_height()),
+            (0, self.diagonal_height() + self.cylinder_height()),
+        ]
+
+        block = (
+            cq.Workplane("YZ", origin=(-cfg.MAST_EXT_WIDTH / 2, 0, 0))
+            .polyline(block_shape_pts)
+            .close()
+            .extrude(cfg.MAST_EXT_WIDTH)
+        )
+
+        block = (
+            block
+            .faces(">Z")
+            .workplane(offset=-(self.cylinder_height()), origin=(0, 0, 0))
+            .move(0, ls_dist)
+            .cylinder(self.cylinder_height(), b_od / 2 + 4, centered=(True, True, False))
+            # Shaft hole
+            .faces(">Z")
+            .workplane()
+            .move(0, ls_dist)
+            .hole(cfg.LEADSCREW_DIA + self.LEADSCREW_HOLE_SPACE)
+            # Bearing recess
+            .faces(">Z")
+            .workplane()
+            .move(0, ls_dist)
+            .hole(b_od + 0.2, b_w)
+        )
+
+        block = block.cut(
+            cq.Workplane("top", origin=(0, 0, self.BOLT_HEAD_HEIGHT))
+            .cylinder(self.BOLT_HOLE_LENGTH, self.BOLT_HOLE_DIA / 2, centered=(True, True, False))
+            .faces(">Y")
+            .workplane()
+            .cylinder(100, self.BOLT_HEAD_DIA / 2, centered=(True, True, False))
+        )
+
+        if orient_for_assembly:
+            return (block
+                    .rotate((0, 0, 0), (0, 0, 1), -90))
+        else:
+            return block
 
 
 def make_t8_shaft(length=LEADSCREW_LENGTH):
     """T8 leadscrew shaft visualization"""
     shaft = cq.Workplane("XY").cylinder(
-        length, LEADSCREW_DIA / 2, centered=(True, True, False)
+        length, cfg.LEADSCREW_DIA / 2, centered=(True, True, False)
     )
     return shaft
 
@@ -239,7 +281,7 @@ class MastAssembly:
         assembly = (
             cq.Assembly()
             .add(
-                make_t_slot_extrusion(),
+                make_mast_spine(),
                 name="extrusion",
                 loc=Location((0, 0, 0)),
                 color=Color("lightgray"),
@@ -250,13 +292,13 @@ class MastAssembly:
                 loc=Location((RAIL_X, 0, RAIL_START_Y)),
                 color=Color("green"))
             .add(
-                make_pillow_block(),
+                LeadscrewBearingHolder().make(),
                 name="bottom_bearing",
                 loc=Location((10, 0, 0)),
                 color=Color("red"),
             )
             .add(
-                make_pillow_block(),
+                LeadscrewBearingHolder().make(),
                 name="top_bearing",
                 loc=Location((10, 0, 400)),
                 color=Color("red"),
@@ -299,12 +341,10 @@ def export_all_parts():
     """Export all parts and assembly"""
     print("Exporting improved parts...")
     try:
-        cq.exporters.export(make_pillow_block(), "pillow_block.stl")
+        cq.exporters.export(LeadscrewBearingHolder().make(), "pillow_block.stl")
         print("Pillow block exported")
         cq.exporters.export(QuillCarriage.make(), "quill_hinge.stl")
         print("Quill hinge exported")
-        cq.exporters.export(make_base_plate(), "base_plate.stl")
-        print("Base plate exported")
         assembly = QuillAssembly.make_assembly()
         cq.exporters.export(assembly.toCompound(), "mast_assembly.stl")
         print("Improved assembly exported")

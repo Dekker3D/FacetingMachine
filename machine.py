@@ -49,7 +49,17 @@ class MachineConfig:
     # Thickness of the pitch joint.
     QH_PITCH_JOINT_THICKNESS = 8.0
 
+    # Mast
+    # Leadscrew diameter
+    LEADSCREW_DIA = 8.0
+    # 20x20mm aluminum t-slot extrusion
+    MAST_EXT_WIDTH = 20.0
+    MAST_EXT_THICKNESS = 20.0
+
     # Frame
+    # 20x20mm aluminum t-slot extrusion
+    FRAME_EXT_WIDTH = 20.0
+    FRAME_EXT_HEIGHT = 20.0
     # Rails for the mast. Smooth rods, really.
     FRAME_RAIL_DIA = 8.0
     # Space between frame and rail.

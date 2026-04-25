@@ -8,7 +8,8 @@
 - [ ] Add motor mount.
 
 ### Mast:
-- [ ] Fix leadscrew bearing-holders.
+- [X] Fix leadscrew bearing-holders.
+- [ ] Figure out alignment mechanism for leadscrew bearing-holders. (V-slot extrusion?)
 - [ ] Fix quill-holder carriage to have swivel joint.
 - [ ] Implement quill-holder properly.
 - [ ] Implement quill-tilt.
