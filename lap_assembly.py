@@ -1,6 +1,7 @@
 import cadquery as cq
 from cadquery import Location, Color
 from machine import MachineConfig as cfg
+import bought_bits as bb
 
 
 class LapHolderBottom:
@@ -75,8 +76,6 @@ class SplashGuard:
     HEIGHT = 30.0
     # The thickness of the splash guard walls.
     THICKNESS = 2.0
-    # The ID of the drain hole.
-    HOLE_ID = 6.0
 
     def make(self):
         """Create the splash guard."""
@@ -117,13 +116,45 @@ class SplashGuard:
 
         # Add drain hole.
         cutout = cutout.union(
-            cq.Workplane("XY", origin=(50, -50, self.THICKNESS - 50))
-            .cylinder(100, self.HOLE_ID / 2, centered=(True, True, False))
+            cq.Workplane("XY", origin=(cfg.sg_drain_offset(), 0, self.THICKNESS - 50))
+            .cylinder(100, cfg.SG_DRAIN_ID / 2, centered=(True, True, False))
         ).edges().fillet(1.0)
 
         guard = guard.cut(cutout)
 
         return guard
+
+
+class SplashGuardBottom:
+    """Class representing the bottom part of the splash guard."""
+
+    @classmethod
+    def make(cls):
+        """Create the bottom part of the splash guard."""
+
+        dia = bb.Bearing608ZZ.OD + 10
+
+        base_pts = [
+            (0, 0),
+            (dia / 2 + 15, 0),
+            (dia / 2, -15),  # Slope
+            (dia / 2, -20),  # Holds bearings
+            (0, -20)
+        ]
+
+        bottom = (cq.Workplane("XZ")
+                  .polyline(base_pts)
+                  .close()
+                  .revolve(360, (0, 0, 0), (0, 1, 0))
+                  .faces("<Z")
+                  .workplane(origin=(0, 0, 0))
+                  .hole(cfg.LAP_AXLE_DIA)
+                  .faces("<Z")
+                  .workplane(origin=(0, 0, 0))
+                  .hole(bb.Bearing608ZZ.OD, bb.Bearing608ZZ.WIDTH)
+                  )
+
+        return bottom
 
 
 class LapAssembly:
@@ -151,6 +182,12 @@ class LapAssembly:
                 name="splash_guard",
                 loc=Location((0, 0, 0)),
                 color=Color("blue"),
+            )
+            .add(
+                SplashGuardBottom().make(),
+                name="splash_guard_bottom",
+                loc=Location((0, 0, 0)),
+                color=Color("green"),
             )
         )
 

@@ -1,4 +1,5 @@
 import math
+import bought_bits as bb
 
 
 class MachineConfig:
@@ -31,6 +32,9 @@ class MachineConfig:
     SG_THICKNESS = 2.0
     # Slope of splash guard interior.
     SG_SLOPE = 0.04
+    # The ID and OD of the drain hole.
+    SG_DRAIN_ID = 6.0
+    SG_DRAIN_OD = 10.0
 
     # Inner diameter.
     @classmethod
@@ -40,6 +44,10 @@ class MachineConfig:
     @classmethod
     def sg_OD(cls):
         return cls.sg_ID() + cls.SG_THICKNESS * 2
+
+    @classmethod
+    def sg_drain_offset(cls):
+        return bb.Bearing608ZZ.OD / 2 + 10 + cls.SG_DRAIN_OD / 2
 
     # Quill holder
     # Diameter of the swing joint.
