@@ -152,6 +152,10 @@ class SplashGuardBottom:
                   .faces("<Z")
                   .workplane(origin=(0, 0, 0))
                   .hole(bb.Bearing608ZZ.OD, bb.Bearing608ZZ.WIDTH)
+                  .faces(">Z")
+                  .workplane(origin=(0, 0, 0), invert=True, offset=20)
+                  .polarArray(radius=cfg.sg_bottom_screw_spacing(), count=4, startAngle=45, angle=360)
+                  .cboreHole(3.2, 6, 15)
                   )
 
         return bottom

@@ -36,6 +36,12 @@ class MachineConfig:
     SG_DRAIN_ID = 6.0
     SG_DRAIN_OD = 10.0
 
+    # Spacing. Basically attach at 4 points around the lap.
+    # Round to 20 mm increments for ease with 2020 extrusions.
+    @classmethod
+    def sg_screw_spacing(cls):
+        return math.ceil(cls.sg_OD() * math.sqrt(0.5) / 20) * 20
+
     # Inner diameter.
     @classmethod
     def sg_ID(cls):
@@ -46,8 +52,19 @@ class MachineConfig:
         return cls.sg_ID() + cls.SG_THICKNESS * 2
 
     @classmethod
+    def sg_bottom_dia(cls):
+        return bb.Bearing608ZZ.OD + 10
+
+    @classmethod
     def sg_drain_offset(cls):
-        return bb.Bearing608ZZ.OD / 2 + 10 + cls.SG_DRAIN_OD / 2
+        return cls.sg_bottom_dia() / 2 + 3 + cls.SG_DRAIN_OD / 2
+
+    # Screw hole spacing for bottom part.
+    @classmethod
+    def sg_bottom_screw_spacing(cls):
+        print(cls.sg_bottom_dia())
+        print(cls.sg_bottom_dia() / 2 + 6.0)
+        return cls.sg_bottom_dia() / 2 + 6.0
 
     # Quill holder
     # Diameter of the swing joint.
@@ -80,12 +97,6 @@ class MachineConfig:
     MAST_CARRIAGE_THICKNESS = 10.0
     # Desired space for mast and its horizontal travel.
     MAST_DESIRED_SPACE = 250.0
-
-    # Spacing. Basically attach at 4 points around the lap.
-    # Round to 20 mm increments for ease with 2020 extrusions.
-    @classmethod
-    def sg_screw_spacing(cls):
-        return math.ceil(cls.sg_OD() * math.sqrt(0.5) / 20) * 20
 
     @classmethod
     def frame_width(cls):
