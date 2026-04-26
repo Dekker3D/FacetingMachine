@@ -29,6 +29,8 @@ class MachineConfig:
     SG_HEIGHT = 30.0
     # Material thickness.
     SG_THICKNESS = 2.0
+    # Slope of splash guard interior.
+    SG_SLOPE = 0.04
 
     # Inner diameter.
     @classmethod

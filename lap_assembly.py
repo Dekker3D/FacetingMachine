@@ -102,7 +102,7 @@ class SplashGuard:
 
         conepts = [
             (0, 0),
-            (500, 20),
+            (500, cfg.SG_SLOPE * 500),
             (500, 500),
             (0, 500)
         ]
