@@ -75,6 +75,8 @@ class SplashGuard:
     HEIGHT = 30.0
     # The thickness of the splash guard walls.
     THICKNESS = 2.0
+    # The ID of the drain hole.
+    HOLE_ID = 6.0
 
     def make(self):
         """Create the splash guard."""
@@ -87,17 +89,37 @@ class SplashGuard:
                      )
                  )
 
+        # Create a cylinder of the right radius. Excess height, shaped by later cone.
         cutout = (guard.faces(">Z")
-                  .workplane(invert=True)
+                  .workplane(invert=True, offset=-50)
                   .cylinder(
-                      cfg.SG_HEIGHT,
+                      cfg.SG_HEIGHT + 100,
                       cfg.sg_ID() / 2,
                       centered=(True, True, False),
                       combine=False
                       )
-                  .edges("<Z")
-                  .fillet(10.0)
                   )
+
+        conepts = [
+            (0, 0),
+            (500, 20),
+            (500, 500),
+            (0, 500)
+        ]
+
+        # Create slope towards drain hole.
+        cutout = cutout.intersect(
+            cq.Workplane("XZ", origin=(50, -50, self.THICKNESS))
+            .polyline(conepts)
+            .close()
+            .revolve(360, (0, 0, 0), (0, 1, 0))
+        ).edges().fillet(5.0)
+
+        # Add drain hole.
+        cutout = cutout.union(
+            cq.Workplane("XY", origin=(50, -50, self.THICKNESS - 50))
+            .cylinder(100, self.HOLE_ID / 2, centered=(True, True, False))
+        ).edges().fillet(1.0)
 
         guard = guard.cut(cutout)
 
