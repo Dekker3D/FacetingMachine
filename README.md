@@ -13,7 +13,13 @@ This project aims to create open-source CAD designs for a gem faceting machine, 
 
 ## Getting Started
 
-TODO
+### Previewing:
+Just download CQ-Editor from https://github.com/CadQuery/CQ-editor/releases, open it, and open machine_assembly.py. Run it, and it should preview the entire machine.
+
+### Exporting:
+- First, make sure you have Python installed.
+- Then, create a virtual environment (venv), by opening the command prompt, going to this project's folder, and typing "python -m venv venv". This creates the virtual environment in the "venv" folder in this project.
+- Third... uh, well, exporting currently is only sorta-kinda supported by mast_design.py, so... >_> TBD.
 
 ## Current Status
 
