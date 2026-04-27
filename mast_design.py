@@ -8,51 +8,27 @@ import bought_bits as bb
 # REMINDER: +X is right, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.
 
-# MGN9H Linear Rail Specifications
-RAIL_WIDTH = 9.0
-RAIL_HEIGHT = 6.5
-RAIL_CARRIAGE_WIDTH = 20.0
-RAIL_CARRIAGE_LENGTH = 39.9
-RAIL_CARRIAGE_HEIGHT = 8.0
-RAIL_TOTAL_HEIGHT = 10.0  # Total rail+carriage height
-RAIL_CARRIAGE_CLEARANCE = 2.0  # Below carriage
-MOUNTING_HOLE_LR_SPACING = 15.0  # Left/right spacing
-MOUNTING_HOLE_UD_SPACING = 16.0  # Up/down spacing
-
-# Leadscrew Specifications
-NUT_DIA = 22.0
-NUT_THICKNESS = 3.5
-NUT_HOLE_DIA = 3.5
-NUT_HOLE_RADIUS = 8.0  # Distance from center to hole
 # Distance from mast surface to center of leadscrew, includes clearance
-SCREW_DISTANCE_FROM_MAST = RAIL_TOTAL_HEIGHT + NUT_DIA / 2 + 5.0
-
-RAIL_LENGTH = 400.0
-LEADSCREW_LENGTH = 450.0
-T_SLOT_LENGTH = 450.0
-
-QUILL_CARRIAGE_JOINT_DIA = 25
-QUILL_CARRIAGE_JOINT_LENGTH = 80
+SCREW_DISTANCE_FROM_MAST = bb.RailMGN9H.total_height() + bb.LeadScrewT8.NUT_DIA / 2 + 5.0
 
 RAIL_X = cfg.MAST_EXT_THICKNESS / 2
-RAIL_SURFACE_X = RAIL_TOTAL_HEIGHT + RAIL_X
-LEADSCREW_RAIL_SPACING = NUT_DIA / 2 + 5.0
+RAIL_SURFACE_X = bb.RailMGN9H.total_height() + RAIL_X
+LEADSCREW_RAIL_SPACING = bb.LeadScrewT8.NUT_DIA / 2 + 5.0
 LEADSCREW_X = LEADSCREW_RAIL_SPACING + RAIL_SURFACE_X
-QUILL_HOLDER_X = LEADSCREW_X + NUT_DIA / 2 + QUILL_CARRIAGE_JOINT_DIA / 2 + 5.0
-
+QUILL_HOLDER_X = LEADSCREW_X + bb.LeadScrewT8.NUT_DIA / 2 + cfg.QC_JOINT_DIA / 2 + 5.0
 
 DESIRED_TRAVEL_HEIGHT = 300.0  # Desired vertical travel of the quill holder.
 
 LEADSCREW_BEARING_HEIGHT = 15.0
 RAIL_START_Y = LEADSCREW_BEARING_HEIGHT
 
-QUILL_CARRIAGE_NUT_DEPTH = NUT_THICKNESS + 1.5
+QUILL_CARRIAGE_NUT_DEPTH = bb.LeadScrewT8.NUT_THICKNESS + 1.5
 RAIL_CARRIAGE_Y_OFFSET = 10.0 + QUILL_CARRIAGE_NUT_DEPTH
 
 QUILL_CARRIAGE_DISPLAY_HEIGHT = RAIL_START_Y + 100.0  # Height of the quill carriage for visualization.
 
 
-def make_mast_spine(length=T_SLOT_LENGTH):
+def make_mast_spine(length=cfg.MAST_SPINE_LENGTH):
     """20x20 T-slot profile.
 
     Aligned to +Z, starting at origin.
@@ -66,7 +42,7 @@ def make_mast_spine(length=T_SLOT_LENGTH):
     return profile
 
 
-def make_mgn9_rail(length=RAIL_LENGTH, orient_for_assembly=True):
+def make_mgn9_rail(length=cfg.MAST_RAIL_LENGTH, orient_for_assembly=True):
     """MGN9 rail profile
 
     Created from origin, going to +Y. Reorient in assembly.
@@ -77,7 +53,7 @@ def make_mgn9_rail(length=RAIL_LENGTH, orient_for_assembly=True):
 
     rail = (
         cq.Workplane("XY")
-        .box(RAIL_WIDTH, length, RAIL_HEIGHT, centered=(True, False, False))
+        .box(bb.RailMGN9H.RAIL_WIDTH, length, bb.RailMGN9H.RAIL_HEIGHT, centered=(True, False, False))
         .edges(">Z")
         .fillet(0.8)
         .faces("<Z")
@@ -88,7 +64,7 @@ def make_mgn9_rail(length=RAIL_LENGTH, orient_for_assembly=True):
     )
     rail.faces(">Z").tag("RailTop")
     rail.faces("<Z").tag("RailBottom")
-    
+
     if orient_for_assembly:
         return (rail
                 .rotate((0, 0, 0), (1, 0, 0), 90)
@@ -106,12 +82,12 @@ def make_mgn9_carriage(orient_for_assembly=True):
     carriage = (
         cq.Workplane("XY")
         .box(
-            RAIL_CARRIAGE_WIDTH,
-            RAIL_CARRIAGE_LENGTH,
-            RAIL_CARRIAGE_HEIGHT,
+            bb.RailMGN9H.CARRIAGE_WIDTH,
+            bb.RailMGN9H.CARRIAGE_LENGTH,
+            bb.RailMGN9H.CARRIAGE_HEIGHT,
             centered=(True, False, False),
         )
-        .translate((0, 0, RAIL_CARRIAGE_CLEARANCE))
+        .translate((0, 0, bb.RailMGN9H.CARRIAGE_CLEARANCE))
         .edges("|Z")
         .fillet(1.0)
     )
@@ -204,7 +180,7 @@ class LeadscrewBearingHolder:
             return block
 
 
-def make_t8_shaft(length=LEADSCREW_LENGTH):
+def make_t8_shaft(length=cfg.LEADSCREW_LENGTH):
     """T8 leadscrew shaft visualization"""
     shaft = cq.Workplane("XY").cylinder(
         length, cfg.LEADSCREW_DIA / 2, centered=(True, True, False)
@@ -216,18 +192,18 @@ def make_t8_nut():
     """T8 leadscrew nut with flange and mounting holes"""
     nut_body = (cq.Workplane("XY")
                 .cylinder(15, 5.1, centered=(True, True, False))
-                .translate((0, 0, -(1.5+NUT_THICKNESS)))
+                .translate((0, 0, -(1.5 + bb.LeadScrewT8.NUT_THICKNESS)))
                 .chamfer(0.25))
     flange = (cq.Workplane("XY")
               .circle(11)
-              .extrude(NUT_THICKNESS)
-              .translate((0, 0, -NUT_THICKNESS))
+              .extrude(bb.LeadScrewT8.NUT_THICKNESS)
+              .translate((0, 0, -bb.LeadScrewT8.NUT_THICKNESS))
               .chamfer(0.5))
     angles = [0, 90, 180, 270]
     hole_positions = [
         (
-            NUT_HOLE_RADIUS * math.cos(math.radians(a)),
-            NUT_HOLE_RADIUS * math.sin(math.radians(a)),
+            bb.LeadScrewT8.NUT_HOLE_RADIUS * math.cos(math.radians(a)),
+            bb.LeadScrewT8.NUT_HOLE_RADIUS * math.sin(math.radians(a)),
         )
         for a in angles
     ]
@@ -235,7 +211,7 @@ def make_t8_nut():
         flange.faces(">Z")
         .workplane()
         .pushPoints(hole_positions)
-        .circle(NUT_HOLE_DIA / 2)
+        .circle(bb.LeadScrewT8.NUT_HOLE_DIA / 2)
         .cutThruAll()
     )
     nut = nut_body.union(flange)
@@ -252,7 +228,7 @@ class QuillCarriage:
         Designed to fit on MGN9 carriage.
         """
         hinge = (cq.Workplane("XY")
-                 .box(RAIL_CARRIAGE_WIDTH, QUILL_HOLDER_X - RAIL_SURFACE_X, RAIL_CARRIAGE_LENGTH + RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
+                 .box(bb.RailMGN9H.CARRIAGE_WIDTH, QUILL_HOLDER_X - RAIL_SURFACE_X, bb.RailMGN9H.CARRIAGE_LENGTH + RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
                  .translate((0, 0, 0)))
         hinge = (
             hinge.faces("<Z")
@@ -263,7 +239,7 @@ class QuillCarriage:
             .faces("<Z")
             .workplane(offset=0)
             .move(0, -(LEADSCREW_X - RAIL_SURFACE_X))
-            .hole(NUT_DIA + 1.0, 1.5 + NUT_THICKNESS)
+            .hole(bb.LeadScrewT8.NUT_DIA + 1.0, 1.5 + bb.LeadScrewT8.NUT_THICKNESS)
         )
         if orient_for_assembly:
             return (hinge

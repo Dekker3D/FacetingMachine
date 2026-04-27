@@ -108,7 +108,7 @@ class SplashGuard:
 
         # Create slope towards drain hole.
         cutout = cutout.intersect(
-            cq.Workplane("XZ", origin=(50, -50, self.THICKNESS))
+            cq.Workplane("XZ", origin=(cfg.sg_drain_offset(), 0, self.THICKNESS))
             .polyline(conepts)
             .close()
             .revolve(360, (0, 0, 0), (0, 1, 0))

@@ -48,3 +48,45 @@ class Bearing624ZZ(BearingGeneric):
     WIDTH = 5.0
     ID = 4.0
     OD = 13.0
+
+
+class RailGeneric:
+    RAIL_WIDTH = 0
+    RAIL_HEIGHT = 0
+    CARRIAGE_WIDTH = 0
+    CARRIAGE_LENGTH = 0
+    CARRIAGE_HEIGHT = 0
+    CARRIAGE_CLEARANCE = 0  # Below carriage
+    MOUNTING_HOLE_LR_SPACING = 0  # Left/right spacing
+    MOUNTING_HOLE_UD_SPACING = 0  # Up/down spacing
+
+    @classmethod
+    def total_height(cls):
+        return cls.CARRIAGE_HEIGHT + cls.CARRIAGE_CLEARANCE
+
+
+class RailMGN9H(RailGeneric):
+    RAIL_WIDTH = 9.0
+    RAIL_HEIGHT = 6.5
+    CARRIAGE_WIDTH = 20.0
+    CARRIAGE_LENGTH = 39.9
+    CARRIAGE_HEIGHT = 8.0
+    CARRIAGE_CLEARANCE = 2.0
+    MOUNTING_HOLE_LR_SPACING = 15.0
+    MOUNTING_HOLE_UD_SPACING = 16.0
+
+
+class LeadScrewGeneric:
+    SCREW_DIA = 0
+    NUT_DIA = 0
+    NUT_THICKNESS = 0
+    NUT_HOLE_DIA = 0
+    NUT_HOLE_RADIUS = 0  # Distance from center to hole
+
+
+class LeadScrewT8(LeadScrewGeneric):
+    SCREW_DIA = 8.0
+    NUT_DIA = 22.0
+    NUT_THICKNESS = 3.5
+    NUT_HOLE_DIA = 3.5
+    NUT_HOLE_RADIUS = 8.0

@@ -62,8 +62,6 @@ class MachineConfig:
     # Screw hole spacing for bottom part.
     @classmethod
     def sg_bottom_screw_spacing(cls):
-        print(cls.sg_bottom_dia())
-        print(cls.sg_bottom_dia() / 2 + 6.0)
         return cls.sg_bottom_dia() / 2 + 6.0
 
     # Quill holder
@@ -97,6 +95,20 @@ class MachineConfig:
     MAST_CARRIAGE_THICKNESS = 10.0
     # Desired space for mast and its horizontal travel.
     MAST_DESIRED_SPACE = 250.0
+    MAST_DESIRED_VERTICAL_TRAVEL = 300.0
+    # The piece holding the mast to the mast-carriage.
+    MAST_HOLDER_THICKNESS = 12.0
+    MAST_HOLDER_HEIGHT = 60.0
+
+    MAST_RAIL_LENGTH = 400.0
+    LEADSCREW_LENGTH = 450.0
+    MAST_SPINE_LENGTH = 450.0
+
+    FRAME_LEG_LENGTH = 40.0
+
+    # Quill carriage
+    QC_JOINT_DIA = 25
+    QC_JOINT_LENGTH = 80
 
     @classmethod
     def frame_width(cls):
