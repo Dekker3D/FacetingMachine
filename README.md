@@ -23,7 +23,7 @@ Just download CQ-Editor from https://github.com/CadQuery/CQ-editor/releases, ope
 
 ## Current Status
 
-TODO
+See TODO.md
 
 ## Other Relevant Projects (for inspiration)
 
