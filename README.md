@@ -5,9 +5,10 @@ This project aims to create open-source CAD designs for a gem faceting machine, 
 ## Project Structure
 
 ```
+- README.md           # This file
 - TODO.md             # Just a to-do list.
 - OFF_THE_SHELF.md    # Dimensions for off-the-shelf parts, for reference.
-- README.md           # This file
+- BOM_ESTIMATE.md     # Estimated Bill of Materials.
 ```
 
 ## Getting Started
