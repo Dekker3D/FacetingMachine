@@ -22,3 +22,6 @@ Most stuff sourced from AliExpress. Because I'm a cheapskate! And they work alri
 - LED display: less cheap. 64x32 pixels should be fine?
 - 8A H-bridge breakout board: probably cheap. Or maybe not.
 - 24V -> 3.3V voltage regulator: no big deal.
+
+## Total:
+About 153 euros. I'd expect there to be about 50 more euros of random bits like bearings, bolts, etc. So maybe 200 euros to build this thing?
