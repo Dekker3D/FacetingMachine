@@ -25,8 +25,8 @@
 - [ ] Add mast-carriage-rail holders.
 - [ ] Add mast-angle calibration mechanism to mast carriage.
 - [ ] Add clamp mechanism to mast carriage, to clamp to rails.
-- [ ] Add legs.
+- [X] Add legs.
 - Check: Free space for 90 degree brackets for 2020 extrusion frame parts.
 
 ## Off-the-shelf parts
-- [ ] Find suitable collect chuck for 6mm dops.
+- [ ] Find suitable collet chuck for 6mm dops.

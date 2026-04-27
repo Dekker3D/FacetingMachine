@@ -97,8 +97,3 @@
 - **Aluminum extrusion**: 80/20, Misumi, local suppliers
 - **Bearings**: McMaster-Carr, AliExpress, bearing specialists
 - **Fasteners**: Local hardware stores, McMaster-Carr
-
-## Notes
-- All dimensions should be verified with actual components
-- Tolerances may need adjustment based on actual manufacturing
-- AliExpress components may have dimensional variations
