@@ -13,57 +13,6 @@ class MachineConfig:
     def printer_safe_size(cls):
         return cls.PRINTER_SIZE - 10.0  # Leave margin for brim, etc.
 
-    # Lap dimensions.
-    # Diameter of the arbor hole.
-    LAP_HOLE_DIA = 12.7
-    # Diameter of the axle. M8 bolt.
-    LAP_AXLE_DIA = 8.0
-    # Diameter of the lap, 6 inches.
-    LAP_DIA = 152.4
-    # Thickness of the lap.
-    LAP_THICKNESS = 2.0
-
-    # Splash guard dimensions.
-    # Space to reach for stuff that fell under the lap.
-    SG_EXTRA_SPACE = 10.0
-    # Height, includes lip.
-    SG_HEIGHT = 30.0
-    # Material thickness.
-    SG_THICKNESS = 2.0
-    # Slope of splash guard interior.
-    SG_SLOPE = 0.04
-    # The ID and OD of the drain hole.
-    SG_DRAIN_ID = 6.0
-    SG_DRAIN_OD = 10.0
-
-    # Spacing. Basically attach at 4 points around the lap.
-    # Round to 20 mm increments for ease with 2020 extrusions.
-    @classmethod
-    def sg_screw_spacing(cls):
-        return math.ceil(cls.sg_OD() * math.sqrt(0.5) / 20) * 20
-
-    # Inner diameter.
-    @classmethod
-    def sg_ID(cls):
-        return cls.LAP_DIA + cls.SG_EXTRA_SPACE * 2
-
-    @classmethod
-    def sg_OD(cls):
-        return cls.sg_ID() + cls.SG_THICKNESS * 2
-
-    @classmethod
-    def sg_bottom_dia(cls):
-        return bb.Bearing608ZZ.OD + 10
-
-    @classmethod
-    def sg_drain_offset(cls):
-        return cls.sg_bottom_dia() / 2 + 3 + cls.SG_DRAIN_OD / 2
-
-    # Screw hole spacing for bottom part.
-    @classmethod
-    def sg_bottom_screw_spacing(cls):
-        return cls.sg_bottom_dia() / 2 + 6.0
-
     # Quill holder
     # Diameter of the swing joint.
     QH_SWING_DIA = 15.0
@@ -104,41 +53,6 @@ class MachineConfig:
     LEADSCREW_LENGTH = 450.0
     MAST_SPINE_LENGTH = 450.0
 
-    FRAME_LEG_LENGTH = 40.0
-
     # Quill carriage
     QC_JOINT_DIA = 25
     QC_JOINT_LENGTH = 80
-
-    @classmethod
-    def frame_width(cls):
-        return cls.sg_screw_spacing() + 20.0  # So that the middle of the 2020 matches the screw spacing.
-
-    @classmethod
-    def frame_width_internal(cls):
-        return cls.frame_width() - 40.0
-
-    @classmethod
-    def frame_rail_width(cls):
-        return cls.frame_width_internal() - cls.FRAME_RAIL_DIA - cls.FRAME_RAIL_SPACING * 2
-
-    @classmethod
-    def mast_space(cls):
-        return cls.frame_length() - cls.lap_space_from_left() - 20
-
-    @classmethod
-    def frame_length(cls):
-        return math.ceil((cls.frame_width() / 2 + cls.sg_OD() / 2 + cls.MAST_DESIRED_SPACE + 20) / 20) * 20
-
-    @classmethod
-    def lap_pos_from_left(cls):
-        return cls.frame_width() / 2
-
-    @classmethod
-    def lap_space_from_left(cls):
-        return cls.lap_pos_from_left() + cls.sg_OD() / 2
-
-    @classmethod
-    def validate(cls):
-        """Validate the configuration."""
-        assert cls.sg_OD() < cls.printer_safe_size(), "Splash guard diameter exceeds 3D printer size!"

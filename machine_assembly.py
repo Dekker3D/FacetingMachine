@@ -9,28 +9,20 @@ from machine import MachineConfig as cfg
 class MachineAssembly:
     """Class representing the entire machine assembly."""
 
-    @classmethod
-    def make_assembly(cls):
+    frame = FrameAssembly()
+    lap = LapAssembly()
+    mast = MastAssembly()
+
+    frame.lap_assembly = lap
+    frame.mast_assembly = mast
+
+    def validate(self):
+        self.frame.validate()
+
+    def make_assembly(self):
         """Create the entire machine assembly."""
 
-        assembly = (
-            cq.Assembly()
-            .add(
-                FrameAssembly.make_assembly(),
-                name="frame_assembly",
-                loc=Location((0, 0, 0)),
-            )
-            .add(
-                LapAssembly.make_assembly(),
-                name="lap_assembly",
-                loc=Location((cfg.frame_length() / 2 - cfg.lap_pos_from_left(), 0, 20)),
-            )
-            .add(
-                MastAssembly.make_assembly(),
-                name="mast_assembly",
-                loc=Location((-cfg.frame_length() / 2 + cfg.MAST_VIS_X, 0, 20)),
-            )
-        )
+        assembly = self.frame.make_assembly()
 
         return assembly
 
@@ -38,6 +30,7 @@ class MachineAssembly:
 if __name__ == "__cq_main__":
     # We're in CQ-Editor. Show the assembly.
     # show_object is a valid CQ-Editor function.
-    cfg.validate()  # Validate the configuration before building.
-    result = MachineAssembly().make_assembly()
+    machine = MachineAssembly()
+    machine.validate()  # Validate the configuration before building.
+    result = machine.make_assembly()
     show_object(result)

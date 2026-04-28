@@ -4,8 +4,9 @@ from cadquery import Location, Color
 from quill_assembly import QuillAssembly
 from machine import MachineConfig as cfg
 import bought_bits as bb
+import mast_abstract
 
-# REMINDER: +X is right, +Y is forwards, +Z is up!
+# REMINDER: +X is left, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.
 
 # Distance from mast surface to center of leadscrew, includes clearance
@@ -248,7 +249,7 @@ class QuillCarriage:
             return hinge
 
 
-class MastAssembly:
+class MastAssembly(mast_abstract.MastAssemblyBase):
     """Class representing the entire mast assembly with all components."""
 
     @classmethod
