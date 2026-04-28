@@ -1,9 +1,6 @@
 from lap_assembly import LapAssembly
 from mast_design import MastAssembly
 from frame_assembly import FrameAssembly
-import cadquery as cq
-from cadquery import Location
-from machine import MachineConfig as cfg
 
 
 class MachineAssembly:
