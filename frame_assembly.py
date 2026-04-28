@@ -10,15 +10,15 @@ import math
 class FrameAssembly(frame_abstract.FrameAssemblyBase):
     """Class representing the entire machine assembly."""
 
-    lap_assembly: lap_abstract.LapAssemblyBase = None
-    mast_assembly: mast_abstract.MastAssemblyBase = None
+    lap: lap_abstract.LapAssemblyBase = None
+    mast: mast_abstract.MastAssemblyBase = None
     frame_ext_width = 20.0
     frame_ext_height = 20.0
     frame_leg_length = 40.0
 
     def frame_width(self):
         # Add 20mm so the centers of 2020 extrusions line up.
-        return self.lap_assembly.required_frame_width() + self.frame_ext_width
+        return self.lap.required_frame_width() + self.frame_ext_width
 
     def frame_width_internal(self):
         return self.frame_width() - self.frame_ext_width * 2
@@ -30,17 +30,17 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
         return self.frame_length() - self.lap_space_from_left() - 20
 
     def frame_length(self):
-        return math.ceil((self.frame_width() / 2 + self.lap_assembly.sg_OD() / 2 + cfg.MAST_DESIRED_SPACE + 20) / 20) * 20
+        return math.ceil((self.frame_width() / 2 + self.lap.sg_OD() / 2 + cfg.MAST_DESIRED_SPACE + 20) / 20) * 20
 
     def lap_pos_from_left(self):
         return self.frame_width() / 2
 
     def lap_space_from_left(self):
-        return self.lap_pos_from_left() + self.lap_assembly.sg_OD() / 2
+        return self.lap_pos_from_left() + self.lap.sg_OD() / 2
 
     def validate(self):
         """Validate the configuration."""
-        assert self.lap_assembly.sg_OD() < cfg.printer_safe_size(), "Splash guard diameter exceeds 3D printer size!"
+        assert self.lap.sg_OD() < cfg.printer_safe_size(), "Splash guard diameter exceeds 3D printer size!"
 
     def make_assembly(self):
         """Create the frame assembly."""
@@ -72,12 +72,12 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
                 color=cq.Color("green")
             )
             .add(
-                self.lap_assembly.make_assembly(),
+                self.lap.make_assembly(),
                 name="lap_assembly",
                 loc=Location((self.frame_length() / 2 - self.lap_pos_from_left(), 0, 20)),
             )
             .add(
-                self.mast_assembly.make_assembly(),
+                self.mast.make_assembly(),
                 name="mast_assembly",
                 loc=Location((-self.frame_length() / 2 + cfg.MAST_VIS_X, 0, 20)),
             )

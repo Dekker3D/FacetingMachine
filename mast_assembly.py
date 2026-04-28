@@ -1,10 +1,10 @@
 import cadquery as cq
 import math
 from cadquery import Location, Color
-from quill_assembly import QuillAssembly
 from machine import MachineConfig as cfg
 import bought_bits as bb
 import mast_abstract
+import quill_abstract
 
 # REMINDER: +X is left, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.
@@ -252,8 +252,9 @@ class QuillCarriage:
 class MastAssembly(mast_abstract.MastAssemblyBase):
     """Class representing the entire mast assembly with all components."""
 
-    @classmethod
-    def make_assembly(cls):
+    quill: quill_abstract.QuillAssemblyBase = None
+
+    def make_assembly(self):
         """Assemble the mast components with colors for visualization."""
         assembly = (
             cq.Assembly()
@@ -305,7 +306,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                 color=Color("purple"),
             )
             .add(
-                QuillAssembly.make_assembly(),
+                self.quill.make_assembly(),
                 name="quill_assembly",
                 loc=Location((QUILL_HOLDER_X, 0, QUILL_CARRIAGE_DISPLAY_HEIGHT)),
             )
@@ -313,35 +314,19 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
         return assembly
 
-
-def export_all_parts():
-    """Export all parts and assembly"""
-    print("Exporting improved parts...")
-    try:
-        cq.exporters.export(LeadscrewBearingHolder().make(), "pillow_block.stl")
-        print("Pillow block exported")
-        cq.exporters.export(QuillCarriage.make(), "quill_hinge.stl")
-        print("Quill hinge exported")
-        assembly = QuillAssembly.make_assembly()
-        cq.exporters.export(assembly.toCompound(), "mast_assembly.stl")
-        print("Improved assembly exported")
-        print("All parts exported successfully!")
-        return True
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
-
-
-if __name__ == "__main__":
-    cfg.validate()  # Validate the configuration before building.
-    success = export_all_parts()
-    if success:
-        print("Design complete!")
-    else:
-        print("Design failed - need different approach")
-elif __name__ == "__cq_main__":
-    # We're in CQ-Editor. Show the assembly.
-    # show_object is a valid CQ-Editor function.
-    cfg.validate()  # Validate the configuration before building.
-    result = QuillAssembly.make_assembly()
-    show_object(result)
+    def export_all_parts(self):
+        """Export all parts and assembly"""
+        print("Exporting improved parts...")
+        try:
+            cq.exporters.export(LeadscrewBearingHolder().make(), "pillow_block.stl")
+            print("Pillow block exported")
+            cq.exporters.export(QuillCarriage.make(), "quill_hinge.stl")
+            print("Quill hinge exported")
+            assembly = self.quill.make_assembly()
+            cq.exporters.export(assembly.toCompound(), "mast_assembly.stl")
+            print("Improved assembly exported")
+            print("All parts exported successfully!")
+            return True
+        except Exception as e:
+            print(f"Error: {e}")
+            return False

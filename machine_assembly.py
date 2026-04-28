@@ -1,6 +1,7 @@
 from lap_assembly import LapAssembly
 from mast_assembly import MastAssembly
 from frame_assembly import FrameAssembly
+from quill_assembly import QuillAssembly
 
 
 class MachineAssembly:
@@ -9,9 +10,11 @@ class MachineAssembly:
     frame = FrameAssembly()
     lap = LapAssembly()
     mast = MastAssembly()
+    quill = QuillAssembly()
 
-    frame.lap_assembly = lap
-    frame.mast_assembly = mast
+    frame.lap = lap
+    frame.mast = mast
+    mast.quill = quill
 
     def validate(self):
         self.frame.validate()
