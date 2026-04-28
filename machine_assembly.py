@@ -1,5 +1,5 @@
 from lap_assembly import LapAssembly
-from mast_design import MastAssembly
+from mast_assembly import MastAssembly
 from frame_assembly import FrameAssembly
 
 
