@@ -63,18 +63,14 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
     def leadscrew_dist_from_rail(self):
         return self.leadscrew_x() - self.rail_surface_x()
+    
+    def quill_holder_distance(self):
+        return self.quill_holder_x() - self.rail_surface_x()
 
     def make_assembly(self):
         """Assemble the mast components with colors for visualization."""
 
-        bearing = LeadscrewBearingHolder()
-        bearing.LEADSCREW_DISTANCE = self.leadscrew_dist_from_spine()
-        bearing.LEADSCREW_DIA = self.leadscrew_dia
-
-        quill_carriage = QuillCarriage()
-        quill_carriage.LEADSCREW_DISTANCE = self.leadscrew_dist_from_rail()
-        quill_carriage.QUILL_HOLDER_DISTANCE = self.quill_holder_x() - self.rail_surface_x()
-        quill_carriage.RAIL_CARRIAGE_Y_OFFSET = self.RAIL_CARRIAGE_Y_OFFSET
+        bearing = LeadscrewBearingHolder(self)
 
         assembly = (
             cq.Assembly()
@@ -120,7 +116,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                 color=Color("orange"),
             )
             .add(
-                quill_carriage.make(),
+                QuillCarriage(self).make(),
                 name="hinge",
                 loc=Location((self.rail_surface_x(), 0, self.QUILL_CARRIAGE_DISPLAY_HEIGHT)),
                 color=Color("purple"),
@@ -260,20 +256,23 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
 class LeadscrewBearingHolder:
     """Bearing holder for T8 leadscrew (608ZZ recess)"""
+    
+    ma: MastAssembly = None
 
     # Bearing-holder stuff
     LEADSCREW_HOLE_SPACE = 4.0
-    LEADSCREW_DISTANCE = 20.0
-    LEADSCREW_DIA = 8.0
     BOLT_HOLE_LENGTH = 8.0
     BOLT_HOLE_DIA = 5.0
     BOLT_HEAD_DIA = 10.0
     BOLT_HEAD_HEIGHT = BOLT_HEAD_DIA / 2 + 5.0
     BASE_WIDTH = 20.0
+    
+    def __init__(self, ma: MastAssembly) -> None:
+        self.ma = ma
 
     def diagonal_length(self):
         # Don't need to go diagonal all the way to the mast.
-        return self.LEADSCREW_DISTANCE - self.BOLT_HOLE_LENGTH
+        return self.ma.leadscrew_dist_from_spine() - self.BOLT_HOLE_LENGTH
 
     def diagonal_height(self):
         # Keep some space for bolt head.
@@ -291,9 +290,9 @@ class LeadscrewBearingHolder:
 
         block_shape_pts = [
             (0, 0),
-            (self.LEADSCREW_DISTANCE - self.diagonal_length(), 0),
-            (self.LEADSCREW_DISTANCE, self.diagonal_height()),
-            (self.LEADSCREW_DISTANCE, self.diagonal_height() + self.cylinder_height()),
+            (self.ma.leadscrew_dist_from_spine() - self.diagonal_length(), 0),
+            (self.ma.leadscrew_dist_from_spine(), self.diagonal_height()),
+            (self.ma.leadscrew_dist_from_spine(), self.diagonal_height() + self.cylinder_height()),
             (0, self.diagonal_height() + self.cylinder_height()),
         ]
 
@@ -308,17 +307,17 @@ class LeadscrewBearingHolder:
             block
             .faces(">Z")
             .workplane(offset=-(self.cylinder_height()), origin=(0, 0, 0))
-            .move(0, self.LEADSCREW_DISTANCE)
+            .move(0, self.ma.leadscrew_dist_from_spine())
             .cylinder(self.cylinder_height(), b_od / 2 + 4, centered=(True, True, False))
             # Shaft hole
             .faces(">Z")
             .workplane()
-            .move(0, self.LEADSCREW_DISTANCE)
-            .hole(self.LEADSCREW_DIA + self.LEADSCREW_HOLE_SPACE)
+            .move(0, self.ma.leadscrew_dist_from_spine())
+            .hole(self.ma.leadscrew_dia + self.LEADSCREW_HOLE_SPACE)
             # Bearing recess
             .faces(">Z")
             .workplane()
-            .move(0, self.LEADSCREW_DISTANCE)
+            .move(0, self.ma.leadscrew_dist_from_spine())
             .hole(b_od + 0.2, b_w)
         )
 
@@ -340,10 +339,10 @@ class LeadscrewBearingHolder:
 class QuillCarriage:
     """Class representing the quill carriage with hinge for the quill holder."""
 
-    # Placeholders.
-    LEADSCREW_DISTANCE = 0.0
-    QUILL_HOLDER_DISTANCE = 0.0
-    RAIL_CARRIAGE_Y_OFFSET = 0.0
+    ma: MastAssembly = None
+    
+    def __init__(self, ma: MastAssembly) -> None:
+        self.ma = ma
 
     def make(self, orient_for_assembly=True):
         """
@@ -351,17 +350,17 @@ class QuillCarriage:
         Designed to fit on MGN9 carriage.
         """
         hinge = (cq.Workplane("XY")
-                 .box(bb.RailMGN9H.CARRIAGE_WIDTH, self.QUILL_HOLDER_DISTANCE, bb.RailMGN9H.CARRIAGE_LENGTH + self.RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
+                 .box(bb.RailMGN9H.CARRIAGE_WIDTH, self.ma.quill_holder_distance(), bb.RailMGN9H.CARRIAGE_LENGTH + self.ma.RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
                  .translate((0, 0, 0)))
         hinge = (
             hinge.faces("<Z")
             .workplane(offset=0)
-            .move(0, -self.LEADSCREW_DISTANCE)
+            .move(0, -self.ma.leadscrew_dist_from_rail())
             .hole(10.2 + 1.0)
 
             .faces("<Z")
             .workplane(offset=0)
-            .move(0, -self.LEADSCREW_DISTANCE)
+            .move(0, -self.ma.leadscrew_dist_from_rail())
             .hole(bb.LeadScrewT8.NUT_DIA + 1.0, 1.5 + bb.LeadScrewT8.NUT_THICKNESS)
         )
         if orient_for_assembly:
