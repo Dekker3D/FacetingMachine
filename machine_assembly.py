@@ -2,6 +2,7 @@ from lap_assembly import LapAssembly
 from mast_assembly import MastAssembly
 from frame_assembly import FrameAssembly
 from quill_assembly import QuillAssembly
+from quill_joint import QuillHolderJointStandard
 
 
 class MachineAssembly:
@@ -10,11 +11,11 @@ class MachineAssembly:
     frame = FrameAssembly()
     lap = LapAssembly()
     mast = MastAssembly()
-    quill = QuillAssembly()
+    quill_joint = QuillHolderJointStandard()
 
     frame.lap = lap
     frame.mast = mast
-    mast.quill = quill
+    mast.quill_joint = quill_joint
 
     def validate(self):
         self.frame.validate()

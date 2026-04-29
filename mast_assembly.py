@@ -5,6 +5,7 @@ from machine import MachineConfig as cfg
 import bought_bits as bb
 import mast_abstract
 import quill_abstract
+import quill_joint_abstract
 
 # REMINDER: +X is left, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.
@@ -14,6 +15,8 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
     """Class representing the entire mast assembly with all components."""
 
     quill: quill_abstract.QuillAssemblyBase = None
+    quill_joint: quill_joint_abstract.QuillHolderJointBase = None
+
     desired_vertical_travel = 300.0
 
     rail_length = 400.0
@@ -44,7 +47,10 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         return self.leadscrew_rail_spacing() + self.rail_surface_x()
 
     def quill_holder_x(self):
-        return self.leadscrew_x() + bb.LeadScrewT8.NUT_DIA / 2 + self.qc_joint_dia / 2 + 5.0
+        return self.leadscrew_x() + bb.LeadScrewT8.NUT_DIA / 2 + 3.0 + self.quill_joint.space_needed_carriage_x()
+    
+    def quill_holder_z(self):
+        return self.quill_joint.offset_carriage_z()
 
     def rail_start_y(self):
         return self.bh_total_height()
@@ -143,17 +149,19 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                 color=Color("orange"),
             )
             .add(
-                QuillCarriage(self).make(),
+                self.make_quill_carriage(),
                 name="hinge",
                 loc=Location((self.rail_surface_x(), 0, self.quill_carriage_display_height())),
                 color=Color("purple"),
             )
-            .add(
+        )
+        
+        if self.quill != None:
+            assembly = assembly.add(
                 self.quill.make_assembly(),
                 name="quill_assembly",
-                loc=Location((self.quill_holder_x(), 0, self.quill_carriage_display_height())),
+                loc=Location((self.quill_holder_x(), 0, self.quill_carriage_display_height() + self.quill_holder_z())),
             )
-        )
 
         return assembly
 
@@ -332,32 +340,36 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             return block
 
 
-class QuillCarriage:
-    """Class representing the quill carriage with hinge for the quill holder."""
-
-    ma: MastAssembly = None
-    
-    def __init__(self, ma: MastAssembly) -> None:
-        self.ma = ma
-
-    def make(self, orient_for_assembly=True):
+    def make_quill_carriage(self, orient_for_assembly=True):
         """
         Vertical carriage with bearing hinge for quill holder.
         Designed to fit on MGN9 carriage.
         """
         hinge = (cq.Workplane("XY")
-                 .box(bb.RailMGN9H.CARRIAGE_WIDTH, self.ma.quill_holder_distance(), bb.RailMGN9H.CARRIAGE_LENGTH + self.ma.RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
+                 .box(bb.RailMGN9H.CARRIAGE_WIDTH, self.quill_holder_distance(), bb.RailMGN9H.CARRIAGE_LENGTH + self.RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
                  .translate((0, 0, 0)))
         hinge = (
             hinge.faces("<Z")
             .workplane(offset=0)
-            .move(0, -self.ma.leadscrew_dist_from_rail())
+            .move(0, -self.leadscrew_dist_from_rail())
             .hole(10.2 + 1.0)
 
             .faces("<Z")
             .workplane(offset=0)
-            .move(0, -self.ma.leadscrew_dist_from_rail())
+            .move(0, -self.leadscrew_dist_from_rail())
             .hole(bb.LeadScrewT8.NUT_DIA + 1.0, 1.5 + bb.LeadScrewT8.NUT_THICKNESS)
+
+            .union(
+                self.quill_joint.add_shape(bb.RailMGN9H.CARRIAGE_WIDTH, self.quill_holder_distance() + 5.0)
+                .rotate((0, 0, 0), (0, 0, 1), -90)
+                .translate((0, self.quill_holder_distance(), self.quill_joint.offset_carriage_z()))
+                )
+
+            .cut(
+                self.quill_joint.cut_shape(bb.RailMGN9H.CARRIAGE_WIDTH, self.quill_holder_distance() + 5.0)
+                .rotate((0, 0, 0), (0, 0, 1), -90)
+                .translate((0, self.quill_holder_distance(), self.quill_joint.offset_carriage_z()))
+            )
         )
         if orient_for_assembly:
             return (hinge
