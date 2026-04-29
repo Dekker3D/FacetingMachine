@@ -1,8 +1,7 @@
 from lap_assembly import LapAssembly
 from mast_assembly import MastAssembly
 from frame_assembly import FrameAssembly
-from quill_assembly import QuillAssembly
-from quill_joint import QuillHolderJointStandard
+from quill_joint import QuillHolderJointAli
 
 
 class MachineAssembly:
@@ -11,7 +10,7 @@ class MachineAssembly:
     frame = FrameAssembly()
     lap = LapAssembly()
     mast = MastAssembly()
-    quill_joint = QuillHolderJointStandard()
+    quill_joint = QuillHolderJointAli()
 
     frame.lap = lap
     frame.mast = mast
