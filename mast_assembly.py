@@ -19,9 +19,13 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
     rail_length = 400.0
 
     leadscrew_dia = 8.0
-    leadscrew_length = 450.0
+    def leadscrew_length(self):
+        return math.ceil((self.rail_length + self.bh_total_height() + self.bh_cylinder_height() + self.handwheel_height) / 50.0) * 50.0
 
-    spine_length = 450.0
+    def spine_length(self):
+        return math.ceil((self.bh_total_height() * 2 + self.rail_length) / 50.0) * 50.0
+
+    handwheel_height = 10.0
 
     # 20x20mm aluminum t-slot extrusion
     spine_ext_width = 20.0
@@ -42,13 +46,15 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
     def quill_holder_x(self):
         return self.leadscrew_x() + bb.LeadScrewT8.NUT_DIA / 2 + self.qc_joint_dia / 2 + 5.0
 
-    LEADSCREW_BEARING_HEIGHT = 15.0
-    RAIL_START_Y = LEADSCREW_BEARING_HEIGHT
+    def rail_start_y(self):
+        return self.bh_total_height()
 
     QUILL_CARRIAGE_NUT_DEPTH = bb.LeadScrewT8.NUT_THICKNESS + 1.5
     RAIL_CARRIAGE_Y_OFFSET = 10.0 + QUILL_CARRIAGE_NUT_DEPTH
 
-    QUILL_CARRIAGE_DISPLAY_HEIGHT = RAIL_START_Y + 100.0  # Height of the quill carriage for visualization.
+    def quill_carriage_display_height(self):
+        # Height of the quill carriage for visualization.
+        return self.rail_start_y() + 100.0
 
     def screw_distance_from_mast(self):
         # Distance from mast surface to center of leadscrew, includes clearance
@@ -96,7 +102,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         assembly = (
             cq.Assembly()
             .add(
-                self.make_mast_spine(self.spine_length),
+                self.make_mast_spine(self.spine_length()),
                 name="extrusion",
                 loc=Location((0, 0, 0)),
                 color=Color("lightgray"),
@@ -104,7 +110,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             .add(
                 self.make_mgn9_rail(self.rail_length),
                 name="rail",
-                loc=Location((self.rail_x(), 0, self.RAIL_START_Y)),
+                loc=Location((self.rail_x(), 0, self.rail_start_y())),
                 color=Color("green"))
             .add(
                 self.make_bearing_holder(),
@@ -115,13 +121,13 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             .add(
                 self.make_bearing_holder(),
                 name="top_bearing",
-                loc=Location((10, 0, 400)),
+                loc=Location((10, 0, self.rail_start_y() + self.rail_length)),
                 color=Color("red"),
             )
             .add(
                 self.make_mgn9_carriage(True),
                 name="carriage1",
-                loc=Location((10, 0, self.QUILL_CARRIAGE_DISPLAY_HEIGHT + self.RAIL_CARRIAGE_Y_OFFSET)),
+                loc=Location((10, 0, self.quill_carriage_display_height() + self.RAIL_CARRIAGE_Y_OFFSET)),
                 color=Color("yellow"),
             )
             .add(
@@ -133,19 +139,19 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             .add(
                 self.make_t8_nut(),
                 name="nut",
-                loc=Location((self.leadscrew_x(), 0, self.QUILL_CARRIAGE_DISPLAY_HEIGHT + self.QUILL_CARRIAGE_NUT_DEPTH)),
+                loc=Location((self.leadscrew_x(), 0, self.quill_carriage_display_height() + self.QUILL_CARRIAGE_NUT_DEPTH)),
                 color=Color("orange"),
             )
             .add(
                 QuillCarriage(self).make(),
                 name="hinge",
-                loc=Location((self.rail_surface_x(), 0, self.QUILL_CARRIAGE_DISPLAY_HEIGHT)),
+                loc=Location((self.rail_surface_x(), 0, self.quill_carriage_display_height())),
                 color=Color("purple"),
             )
             .add(
                 self.quill.make_assembly(),
                 name="quill_assembly",
-                loc=Location((self.quill_holder_x(), 0, self.QUILL_CARRIAGE_DISPLAY_HEIGHT)),
+                loc=Location((self.quill_holder_x(), 0, self.quill_carriage_display_height())),
             )
         )
 
@@ -241,7 +247,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
     def make_t8_shaft(self):
         """T8 leadscrew shaft visualization"""
         shaft = cq.Workplane("XY").cylinder(
-            self.leadscrew_length, self.leadscrew_dia / 2, centered=(True, True, False)
+            self.leadscrew_length(), self.leadscrew_dia / 2, centered=(True, True, False)
         )
         return shaft
 
