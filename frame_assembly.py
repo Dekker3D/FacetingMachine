@@ -15,6 +15,8 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
     frame_ext_width = 20.0
     frame_ext_height = 20.0
     frame_leg_length = 40.0
+    # X position of mast, for visualization.
+    mast_vis_x = 100.0
 
     def frame_width(self):
         # Add 20mm so the centers of 2020 extrusions line up.
@@ -62,7 +64,7 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
             .add(
                 MastCarriage.make(self),
                 name="mast_carriage",
-                loc=Location((-self.frame_length() / 2 + cfg.MAST_VIS_X, 0, 20)),
+                loc=Location((-self.frame_length() / 2 + self.mast_vis_x, 0, 20)),
                 color=cq.Color("red")
             )
             .add(
@@ -79,7 +81,7 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
             .add(
                 self.mast.make_assembly(),
                 name="mast_assembly",
-                loc=Location((-self.frame_length() / 2 + cfg.MAST_VIS_X, 0, 20)),
+                loc=Location((-self.frame_length() / 2 + self.mast_vis_x, 0, 20)),
             )
         )
 
@@ -136,8 +138,8 @@ class MastCarriage:
     def make(cls, fa: FrameAssembly):
         rail_Z = -cfg.FRAME_RAIL_DIA / 2
 
-        holder_width = cfg.MAST_EXT_WIDTH + cfg.MAST_HOLDER_THICKNESS * 2
-        holder_thickness = cfg.MAST_EXT_THICKNESS + cfg.MAST_HOLDER_THICKNESS * 2
+        holder_width = fa.mast.spine_ext_width + cfg.MAST_HOLDER_THICKNESS * 2
+        holder_thickness = fa.mast.spine_ext_thickness + cfg.MAST_HOLDER_THICKNESS * 2
 
         carriage = (cq.Workplane("XY", origin=(0, 0, rail_Z + 1))
                     .box(
@@ -166,12 +168,12 @@ class MastCarriage:
         )
 
         cutoutPoints = [
-            (-cfg.MAST_EXT_THICKNESS / 2, -cfg.MAST_EXT_WIDTH / 2),
-            (cfg.MAST_EXT_THICKNESS / 2, -cfg.MAST_EXT_WIDTH / 2),
+            (-fa.mast.spine_ext_thickness / 2, -fa.mast.spine_ext_width / 2),
+            (fa.mast.spine_ext_thickness / 2, -fa.mast.spine_ext_width / 2),
             (40, -40),
             (40, 40),
-            (cfg.MAST_EXT_THICKNESS / 2, cfg.MAST_EXT_WIDTH / 2),
-            (-cfg.MAST_EXT_THICKNESS / 2, cfg.MAST_EXT_WIDTH / 2)
+            (fa.mast.spine_ext_thickness / 2, fa.mast.spine_ext_width / 2),
+            (-fa.mast.spine_ext_thickness / 2, fa.mast.spine_ext_width / 2)
         ]
         carriage = carriage.cut(
             cq.Workplane("XY", origin=(0, 0, 0))
