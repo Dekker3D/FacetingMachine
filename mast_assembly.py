@@ -66,11 +66,32 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
     
     def quill_holder_distance(self):
         return self.quill_holder_x() - self.rail_surface_x()
+    
+    # Bearing-holder stuff
+    BH_LEADSCREW_HOLE_SPACE = 4.0
+    BH_BOLT_HOLE_LENGTH = 8.0
+    BH_BOLT_HOLE_DIA = 5.0
+    BH_BOLT_HEAD_DIA = 10.0
+    
+    def bh_bolt_head_height(self):
+        return self.BH_BOLT_HEAD_DIA / 2 + 5.0
+
+    def bh_diagonal_length(self):
+        # Don't need to go diagonal all the way to the mast.
+        return self.leadscrew_dist_from_spine() - self.BH_BOLT_HOLE_LENGTH
+
+    def bh_diagonal_height(self):
+        # Keep some space for bolt head.
+        return max(self.bh_diagonal_length(), self.bh_bolt_head_height() + self.BH_BOLT_HEAD_DIA / 2)
+
+    def bh_cylinder_height(self):
+        return bb.Bearing608ZZ.WIDTH + 5.0
+
+    def bh_total_height(self):
+        return self.bh_diagonal_height() + self.bh_cylinder_height()
 
     def make_assembly(self):
         """Assemble the mast components with colors for visualization."""
-
-        bearing = LeadscrewBearingHolder(self)
 
         assembly = (
             cq.Assembly()
@@ -86,13 +107,13 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                 loc=Location((self.rail_x(), 0, self.RAIL_START_Y)),
                 color=Color("green"))
             .add(
-                bearing.make(),
+                self.make_bearing_holder(),
                 name="bottom_bearing",
                 loc=Location((10, 0, 0)),
                 color=Color("red"),
             )
             .add(
-                bearing.make(),
+                self.make_bearing_holder(),
                 name="top_bearing",
                 loc=Location((10, 0, 400)),
                 color=Color("red"),
@@ -253,80 +274,49 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         nut = nut_body.union(flange)
         return nut
 
-
-class LeadscrewBearingHolder:
-    """Bearing holder for T8 leadscrew (608ZZ recess)"""
-    
-    ma: MastAssembly = None
-
-    # Bearing-holder stuff
-    LEADSCREW_HOLE_SPACE = 4.0
-    BOLT_HOLE_LENGTH = 8.0
-    BOLT_HOLE_DIA = 5.0
-    BOLT_HEAD_DIA = 10.0
-    BOLT_HEAD_HEIGHT = BOLT_HEAD_DIA / 2 + 5.0
-    BASE_WIDTH = 20.0
-    
-    def __init__(self, ma: MastAssembly) -> None:
-        self.ma = ma
-
-    def diagonal_length(self):
-        # Don't need to go diagonal all the way to the mast.
-        return self.ma.leadscrew_dist_from_spine() - self.BOLT_HOLE_LENGTH
-
-    def diagonal_height(self):
-        # Keep some space for bolt head.
-        return max(self.diagonal_length(), self.BOLT_HEAD_HEIGHT + self.BOLT_HEAD_DIA / 2)
-
-    def cylinder_height(self):
-        return bb.Bearing608ZZ.WIDTH + 5.0
-
-    def total_height(self):
-        return self.diagonal_height() + self.cylinder_height()
-
-    def make(self, orient_for_assembly=True):
+    def make_bearing_holder(self, orient_for_assembly=True):
         b_w = bb.Bearing608ZZ.WIDTH
         b_od = bb.Bearing608ZZ.OD
 
         block_shape_pts = [
             (0, 0),
-            (self.ma.leadscrew_dist_from_spine() - self.diagonal_length(), 0),
-            (self.ma.leadscrew_dist_from_spine(), self.diagonal_height()),
-            (self.ma.leadscrew_dist_from_spine(), self.diagonal_height() + self.cylinder_height()),
-            (0, self.diagonal_height() + self.cylinder_height()),
+            (self.leadscrew_dist_from_spine() - self.bh_diagonal_length(), 0),
+            (self.leadscrew_dist_from_spine(), self.bh_diagonal_height()),
+            (self.leadscrew_dist_from_spine(), self.bh_diagonal_height() + self.bh_cylinder_height()),
+            (0, self.bh_diagonal_height() + self.bh_cylinder_height()),
         ]
 
         block = (
-            cq.Workplane("YZ", origin=(-self.BASE_WIDTH / 2, 0, 0))
+            cq.Workplane("YZ", origin=(-self.spine_ext_width / 2, 0, 0))
             .polyline(block_shape_pts)
             .close()
-            .extrude(self.BASE_WIDTH)
+            .extrude(self.spine_ext_width)
         )
 
         block = (
             block
             .faces(">Z")
-            .workplane(offset=-(self.cylinder_height()), origin=(0, 0, 0))
-            .move(0, self.ma.leadscrew_dist_from_spine())
-            .cylinder(self.cylinder_height(), b_od / 2 + 4, centered=(True, True, False))
+            .workplane(offset=-(self.bh_cylinder_height()), origin=(0, 0, 0))
+            .move(0, self.leadscrew_dist_from_spine())
+            .cylinder(self.bh_cylinder_height(), b_od / 2 + 4, centered=(True, True, False))
             # Shaft hole
             .faces(">Z")
             .workplane()
-            .move(0, self.ma.leadscrew_dist_from_spine())
-            .hole(self.ma.leadscrew_dia + self.LEADSCREW_HOLE_SPACE)
+            .move(0, self.leadscrew_dist_from_spine())
+            .hole(self.leadscrew_dia + self.BH_LEADSCREW_HOLE_SPACE)
             # Bearing recess
             .faces(">Z")
             .workplane()
-            .move(0, self.ma.leadscrew_dist_from_spine())
+            .move(0, self.leadscrew_dist_from_spine())
             .hole(b_od + 0.2, b_w)
         )
 
         block = block.cut(
-            cq.Workplane("top", origin=(0, 0, self.BOLT_HEAD_HEIGHT))
-            .cylinder(self.BOLT_HOLE_LENGTH, self.BOLT_HOLE_DIA / 2, centered=(True, True, False))
+            cq.Workplane("top", origin=(0, 0, self.bh_bolt_head_height()))
+            .cylinder(self.BH_BOLT_HOLE_LENGTH, self.BH_BOLT_HOLE_DIA / 2, centered=(True, True, False))
             .faces(">Y")
             .workplane()
-            .cylinder(100, self.BOLT_HEAD_DIA / 2, centered=(True, True, False))
+            .cylinder(100, self.BH_BOLT_HEAD_DIA / 2, centered=(True, True, False))
         )
 
         if orient_for_assembly:
