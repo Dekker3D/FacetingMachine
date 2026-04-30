@@ -26,7 +26,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         return math.ceil((self.rail_length + self.bh_total_height() + self.bh_cylinder_height() + self.handwheel_height) / 50.0) * 50.0
 
     def spine_length(self):
-        return math.ceil((self.bh_total_height() * 2 + self.rail_length) / 50.0) * 50.0
+        return math.ceil((self.bh_total_height() * 2 + self.rail_length) / 20.0) * 20.0
 
     handwheel_height = 10.0
 
