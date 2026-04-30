@@ -1,8 +1,8 @@
-# This allows type-hinting despite circular references.
+# This allows easier type-hinting.
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from mast_abstract import MastAssemblyBase
+    from mast.mast_abstract import MastAssemblyBase
 
 class FrameMastJointBase:
     mast: MastAssemblyBase = None

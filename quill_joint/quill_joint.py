@@ -1,4 +1,4 @@
-import quill_joint_abstract
+import quill_joint.quill_joint_abstract as quill_joint_abstract
 import bought_bits as bb
 import cadquery as cq
 

@@ -1,7 +1,7 @@
 import cadquery as cq
 from cadquery import Location, Color
 import bought_bits as bb
-import lap_abstract
+import lap.lap_abstract as lap_abstract
 import math
 
 

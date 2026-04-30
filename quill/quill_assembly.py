@@ -2,7 +2,7 @@ import cadquery as cq
 from cadquery import Location
 from machine import MachineConfig as cfg
 import bought_bits as bb
-import quill_abstract
+import quill.quill_abstract as quill_abstract
 
 
 class QuillAssembly(quill_abstract.QuillAssemblyBase):

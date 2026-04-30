@@ -1,8 +1,8 @@
-from lap_assembly import LapAssembly
-from mast_assembly import MastAssembly
-from frame_assembly import FrameAssembly
-from quill_joint import QuillHolderJointAli
-from frame_joint import FrameMastJointSmoothRodRails
+from lap.lap_assembly import LapAssembly
+from mast.mast_assembly import MastAssembly
+from frame.frame_assembly import FrameAssembly
+from quill_joint.quill_joint import QuillHolderJointAli
+from frame_mast_joint.frame_mast_joint import FrameMastJointSmoothRodRails
 
 
 class MachineAssembly:

@@ -3,9 +3,9 @@ import math
 from cadquery import Location, Color
 from machine import MachineConfig as cfg
 import bought_bits as bb
-import mast_abstract
-import quill_abstract
-import quill_joint_abstract
+import mast.mast_abstract as mast_abstract
+import quill.quill_abstract as quill_abstract
+import quill_joint.quill_joint_abstract as quill_joint_abstract
 
 # REMINDER: +X is left, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.

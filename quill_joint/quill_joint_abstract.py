@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from mast_abstract import MastAssemblyBase
+    from mast.mast_abstract import MastAssemblyBase
     from quill_abstract import QuillAssemblyBase
 
 class QuillHolderJointBase:
