@@ -33,3 +33,14 @@ See TODO.md
 ## Contributing
 
 This is intended to be an open hardware project. Contributions are welcome!
+
+Ways that you can contribute:
+
+### Reorganize the code to be cleaner
+It's all Python code, and designed to be modular and clean, but I (Dekker3D) am no Python programmer, and this programming language is mildly alien to me.
+
+### Design/fix parts
+I guess this one's obvious. It's made to be modular: you should be able to design alternative versions of parts if you want to make big changes, without negatively affecting anyone who wants to use another version. If you find yourself running into issues with that, the design isn't modular enough, and you can point it out, for discussion.
+
+### Build this stuff yourself and test it
+Best way to get feedback, probably. It's a good way to contribute if you can't do anything else on this project. Make sure to fill out issues (check the "issues" tab on this GitHub repo) or start discussions about any issue you come across, or any idea you have.
