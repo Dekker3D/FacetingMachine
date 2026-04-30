@@ -2,18 +2,22 @@ from lap_assembly import LapAssembly
 from mast_assembly import MastAssembly
 from frame_assembly import FrameAssembly
 from quill_joint import QuillHolderJointAli
+from frame_joint import FrameMastJointSmoothRodRails
 
 
 class MachineAssembly:
     """Class representing the entire machine assembly."""
 
     frame = FrameAssembly()
+    frame.set_mast_joint(MastAssembly())
     lap = LapAssembly()
     mast = MastAssembly()
     quill_joint = QuillHolderJointAli()
+    mast_joint = FrameMastJointSmoothRodRails()
 
     frame.lap = lap
     frame.mast = mast
+    frame.mast_joint = mast_joint
     mast.quill_joint = quill_joint
 
     def validate(self):

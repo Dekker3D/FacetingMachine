@@ -4,6 +4,7 @@ from machine import MachineConfig as cfg
 import frame_abstract
 import lap_abstract
 import mast_abstract
+import frame_joint_abstract
 import math
 
 
@@ -12,6 +13,7 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
 
     lap: lap_abstract.LapAssemblyBase = None
     mast: mast_abstract.MastAssemblyBase = None
+    mast_joint: frame_joint_abstract.FrameMastJointBase = None
     frame_ext_width = 20.0
     frame_ext_height = 20.0
     frame_leg_length = 40.0
@@ -43,6 +45,9 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
     def validate(self):
         """Validate the configuration."""
         assert self.lap.sg_OD() < cfg.printer_safe_size(), "Splash guard diameter exceeds 3D printer size!"
+
+    def set_mast_joint(self, mast_joint: frame_joint_abstract.FrameMastJointBase):
+        self.mast_joint = mast_joint
 
     def make_assembly(self):
         """Create the frame assembly."""
