@@ -6,6 +6,7 @@ import bought_bits as bb
 import mast.mast_abstract as mast_abstract
 import quill.quill_abstract as quill_abstract
 import quill_joint.quill_joint_abstract as quill_joint_abstract
+import mast.handwheel as handwheel
 
 # REMINDER: +X is left, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.
@@ -105,6 +106,8 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
     def make_assembly(self):
         """Assemble the mast components with colors for visualization."""
 
+        hw = handwheel.HandWheel()
+
         assembly = (
             cq.Assembly()
             .add(
@@ -153,6 +156,12 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                 name="hinge",
                 loc=Location((self.rail_surface_x(), 0, self.quill_carriage_display_height())),
                 color=Color("purple"),
+            )
+            .add(
+                hw.make(),
+                name="handwheel",
+                loc=Location(self.leadscrew_x(), 0, self.rail_start_y() + self.rail_length + self.bh_total_height()),
+                color=Color("orange")
             )
         )
         
