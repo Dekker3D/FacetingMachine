@@ -76,6 +76,17 @@ class RailMGN9H(RailGeneric):
     MOUNTING_HOLE_UD_SPACING = 16.0
 
 
+class RailMGN15H(RailGeneric):
+    RAIL_WIDTH = 15.0
+    RAIL_HEIGHT = 10.0
+    CARRIAGE_WIDTH = 32.0
+    CARRIAGE_LENGTH = 58.8
+    CARRIAGE_HEIGHT = 12.0
+    CARRIAGE_CLEARANCE = 4.0
+    MOUNTING_HOLE_LR_SPACING = 25.0
+    MOUNTING_HOLE_UD_SPACING = 25.0
+
+
 class LeadScrewGeneric:
     SCREW_DIA = 0
     NUT_DIA = 0

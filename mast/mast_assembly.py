@@ -39,7 +39,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         return self.spine_ext_thickness / 2
 
     def rail_surface_x(self):
-        return bb.RailMGN9H.total_height() + self.rail_x()
+        return bb.RailMGN15H.total_height() + self.rail_x()
 
     def leadscrew_rail_spacing(self):
         return bb.LeadScrewT8.NUT_DIA / 2 + 5.0
@@ -65,7 +65,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
     def screw_distance_from_mast(self):
         # Distance from mast surface to center of leadscrew, includes clearance
-        return bb.RailMGN9H.total_height() + bb.LeadScrewT8.NUT_DIA / 2 + 5.0
+        return bb.RailMGN15H.total_height() + bb.LeadScrewT8.NUT_DIA / 2 + 5.0
 
     # Quill carriage
     qc_joint_dia = 25
@@ -215,7 +215,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
         rail = (
             cq.Workplane("XY")
-            .box(bb.RailMGN9H.RAIL_WIDTH, length, bb.RailMGN9H.RAIL_HEIGHT, centered=(True, False, False))
+            .box(bb.RailMGN15H.RAIL_WIDTH, length, bb.RailMGN15H.RAIL_HEIGHT, centered=(True, False, False))
             .edges(">Z")
             .fillet(0.8)
             .faces("<Z")
@@ -235,7 +235,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             return rail
 
     def make_mgn9_carriage(self, orient_for_assembly=True):
-        """MGN9H carriage
+        """MGN15H carriage
 
         Created from origin, going to +Y, top is +Z.
         Raised by clearance, assuming rail is at Z0.
@@ -243,12 +243,12 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         carriage = (
             cq.Workplane("XY")
             .box(
-                bb.RailMGN9H.CARRIAGE_WIDTH,
-                bb.RailMGN9H.CARRIAGE_LENGTH,
-                bb.RailMGN9H.CARRIAGE_HEIGHT,
+                bb.RailMGN15H.CARRIAGE_WIDTH,
+                bb.RailMGN15H.CARRIAGE_LENGTH,
+                bb.RailMGN15H.CARRIAGE_HEIGHT,
                 centered=(True, False, False),
             )
-            .translate((0, 0, bb.RailMGN9H.CARRIAGE_CLEARANCE))
+            .translate((0, 0, bb.RailMGN15H.CARRIAGE_CLEARANCE))
             .edges("|Z")
             .fillet(1.0)
         )
@@ -355,7 +355,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         Designed to fit on MGN9 carriage.
         """
         hinge = (cq.Workplane("XY")
-                 .box(bb.RailMGN9H.CARRIAGE_WIDTH, self.quill_holder_distance(), bb.RailMGN9H.CARRIAGE_LENGTH + self.RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
+                 .box(bb.RailMGN15H.CARRIAGE_WIDTH, self.quill_holder_distance(), bb.RailMGN15H.CARRIAGE_LENGTH + self.RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
                  .translate((0, 0, 0)))
         hinge = (
             hinge.faces("<Z")
@@ -369,13 +369,13 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             .hole(bb.LeadScrewT8.NUT_DIA + 1.0, 1.5 + bb.LeadScrewT8.NUT_THICKNESS)
 
             .union(
-                self.quill_joint.add_shape(bb.RailMGN9H.CARRIAGE_WIDTH, self.quill_holder_distance() + 5.0)
+                self.quill_joint.add_shape(bb.RailMGN15H.CARRIAGE_WIDTH, self.quill_holder_distance() + 5.0)
                 .rotate((0, 0, 0), (0, 0, 1), -90)
                 .translate((0, self.quill_holder_distance(), self.quill_joint.offset_carriage_z()))
                 )
 
             .cut(
-                self.quill_joint.cut_shape(bb.RailMGN9H.CARRIAGE_WIDTH, self.quill_holder_distance() + 5.0)
+                self.quill_joint.cut_shape(bb.RailMGN15H.CARRIAGE_WIDTH, self.quill_holder_distance() + 5.0)
                 .rotate((0, 0, 0), (0, 0, 1), -90)
                 .translate((0, self.quill_holder_distance(), self.quill_joint.offset_carriage_z()))
             )
