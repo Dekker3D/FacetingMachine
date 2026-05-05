@@ -23,6 +23,8 @@ Just download CQ-Editor from https://github.com/CadQuery/CQ-editor/releases, ope
 
 ## Current Status
 
+<img width="790" height="887" alt="image" src="https://github.com/user-attachments/assets/055dcb2e-2de6-463f-97a5-43ef8823f2dc" />
+
 See TODO.md
 
 ## Other Relevant Projects (for inspiration)
