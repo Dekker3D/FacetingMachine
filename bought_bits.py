@@ -2,10 +2,9 @@ import bom_part_data as bom
 import cadquery as cq
 
 
-class Part:
+class BoughtPartWithModel(bom.BoughtPart):
     """Base class for all parts."""
     _cached_obj: cq.Workplane = None
-    metadata: bom.PartMetadata = None
 
     @classmethod
     def get_object(cls) -> cq.Workplane:
@@ -20,7 +19,7 @@ class Part:
         raise NotImplementedError()
 
 
-class BearingGeneric(Part):
+class BearingGeneric(BoughtPartWithModel):
     WIDTH = 0.0
     ID = 0.0
     OD = 0.0
@@ -37,17 +36,24 @@ class BearingGeneric(Part):
 
 
 class Bearing608ZZ(BearingGeneric):
-    metadata = bom.PartMetadata(name="608ZZ Bearing")
+    name = "608ZZ Bearing"
     WIDTH = 7.0
     ID = 8.0
     OD = 22.0
 
 
 class Bearing624ZZ(BearingGeneric):
-    metadata = bom.PartMetadata(name="624ZZ Bearing")
+    name = "624ZZ Bearing"
     WIDTH = 5.0
     ID = 4.0
     OD = 13.0
+
+
+class Bearing6001ZZ(BearingGeneric):
+    name = "6001ZZ Bearing"
+    WIDTH = 8.0
+    ID = 12.0
+    OD = 28.0
 
 
 class RailGeneric:
@@ -101,3 +107,21 @@ class LeadScrewT8(LeadScrewGeneric):
     NUT_THICKNESS = 3.5
     NUT_HOLE_DIA = 3.5
     NUT_HOLE_RADIUS = 8.0
+
+
+class StraightShankColletExtension(BoughtPartWithModel):
+    def __init__(self, dia: float = 12.0, collet: float = 11, type: str = "M", length: float = 150):
+        self.name = F"C{dia}-ER{collet}{type}-{length}L"
+        self.dia = dia
+        self.collet = collet
+        self.type = type
+        self.length = length
+
+    @classmethod
+    def create_object(self):
+        obj = (
+            cq.WorkPlane("XZ")
+            .cylinder(self.dia, self.length, centered=(True, True, False))
+        )
+
+        return obj
