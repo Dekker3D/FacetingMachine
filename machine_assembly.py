@@ -3,9 +3,10 @@ from mast.mast_assembly import MastAssembly
 from frame.frame_assembly import FrameAssembly
 from quill_joint.quill_joint import QuillHolderJointAli
 from frame_mast_joint.frame_mast_joint import FrameMastJointSmoothRodRails
+import bom_part_data as bpd
 
 
-class MachineAssembly:
+class MachineAssembly(bpd.PartAssembly):
     """Class representing the entire machine assembly."""
 
     frame = FrameAssembly()
@@ -30,6 +31,12 @@ class MachineAssembly:
 
         return assembly
 
+    def get_BOM(self) -> bpd.BOM:
+        bom = bpd.BOM()
+        bom.merge(self.frame.get_BOM())
+        bom.merge(self.lap.get_BOM())
+        return bom
+
 
 if __name__ == "__cq_main__":
     # We're in CQ-Editor. Show the assembly.
@@ -38,3 +45,5 @@ if __name__ == "__cq_main__":
     machine.validate()  # Validate the configuration before building.
     result = machine.make_assembly()
     show_object(result)
+    print(machine.get_BOM().tostring())
+    print("done")

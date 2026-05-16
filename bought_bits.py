@@ -2,7 +2,7 @@ import bom_part_data as bom
 import cadquery as cq
 
 
-class BoughtPartWithModel(bom.BoughtPart):
+class BoughtPartWithModel(bom.PartWithMetadata):
     """Base class for all parts."""
     _cached_obj: cq.Workplane = None
 

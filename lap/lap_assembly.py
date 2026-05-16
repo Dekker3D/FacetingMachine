@@ -3,6 +3,7 @@ from cadquery import Location, Color
 import bought_bits as bb
 import lap.lap_abstract as lap_abstract
 import math
+import bom_part_data as bpd
 
 
 class LapAssembly(lap_abstract.LapAssemblyBase):
@@ -30,6 +31,8 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
     # The ID and OD of the drain hole.
     SG_DRAIN_ID = 6.0
     SG_DRAIN_OD = 10.0
+    
+    _ready = False
 
     # Spacing. Basically attach at 4 points around the lap.
     # Round to 20 mm increments for ease with 2020 extrusions.
@@ -56,21 +59,29 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
     def required_frame_width(self):
         return self.sg_screw_spacing() + 20.0  # So that the middle of the 2020 matches the screw spacing.
 
+    def ready(self):
+        if not self._ready:
+            self._lhb = LapHolderBottom(self.LAP_AXLE_DIA, self.LAP_THICKNESS)
+            self._lht = LapHolderTop(self.LAP_AXLE_DIA)
+            self._ready = True
+
     def make_assembly(self):
         """Assemble the faceting lap components with colors for visualization."""
+
+        self.ready()
 
         assembly = (
             cq.Assembly()
             .add(
-                LapHolderBottom().make(self),
+                self._lhb.make(),
                 name="lap_holder_bottom",
                 loc=Location((0, 0, 0)),
                 color=Color("red"),
             )
             .add(
-                LapHolderTop().make(self),
+                self._lht.make(),
                 name="lap_holder_top",
-                loc=Location((0, 0, LapHolderBottom.top_height(self))),
+                loc=Location((0, 0, self._lhb.top_height())),
                 color=Color("yellow"),
             )
             .add(
@@ -89,26 +100,45 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
 
         return assembly
 
+    def get_BOM(self) -> bpd.BOM:
+        self.ready()
+        bom = bpd.BOM()
+        bom.add(self._lhb)
+        bom.add(self._lht)
+        return bom
 
-class LapHolderBottom:
+
+class LapHolderBottom(bpd.PartWithMetadata):
     """Class representing the bottom part of the faceting lap holder."""
 
-    @classmethod
-    def cone_height(cls):
+    def __init__(self, axle_dia: float, lap_thickness: float):
+        self.axle_dia = axle_dia
+        self.lap_thickness = lap_thickness
+        self.name = "Lap Holder Bottom"
+
+    def __eq__(self, other):
+        return (isinstance(other, type(self))
+                and self.name == other.name
+                and self.axle_dia == other.axle_dia
+                and self.lap_thickness == other.lap_thickness)
+
+    def __hash__(self):
+        return hash((self.axle_dia, self.lap_thickness, self.name))
+
+    def cone_height(self):
         return 20.0
 
-    @classmethod
-    def make(cls, la: LapAssembly):
+    def make(self):
         """Create the bottom part of the faceting lap holder."""
 
-        bump_height = cls.cone_height() + (la.LAP_THICKNESS / 2.0)
+        bump_height = self.cone_height() + (self.lap_thickness / 2.0)
         cone_points = [
-            (la.LAP_AXLE_DIA / 2, 0),
-            (la.LAP_AXLE_DIA / 2 + 2.0, 0),
-            (la.LAP_AXLE_DIA / 2 + 2.0 + cls.cone_height(), cls.cone_height()),
-            (la.LAP_HOLE_DIA / 2 - 0.1, cls.cone_height()),
-            (la.LAP_HOLE_DIA / 2 - 0.1, bump_height),
-            (la.LAP_AXLE_DIA / 2, bump_height)
+            (self.axle_dia / 2, 0),
+            (self.axle_dia / 2 + 2.0, 0),
+            (self.axle_dia / 2 + 2.0 + self.cone_height(), self.cone_height()),
+            (self.axle_dia / 2 - 0.1, self.cone_height()),
+            (self.axle_dia / 2 - 0.1, bump_height),
+            (self.axle_dia / 2, bump_height)
         ]
         holder = (cq.Workplane("XZ")
                   .polyline(cone_points)
@@ -118,33 +148,41 @@ class LapHolderBottom:
 
         return holder
 
-    @classmethod
-    def top_height(cls, la: LapAssembly):
+    def top_height(self):
         """Return the offset for the top part."""
-        return cls.cone_height() + la.LAP_THICKNESS  # The lap is 2 mm thick.
+        return self.cone_height() + self.lap_thickness  # The lap is 2 mm thick.
 
 
-class LapHolderTop:
+class LapHolderTop(bpd.PartWithMetadata):
     """Class representing the top part of the faceting lap holder."""
 
-    @classmethod
-    def cone_height(cls):
+    def __init__(self, axle_dia: float):
+        self.axle_dia = axle_dia
+        self.name = "Lap Holder Top"
+
+    def __eq__(self, other):
+        return (isinstance(other, type(self))
+                and self.name == other.name
+                and self.axle_dia == other.axle_dia)
+
+    def __hash__(self):
+        return hash((self.axle_dia, self.name))
+
+    def cone_height(self):
         return 6.0
 
-    @classmethod
-    def cone_dia(cls):
+    def cone_dia(self):
         return 40.0
 
-    @classmethod
-    def make(cls, la: LapAssembly):
+    def make(self):
         """Create the top part of the faceting lap holder."""
 
         cone_points = [
-            (la.LAP_AXLE_DIA / 2, 0),
-            (la.LAP_AXLE_DIA / 2, cls.cone_height()),
-            (la.LAP_AXLE_DIA / 2 + 4.0, cls.cone_height()),
-            (cls.cone_dia() / 2, 1.0),
-            (cls.cone_dia() / 2, 0.0)
+            (self.axle_dia / 2, 0),
+            (self.axle_dia / 2, self.cone_height()),
+            (self.axle_dia / 2 + 4.0, self.cone_height()),
+            (self.cone_dia() / 2, 1.0),
+            (self.cone_dia() / 2, 0.0)
         ]
         holder = (cq.Workplane("XZ")
                   .polyline(cone_points)

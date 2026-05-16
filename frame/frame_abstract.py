@@ -1,4 +1,6 @@
-class FrameAssemblyBase:
+import bom_part_data as bpd
+
+class FrameAssemblyBase(bpd.PartAssembly):
     def frame_width(self):
         raise NotImplementedError()
 

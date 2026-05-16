@@ -6,6 +6,7 @@ import lap.lap_abstract as lap_abstract
 import mast.mast_abstract as mast_abstract
 import frame_mast_joint.frame_mast_joint_abstract as frame_mast_joint
 import math
+import bom_part_data as bpd
 
 
 class FrameAssembly(frame_abstract.FrameAssemblyBase):
@@ -91,6 +92,10 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
         )
 
         return assembly
+
+    def get_BOM(self) -> bpd.BOM:
+        bom = bpd.BOM()
+        return bom
 
 
 class FrameExtrusions:
