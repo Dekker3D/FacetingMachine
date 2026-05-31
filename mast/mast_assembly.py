@@ -192,130 +192,35 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             bearing_type=bb.Bearing608ZZ,
         ).get_object()
 
-    def export_all_parts(self):
-        """Export all parts and assembly"""
-        print("Exporting improved parts...")
-        try:
-            cq.exporters.export(self.make_bearing_holder(), "pillow_block.stl")
-            print("Pillow block exported")
-            cq.exporters.export(self.make_quill_carriage(), "quill_hinge.stl")
-            print("Quill hinge exported")
-            assembly = self.quill.make_assembly()
-            cq.exporters.export(assembly.toCompound(), "mast_assembly.stl")
-            print("Improved assembly exported")
-            print("All parts exported successfully!")
-            return True
-        except Exception as e:
-            print(f"Error: {e}")
-            return False
-
     def make_mast_spine(self, length):
-        """20x20 T-slot profile.
-
-        Aligned to +Z, starting at origin.
-        """
-
-        shell = cq.Workplane("XY").box(
-            self.spine_ext_thickness, self.spine_ext_width, length, centered=(True, True, False)
-        )
-        profile = shell.edges("|Z").chamfer(3)
-        profile.faces(">X").tag("SpineFront")
-        return profile
+        """20x20 T-slot profile. Delegates to bought_bits."""
+        return bb.TslotExtrusion2020.make_profile(length)
 
     def make_mgn9_rail(self, length, orient_for_assembly=True):
-        """MGN9 rail profile
-
-        Created from origin, going to +Y. Reorient in assembly.
-        """
-
-        num_holes = int(length / 30) + 1
-        hole_positions = [(0, -i * 30) for i in range(num_holes)]
-
-        rail = (
-            cq.Workplane("XY")
-            .box(bb.RailMGN15H.RAIL_WIDTH, length, bb.RailMGN15H.RAIL_HEIGHT, centered=(True, False, False))
-            .edges(">Z")
-            .fillet(0.8)
-            .faces("<Z")
-            .workplane()
-            .pushPoints(hole_positions)
-            .circle(3.2 / 2)
-            .cutThruAll()
-        )
-        rail.faces(">Z").tag("RailTop")
-        rail.faces("<Z").tag("RailBottom")
-        print(F"Rail length: {length}")
-
+        """MGN15H rail profile. Delegates to bought_bits."""
+        rail = bb.RailMGN15H.make_rail(length)
         if orient_for_assembly:
             return (rail
                     .rotate((0, 0, 0), (1, 0, 0), 90)
                     .rotate((0, 0, 0), (0, 0, 1), 90))
-        else:
-            return rail
+        return rail
 
     def make_mgn9_carriage(self, orient_for_assembly=True):
-        """MGN15H carriage
-
-        Created from origin, going to +Y, top is +Z.
-        Raised by clearance, assuming rail is at Z0.
-        """
-        carriage = (
-            cq.Workplane("XY")
-            .box(
-                bb.RailMGN15H.CARRIAGE_WIDTH,
-                bb.RailMGN15H.CARRIAGE_LENGTH,
-                bb.RailMGN15H.CARRIAGE_HEIGHT,
-                centered=(True, False, False),
-            )
-            .translate((0, 0, bb.RailMGN15H.CARRIAGE_CLEARANCE))
-            .edges("|Z")
-            .fillet(1.0)
-        )
+        """MGN15H carriage. Delegates to bought_bits."""
+        carriage = bb.RailMGN15H.make_carriage()
         if orient_for_assembly:
-            return (
-                carriage
-                .rotate((0, 0, 0), (1, 0, 0), 90)
-                .rotate((0, 0, 0), (0, 0, 1), 90)
-            )
-        else:
-            return carriage
+            return (carriage
+                    .rotate((0, 0, 0), (1, 0, 0), 90)
+                    .rotate((0, 0, 0), (0, 0, 1), 90))
+        return carriage
 
     def make_t8_shaft(self):
-        """T8 leadscrew shaft visualization"""
-        shaft = cq.Workplane("XY").cylinder(
-            self.leadscrew_length(), self.leadscrew_dia / 2, centered=(True, True, False)
-        )
-        print(F"Leadscrew length: {self.leadscrew_length()}")
-        return shaft
+        """T8 leadscrew shaft. Delegates to bought_bits."""
+        return bb.LeadScrewT8.make_shaft(self.leadscrew_length())
 
     def make_t8_nut(self):
-        """T8 leadscrew nut with flange and mounting holes"""
-        nut_body = (cq.Workplane("XY")
-                    .cylinder(15, 5.1, centered=(True, True, False))
-                    .translate((0, 0, -(1.5 + bb.LeadScrewT8.NUT_THICKNESS)))
-                    .chamfer(0.25))
-        flange = (cq.Workplane("XY")
-                  .circle(11)
-                  .extrude(bb.LeadScrewT8.NUT_THICKNESS)
-                  .translate((0, 0, -bb.LeadScrewT8.NUT_THICKNESS))
-                  .chamfer(0.5))
-        angles = [0, 90, 180, 270]
-        hole_positions = [
-            (
-                bb.LeadScrewT8.NUT_HOLE_RADIUS * math.cos(math.radians(a)),
-                bb.LeadScrewT8.NUT_HOLE_RADIUS * math.sin(math.radians(a)),
-            )
-            for a in angles
-        ]
-        flange = (
-            flange.faces(">Z")
-            .workplane()
-            .pushPoints(hole_positions)
-            .circle(bb.LeadScrewT8.NUT_HOLE_DIA / 2)
-            .cutThruAll()
-        )
-        nut = nut_body.union(flange)
-        return nut
+        """T8 leadscrew nut. Delegates to bought_bits."""
+        return bb.LeadScrewT8.make_nut()
 
 
     def make_quill_carriage(self, orient_for_assembly=True):

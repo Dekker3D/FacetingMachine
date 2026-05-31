@@ -1,5 +1,6 @@
 import bom_part_data as bom
 import cadquery as cq
+import math
 
 
 class BoughtPartWithModel(bom.PartWithMetadata):
@@ -67,6 +68,32 @@ class RailGeneric:
     def total_height(cls):
         return cls.CARRIAGE_HEIGHT + cls.CARRIAGE_CLEARANCE
 
+    @classmethod
+    def make_rail(cls, length: float) -> cq.Workplane:
+        """Rail profile in canonical orientation (along +Y, top at +Z, origin at start)."""
+        num_holes = int(length / 30) + 1
+        hole_positions = [(0, -i * 30) for i in range(num_holes)]
+        return (
+            cq.Workplane("XY")
+            .box(cls.RAIL_WIDTH, length, cls.RAIL_HEIGHT, centered=(True, False, False))
+            .edges(">Z").fillet(0.8)
+            .faces("<Z").workplane()
+            .pushPoints(hole_positions)
+            .circle(3.2 / 2)
+            .cutThruAll()
+        )
+
+    @classmethod
+    def make_carriage(cls) -> cq.Workplane:
+        """Carriage in canonical orientation (along +Y, bottom at Z=clearance, top at +Z)."""
+        return (
+            cq.Workplane("XY")
+            .box(cls.CARRIAGE_WIDTH, cls.CARRIAGE_LENGTH, cls.CARRIAGE_HEIGHT,
+                 centered=(True, False, False))
+            .translate((0, 0, cls.CARRIAGE_CLEARANCE))
+            .edges("|Z").fillet(1.0)
+        )
+
 
 class RailMGN9H(RailGeneric):
     RAIL_WIDTH = 9.0
@@ -97,6 +124,36 @@ class LeadScrewGeneric:
     NUT_HOLE_DIA = 0
     NUT_HOLE_RADIUS = 0  # Distance from center to hole
 
+    @classmethod
+    def make_shaft(cls, length: float) -> cq.Workplane:
+        """Leadscrew shaft along +Z, starting at origin."""
+        return cq.Workplane("XY").cylinder(length, cls.SCREW_DIA / 2,
+                                            centered=(True, True, False))
+
+    @classmethod
+    def make_nut(cls) -> cq.Workplane:
+        """T8 nut with flange and mounting holes, centered on origin."""
+        nut_body = (cq.Workplane("XY")
+                    .cylinder(15, 5.1, centered=(True, True, False))
+                    .translate((0, 0, -(1.5 + cls.NUT_THICKNESS)))
+                    .chamfer(0.25))
+        flange = (cq.Workplane("XY")
+                  .circle(11)
+                  .extrude(cls.NUT_THICKNESS)
+                  .translate((0, 0, -cls.NUT_THICKNESS))
+                  .chamfer(0.5))
+        angles = [0, 90, 180, 270]
+        hole_positions = [
+            (cls.NUT_HOLE_RADIUS * math.cos(math.radians(a)),
+             cls.NUT_HOLE_RADIUS * math.sin(math.radians(a)))
+            for a in angles
+        ]
+        flange = (flange.faces(">Z").workplane()
+                  .pushPoints(hole_positions)
+                  .circle(cls.NUT_HOLE_DIA / 2)
+                  .cutThruAll())
+        return nut_body.union(flange)
+
 
 class LeadScrewT8(LeadScrewGeneric):
     SCREW_DIA = 8.0
@@ -104,6 +161,21 @@ class LeadScrewT8(LeadScrewGeneric):
     NUT_THICKNESS = 3.5
     NUT_HOLE_DIA = 3.5
     NUT_HOLE_RADIUS = 8.0
+
+
+class TslotExtrusion2020:
+    """20x20mm aluminum T-slot extrusion profile."""
+    WIDTH = 20.0
+    HEIGHT = 20.0
+
+    @classmethod
+    def make_profile(cls, length: float) -> cq.Workplane:
+        """Extrusion along +Z, starting at origin. Edges chamfered."""
+        return (
+            cq.Workplane("XY")
+            .box(cls.WIDTH, cls.HEIGHT, length, centered=(True, True, False))
+            .edges("|Z").chamfer(3)
+        )
 
 
 class StraightShankColletExtension(BoughtPartWithModel):
