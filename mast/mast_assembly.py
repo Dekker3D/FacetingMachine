@@ -194,11 +194,11 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
     def make_mast_spine(self, length):
         """20x20 T-slot profile. Delegates to bought_bits."""
-        return bb.TslotExtrusion2020.make_profile(length)
+        return bb.TslotExtrusion2020(length).get_object()
 
     def make_mgn9_rail(self, length, orient_for_assembly=True):
         """MGN15H rail profile. Delegates to bought_bits."""
-        rail = bb.RailMGN15H.make_rail(length)
+        rail = bb.RailMGN15H(length).get_object()
         if orient_for_assembly:
             return (rail
                     .rotate((0, 0, 0), (1, 0, 0), 90)
@@ -216,7 +216,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
     def make_t8_shaft(self):
         """T8 leadscrew shaft. Delegates to bought_bits."""
-        return bb.LeadScrewT8.make_shaft(self.leadscrew_length())
+        return bb.LeadScrewT8(self.leadscrew_length()).get_object()
 
     def make_t8_nut(self):
         """T8 leadscrew nut. Delegates to bought_bits."""
