@@ -15,15 +15,22 @@ class PartWithMetadata:
         """Returns the CadQuery object for this part, if it has one."""
         return None
 
+    def _comparables(self) -> tuple:
+        """Override in subclasses to include all dimension fields.
+
+        The BOM uses __eq__/__hash__ to deduplicate parts. Override this
+        to return a tuple of every field that defines the part's identity.
+        Defaults to (name,).
+        """
+        return (self.name,)
+
     def __hash__(self):
-        # We need a stable hash for the BOM dictionary.
-        # Fallback to name if not overridden.
-        return hash(self.name)
+        return hash(self._comparables())
 
     def __eq__(self, other):
-        if not isinstance(other, PartWithMetadata):
+        if type(other) is not type(self):
             return False
-        return self.name == other.name
+        return self._comparables() == other._comparables()
 
 
 class PrintedPart(PartWithMetadata):

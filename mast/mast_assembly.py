@@ -393,22 +393,12 @@ class BearingHolder(bpd.PrintedPart):
         self.bearing_type = bearing_type
         super().__init__(name="Bearing Holder")
 
-    def __eq__(self, other):
-        if not isinstance(other, BearingHolder):
-            return False
-        return (self.name == other.name
-                and self.spine_span == other.spine_span
-                and self.leadscrew_dist == other.leadscrew_dist
-                and self.diagonal_length == other.diagonal_length
-                and self.diagonal_height == other.diagonal_height
-                and self.cylinder_height == other.cylinder_height
-                and self.leadscrew_dia == other.leadscrew_dia)
-
-    def __hash__(self):
-        return hash((self.name, self.spine_span,
-                     self.leadscrew_dist, self.diagonal_length,
-                     self.diagonal_height, self.cylinder_height,
-                     self.leadscrew_dia))
+    def _comparables(self):
+        return (self.name, self.spine_span, self.leadscrew_dist,
+                self.diagonal_length, self.diagonal_height,
+                self.cylinder_height, self.bolt_head_height, self.bolt_hole_length,
+                self.bolt_hole_dia, self.bolt_head_dia, self.leadscrew_dia,
+                self.leadscrew_hole_space, self.bearing_type)
 
     def total_height(self):
         return self.diagonal_height + self.cylinder_height

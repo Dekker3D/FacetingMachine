@@ -121,14 +121,8 @@ class LapHolderBottom(bpd.PrintedPart):
         self.bore_dia = bore_dia
         super().__init__(name="Lap Holder Bottom")
 
-    def __eq__(self, other):
-        return (isinstance(other, LapHolderBottom)
-                and self.name == other.name
-                and self.axle_dia == other.axle_dia
-                and self.lap_thickness == other.lap_thickness)
-
-    def __hash__(self):
-        return hash((self.axle_dia, self.lap_thickness, self.name))
+    def _comparables(self):
+        return (self.name, self.axle_dia, self.lap_thickness, self.bore_dia)
 
     def cone_height(self):
         return 20.0
@@ -168,13 +162,8 @@ class LapHolderTop(bpd.PrintedPart):
         self.axle_dia = axle_dia
         super().__init__(name="Lap Holder Top")
 
-    def __eq__(self, other):
-        return (isinstance(other, LapHolderTop)
-                and self.name == other.name
-                and self.axle_dia == other.axle_dia)
-
-    def __hash__(self):
-        return hash((self.axle_dia, self.name))
+    def _comparables(self):
+        return (self.name, self.axle_dia)
 
     def cone_height(self):
         return 6.0
@@ -211,11 +200,8 @@ class SplashGuard(bpd.PrintedPart):
         self.la = la
         super().__init__(name="Splash Guard")
 
-    def __hash__(self):
-        return hash(self.name)
-
-    def __eq__(self, other):
-        return isinstance(other, SplashGuard)
+    def _comparables(self):
+        return (self.name,)
 
     def get_object(self):
         """Create the splash guard."""
@@ -275,11 +261,8 @@ class SplashGuardBottom(bpd.PrintedPart):
         self.la = la
         super().__init__(name="Splash Guard Bottom")
 
-    def __hash__(self):
-        return hash(self.name)
-
-    def __eq__(self, other):
-        return isinstance(other, SplashGuardBottom)
+    def _comparables(self):
+        return (self.name,)
 
     def get_object(self):
         """Create the bottom part of the splash guard."""
