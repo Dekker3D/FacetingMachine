@@ -61,7 +61,7 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
 
     def ready(self):
         if not self._ready:
-            self._lhb = LapHolderBottom(self.LAP_AXLE_DIA, self.LAP_THICKNESS)
+            self._lhb = LapHolderBottom(self.LAP_AXLE_DIA, self.LAP_THICKNESS, self.LAP_HOLE_DIA)
             self._lht = LapHolderTop(self.LAP_AXLE_DIA)
             self._sg = SplashGuard(self)
             self._sgb = SplashGuardBottom(self)
@@ -115,9 +115,10 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
 class LapHolderBottom(bpd.PrintedPart):
     """Class representing the bottom part of the faceting lap holder."""
 
-    def __init__(self, axle_dia: float, lap_thickness: float):
+    def __init__(self, axle_dia: float, lap_thickness: float, bore_dia: float):
         self.axle_dia = axle_dia
         self.lap_thickness = lap_thickness
+        self.bore_dia = bore_dia
         super().__init__(name="Lap Holder Bottom")
 
     def __eq__(self, other):
@@ -140,8 +141,8 @@ class LapHolderBottom(bpd.PrintedPart):
             (self.axle_dia / 2, 0),
             (self.axle_dia / 2 + 2.0, 0),
             (self.axle_dia / 2 + 2.0 + self.cone_height(), self.cone_height()),
-            (self.axle_dia / 2 - 0.1, self.cone_height()),
-            (self.axle_dia / 2 - 0.1, bump_height),
+            (self.bore_dia / 2, self.cone_height()),
+            (self.bore_dia / 2 - 0.1, bump_height),
             (self.axle_dia / 2, bump_height)
         ]
         holder = (cq.Workplane("XZ")

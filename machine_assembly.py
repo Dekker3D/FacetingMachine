@@ -53,5 +53,6 @@ if __name__ == "__cq_main__":
     machine.validate()  # Validate the configuration before building.
     result = machine.make_assembly()
     show_object(result)
+    machine.export_everything()
     print(machine.get_BOM().tostring())
     print("done")

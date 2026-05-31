@@ -1,8 +1,8 @@
 import cadquery as cq
 import math
 from cadquery import Location, Color
-from machine import MachineConfig as cfg
 import bought_bits as bb
+import bom_part_data as bpd
 import mast.mast_abstract as mast_abstract
 import quill.quill_abstract as quill_abstract
 import quill_joint.quill_joint_abstract as quill_joint_abstract
@@ -10,6 +10,7 @@ import mast.handwheel as handwheel
 
 # REMINDER: +X is left, +Y is forwards, +Z is up!
 # The mast faces left (+X), the lap is to the left of the mast.
+
 
 
 class MastAssembly(mast_abstract.MastAssemblyBase):
@@ -174,13 +175,30 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
         return assembly
 
+    def make_bearing_holder(self):
+        """Create a bearing holder instance for the current mast config."""
+        return BearingHolder(
+            spine_span=self.spine_ext_width,
+            leadscrew_dist=self.leadscrew_dist_from_spine(),
+            diagonal_length=self.bh_diagonal_length(),
+            diagonal_height=self.bh_diagonal_height(),
+            cylinder_height=self.bh_cylinder_height(),
+            bolt_head_height=self.bh_bolt_head_height(),
+            bolt_hole_length=self.BH_BOLT_HOLE_LENGTH,
+            bolt_hole_dia=self.BH_BOLT_HOLE_DIA,
+            bolt_head_dia=self.BH_BOLT_HEAD_DIA,
+            leadscrew_dia=self.leadscrew_dia,
+            leadscrew_hole_space=self.BH_LEADSCREW_HOLE_SPACE,
+            bearing_type=bb.Bearing608ZZ,
+        ).get_object()
+
     def export_all_parts(self):
         """Export all parts and assembly"""
         print("Exporting improved parts...")
         try:
-            cq.exporters.export(LeadscrewBearingHolder().make(), "pillow_block.stl")
+            cq.exporters.export(self.make_bearing_holder(), "pillow_block.stl")
             print("Pillow block exported")
-            cq.exporters.export(QuillCarriage.make(), "quill_hinge.stl")
+            cq.exporters.export(self.make_quill_carriage(), "quill_hinge.stl")
             print("Quill hinge exported")
             assembly = self.quill.make_assembly()
             cq.exporters.export(assembly.toCompound(), "mast_assembly.stl")
@@ -299,57 +317,6 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         nut = nut_body.union(flange)
         return nut
 
-    def make_bearing_holder(self, orient_for_assembly=True):
-        b_w = bb.Bearing608ZZ.WIDTH
-        b_od = bb.Bearing608ZZ.OD
-
-        block_shape_pts = [
-            (0, 0),
-            (self.leadscrew_dist_from_spine() - self.bh_diagonal_length(), 0),
-            (self.leadscrew_dist_from_spine(), self.bh_diagonal_height()),
-            (self.leadscrew_dist_from_spine(), self.bh_diagonal_height() + self.bh_cylinder_height()),
-            (0, self.bh_diagonal_height() + self.bh_cylinder_height()),
-        ]
-
-        block = (
-            cq.Workplane("YZ", origin=(-self.spine_ext_width / 2, 0, 0))
-            .polyline(block_shape_pts)
-            .close()
-            .extrude(self.spine_ext_width)
-        )
-
-        block = (
-            block
-            .faces(">Z")
-            .workplane(offset=-(self.bh_cylinder_height()), origin=(0, 0, 0))
-            .move(0, self.leadscrew_dist_from_spine())
-            .cylinder(self.bh_cylinder_height(), b_od / 2 + 4, centered=(True, True, False))
-            # Shaft hole
-            .faces(">Z")
-            .workplane()
-            .move(0, self.leadscrew_dist_from_spine())
-            .hole(self.leadscrew_dia + self.BH_LEADSCREW_HOLE_SPACE)
-            # Bearing recess
-            .faces(">Z")
-            .workplane()
-            .move(0, self.leadscrew_dist_from_spine())
-            .hole(b_od + 0.2, b_w)
-        )
-
-        block = block.cut(
-            cq.Workplane("top", origin=(0, 0, self.bh_bolt_head_height()))
-            .cylinder(self.BH_BOLT_HOLE_LENGTH, self.BH_BOLT_HOLE_DIA / 2, centered=(True, True, False))
-            .faces(">Y")
-            .workplane()
-            .cylinder(100, self.BH_BOLT_HEAD_DIA / 2, centered=(True, True, False))
-        )
-
-        if orient_for_assembly:
-            return (block
-                    .rotate((0, 0, 0), (0, 0, 1), -90))
-        else:
-            return block
-
 
     def make_quill_carriage(self, orient_for_assembly=True):
         """
@@ -387,3 +354,106 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                     .rotate((0, 0, 0), (0, 0, 1), -90))
         else:
             return hinge
+
+
+class BearingHolder(bpd.PrintedPart):
+    """Leadscrew bearing holder (pillow block).
+
+    Printed part that mounts to the mast spine and holds a 608ZZ bearing
+    for the leadscrew. All dimensions come from the assembly — this class
+    just builds geometry.
+    """
+
+    def __init__(self, *,
+                 spine_span: float,
+                 leadscrew_dist: float,
+                 diagonal_length: float,
+                 diagonal_height: float,
+                 cylinder_height: float,
+                 bolt_head_height: float,
+                 bolt_hole_length: float,
+                 bolt_hole_dia: float,
+                 bolt_head_dia: float,
+                 leadscrew_dia: float,
+                 leadscrew_hole_space: float,
+                 bearing_type,
+                 ):
+        # spine_span = width of the mast spine in Y (this part spans that full width)
+        self.spine_span = spine_span
+        self.leadscrew_dist = leadscrew_dist
+        self.diagonal_length = diagonal_length
+        self.diagonal_height = diagonal_height
+        self.cylinder_height = cylinder_height
+        self.bolt_head_height = bolt_head_height
+        self.bolt_hole_length = bolt_hole_length
+        self.bolt_hole_dia = bolt_hole_dia
+        self.bolt_head_dia = bolt_head_dia
+        self.leadscrew_dia = leadscrew_dia
+        self.leadscrew_hole_space = leadscrew_hole_space
+        self.bearing_type = bearing_type
+        super().__init__(name="Bearing Holder")
+
+    def __eq__(self, other):
+        if not isinstance(other, BearingHolder):
+            return False
+        return (self.name == other.name
+                and self.spine_span == other.spine_span
+                and self.leadscrew_dist == other.leadscrew_dist
+                and self.diagonal_length == other.diagonal_length
+                and self.diagonal_height == other.diagonal_height
+                and self.cylinder_height == other.cylinder_height
+                and self.leadscrew_dia == other.leadscrew_dia)
+
+    def __hash__(self):
+        return hash((self.name, self.spine_span,
+                     self.leadscrew_dist, self.diagonal_length,
+                     self.diagonal_height, self.cylinder_height,
+                     self.leadscrew_dia))
+
+    def total_height(self):
+        return self.diagonal_height + self.cylinder_height
+
+    def get_object(self):
+        block_shape_pts = [
+            (0, 0),
+            (self.leadscrew_dist - self.diagonal_length, 0),
+            (self.leadscrew_dist, self.diagonal_height),
+            (self.leadscrew_dist, self.diagonal_height + self.cylinder_height),
+            (0, self.diagonal_height + self.cylinder_height),
+        ]
+
+        block = (
+            cq.Workplane("YZ", origin=(-self.spine_span / 2, 0, 0))
+            .polyline(block_shape_pts)
+            .close()
+            .extrude(self.spine_span)
+        )
+
+        block = (
+            block
+            .faces(">Z")
+            .workplane(offset=-(self.cylinder_height), origin=(0, 0, 0))
+            .move(0, self.leadscrew_dist)
+            .cylinder(self.cylinder_height, self.bearing_type.OD / 2 + 4, centered=(True, True, False))
+            # Shaft hole
+            .faces(">Z")
+            .workplane()
+            .move(0, self.leadscrew_dist)
+            .hole(self.leadscrew_dia + self.leadscrew_hole_space)
+            # Bearing recess
+            .faces(">Z")
+            .workplane()
+            .move(0, self.leadscrew_dist)
+            .hole(self.bearing_type.OD + 0.2, self.bearing_type.WIDTH)
+        )
+
+        block = block.cut(
+            cq.Workplane("top", origin=(0, 0, self.bolt_head_height))
+            .cylinder(self.bolt_hole_length, self.bolt_hole_dia / 2, centered=(True, True, False))
+            .faces(">Y")
+            .workplane()
+            .cylinder(100, self.bolt_head_dia / 2, centered=(True, True, False))
+        )
+
+        # Rotate into display orientation (assembly will place it).
+        return block.rotate((0, 0, 0), (0, 0, 1), -90)
