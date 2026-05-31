@@ -176,6 +176,23 @@ The BOM system (`bom_part_data.py`) tracks all parts with quantities and prices:
 
 Each assembly's `get_BOM()` returns its parts. `machine_assembly.py` merges all BOMs for the full project.
 
+### Part Identity (`_comparables`)
+
+The BOM uses `__eq__`/`__hash__` to deduplicate parts. Override `_comparables()` — not `__eq__` or `__hash__` directly — to define what makes a part unique:
+
+```python
+class SomePart(bpd.PrintedPart):
+    def __init__(self, width: float, height: float):
+        self.width = width
+        self.height = height
+        super().__init__(name="Some Part")
+    
+    def _comparables(self):
+        return (self.name, self.width, self.height)
+```
+
+This avoids duplicating field lists between `__eq__` and `__hash__`. The base class (`PartWithMetadata`) uses `type(self) is type(other)` for strict class matching — a `LapHolderBottom` will never equal a `LapHolderTop` even if their tuples match.
+
 ## Contributing
 
 ### Adding a New Part Variant
