@@ -226,6 +226,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         )
         rail.faces(">Z").tag("RailTop")
         rail.faces("<Z").tag("RailBottom")
+        print(F"Rail length: {length}")
 
         if orient_for_assembly:
             return (rail
@@ -266,6 +267,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         shaft = cq.Workplane("XY").cylinder(
             self.leadscrew_length(), self.leadscrew_dia / 2, centered=(True, True, False)
         )
+        print(F"Leadscrew length: {self.leadscrew_length()}")
         return shaft
 
     def make_t8_nut(self):

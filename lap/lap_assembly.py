@@ -63,6 +63,8 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
         if not self._ready:
             self._lhb = LapHolderBottom(self.LAP_AXLE_DIA, self.LAP_THICKNESS)
             self._lht = LapHolderTop(self.LAP_AXLE_DIA)
+            self._sg = SplashGuard(self)
+            self._sgb = SplashGuardBottom(self)
             self._ready = True
 
     def make_assembly(self):
@@ -85,13 +87,13 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
                 color=Color("yellow"),
             )
             .add(
-                SplashGuard().make(self),
+                self._sg.make(self),
                 name="splash_guard",
                 loc=Location((0, 0, 0)),
                 color=Color("blue"),
             )
             .add(
-                SplashGuardBottom().make(self),
+                self._sgb.make(self),
                 name="splash_guard_bottom",
                 loc=Location((0, 0, 0)),
                 color=Color("green"),
@@ -105,19 +107,21 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
         bom = bpd.BOM()
         bom.add(self._lhb)
         bom.add(self._lht)
+        bom.add(self._sg)
+        bom.add(self._sgb)
         return bom
 
 
-class LapHolderBottom(bpd.PartWithMetadata):
+class LapHolderBottom(bpd.PrintedPart):
     """Class representing the bottom part of the faceting lap holder."""
 
     def __init__(self, axle_dia: float, lap_thickness: float):
         self.axle_dia = axle_dia
         self.lap_thickness = lap_thickness
-        self.name = "Lap Holder Bottom"
+        super().__init__(name="Lap Holder Bottom")
 
     def __eq__(self, other):
-        return (isinstance(other, type(self))
+        return (isinstance(other, LapHolderBottom)
                 and self.name == other.name
                 and self.axle_dia == other.axle_dia
                 and self.lap_thickness == other.lap_thickness)
@@ -128,7 +132,7 @@ class LapHolderBottom(bpd.PartWithMetadata):
     def cone_height(self):
         return 20.0
 
-    def make(self):
+    def get_object(self):
         """Create the bottom part of the faceting lap holder."""
 
         bump_height = self.cone_height() + (self.lap_thickness / 2.0)
@@ -148,20 +152,23 @@ class LapHolderBottom(bpd.PartWithMetadata):
 
         return holder
 
+    def make(self):
+        return self.get_object()
+
     def top_height(self):
         """Return the offset for the top part."""
         return self.cone_height() + self.lap_thickness  # The lap is 2 mm thick.
 
 
-class LapHolderTop(bpd.PartWithMetadata):
+class LapHolderTop(bpd.PrintedPart):
     """Class representing the top part of the faceting lap holder."""
 
     def __init__(self, axle_dia: float):
         self.axle_dia = axle_dia
-        self.name = "Lap Holder Top"
+        super().__init__(name="Lap Holder Top")
 
     def __eq__(self, other):
-        return (isinstance(other, type(self))
+        return (isinstance(other, LapHolderTop)
                 and self.name == other.name
                 and self.axle_dia == other.axle_dia)
 
@@ -174,7 +181,7 @@ class LapHolderTop(bpd.PartWithMetadata):
     def cone_dia(self):
         return 40.0
 
-    def make(self):
+    def get_object(self):
         """Create the top part of the faceting lap holder."""
 
         cone_points = [
@@ -192,18 +199,26 @@ class LapHolderTop(bpd.PartWithMetadata):
 
         return holder
 
+    def make(self):
+        return self.get_object()
 
-class SplashGuard:
+
+class SplashGuard(bpd.PrintedPart):
     """Class representing the splash guard."""
 
-    # The height of the splash guard, including the lip that extends above the lap.
-    HEIGHT = 30.0
-    # The thickness of the splash guard walls.
-    THICKNESS = 2.0
+    def __init__(self, la: 'LapAssembly'):
+        self.la = la
+        super().__init__(name="Splash Guard")
 
-    def make(self, la: LapAssembly):
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, other):
+        return isinstance(other, SplashGuard)
+
+    def get_object(self):
         """Create the splash guard."""
-
+        la = self.la
         guard = (cq.Workplane("XY")
                  .cylinder(
                      la.SG_HEIGHT + la.SG_THICKNESS,
@@ -232,7 +247,7 @@ class SplashGuard:
 
         # Create slope towards drain hole.
         cutout = cutout.intersect(
-            cq.Workplane("XZ", origin=(la.sg_drain_offset(), 0, self.THICKNESS))
+            cq.Workplane("XZ", origin=(la.sg_drain_offset(), 0, la.SG_THICKNESS))
             .polyline(conepts)
             .close()
             .revolve(360, (0, 0, 0), (0, 1, 0))
@@ -240,7 +255,7 @@ class SplashGuard:
 
         # Add drain hole.
         cutout = cutout.union(
-            cq.Workplane("XY", origin=(la.sg_drain_offset(), 0, self.THICKNESS - 50))
+            cq.Workplane("XY", origin=(la.sg_drain_offset(), 0, la.SG_THICKNESS - 50))
             .cylinder(100, la.SG_DRAIN_ID / 2, centered=(True, True, False))
         ).edges().fillet(1.0)
 
@@ -248,14 +263,26 @@ class SplashGuard:
 
         return guard
 
+    def make(self, la: 'LapAssembly'):
+        return self.get_object()
 
-class SplashGuardBottom:
+
+class SplashGuardBottom(bpd.PrintedPart):
     """Class representing the bottom part of the splash guard."""
 
-    @classmethod
-    def make(cls, la: LapAssembly):
-        """Create the bottom part of the splash guard."""
+    def __init__(self, la: 'LapAssembly'):
+        self.la = la
+        super().__init__(name="Splash Guard Bottom")
 
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, other):
+        return isinstance(other, SplashGuardBottom)
+
+    def get_object(self):
+        """Create the bottom part of the splash guard."""
+        la = self.la
         dia = bb.Bearing608ZZ.OD + 10
 
         base_pts = [
@@ -283,6 +310,10 @@ class SplashGuardBottom:
                   )
 
         return bottom
+
+    def make(self, la: 'LapAssembly'):
+        return self.get_object()
+
 
 
 if __name__ == "__cq_main__":

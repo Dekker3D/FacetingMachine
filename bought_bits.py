@@ -6,15 +6,13 @@ class BoughtPartWithModel(bom.PartWithMetadata):
     """Base class for all parts."""
     _cached_obj: cq.Workplane = None
 
-    @classmethod
-    def get_object(cls) -> cq.Workplane:
+    def get_object(self) -> cq.Workplane:
         """Returns a cadquery object representing this part."""
-        if cls._cached_obj is None:
-            cls._cached_obj = cls._create_object()
-        return cls._cached_obj
+        if self._cached_obj is None:
+            self._cached_obj = self._create_object()
+        return self._cached_obj
 
-    @classmethod
-    def _create_object(cls) -> cq.Workplane:
+    def _create_object(self) -> cq.Workplane:
         """Creates a cadquery object representing this part."""
         raise NotImplementedError()
 
@@ -24,12 +22,11 @@ class BearingGeneric(BoughtPartWithModel):
     ID = 0.0
     OD = 0.0
 
-    @classmethod
-    def _create_object(cls):
+    def _create_object(self):
         return (
             cq.Workplane("XY")
-            .circle(cls.OD / 2)
-            .extrude(cls.WIDTH)
+            .circle(self.OD / 2)
+            .extrude(self.WIDTH)
             .edges()
             .fillet(1.0)
         )
@@ -117,10 +114,9 @@ class StraightShankColletExtension(BoughtPartWithModel):
         self.type = type
         self.length = length
 
-    @classmethod
-    def create_object(self):
+    def _create_object(self):
         obj = (
-            cq.WorkPlane("XZ")
+            cq.Workplane("XZ")
             .cylinder(self.dia, self.length, centered=(True, True, False))
         )
 
