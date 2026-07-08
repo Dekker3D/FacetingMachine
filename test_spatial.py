@@ -263,9 +263,10 @@ def test_ref_frames_on_mast_spine():
         f"Spine X faces should be ~20mm apart, got {x_gap:.1f}mm"
     )
 
-    # Both faces should be at Y=0 (centered)
-    assert abs(plus_y_face.origin.y) < 1.0, (
-        f"Spine +Y face should be near Y=0, got Y={plus_y_face.origin.y:.1f}"
+    # The extrusion is centered at origin, so +Y face is at half width (10mm)
+    assert 9.0 < plus_y_face.origin.y < 11.0, (
+        f"Spine +Y face should be near Y=10 (half of 20mm width), "
+        f"got Y={plus_y_face.origin.y:.1f}"
     )
 
     print(f"    plus_x_face: {plus_x_face}")

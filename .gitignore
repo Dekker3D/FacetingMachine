@@ -1,3 +1,5 @@
 /venv
 /*.stl
 /export
+__pycache__/
+venv/

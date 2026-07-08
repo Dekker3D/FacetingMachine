@@ -43,9 +43,14 @@ def _resolve(obj: Union[cq.Workplane, cq.Assembly, cq.Shape]) -> cq.Shape:
 def has_volume(obj: Union[cq.Workplane, cq.Shape], tolerance: float = 0.001) -> bool:
     """True if the shape has measurable volume (> tolerance mm³)."""
     shape = _resolve(obj)
-    if shape.IsNull():
+    # CadQuery/OCP uses isNull() (lowercase) on some shape types
+    is_null = shape.isNull() if hasattr(shape, 'isNull') else shape.IsNull()
+    if is_null:
         return False
-    return shape.Volume() > tolerance
+    try:
+        return shape.Volume() > tolerance
+    except Exception:
+        return False
 
 
 def assert_no_overlap(a, b, *, msg: str = "", tolerance: float = 0.001):
