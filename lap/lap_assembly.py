@@ -272,14 +272,18 @@ class SplashGuard(bpd.PrintedPart):
         floor_z = la.SG_THICKNESS
 
         # Inverted cone: wide at tower top, narrow at floor.
-        cone_top_r = la.LAP_HOLE_DIA / 2 + 5   # clears holder + adapter
+        # Must clear the lap holder bottom at all heights.
+        # Holder max radius ≈ axle/2 + 2 + cone_height ≈ 4 + 2 + 15 = 21mm
+        cone_top_r = tower_od / 2 - 5   # ~23mm, leaves 5mm wall at top
         cone_floor_r = la.LAP_AXLE_DIA / 2 + 1  # clears shaft
 
+        # Cone goes from center axis outward; cutting it from the
+        # cylinder leaves the outer ring (the tower walls).
         cone_cut_pts = [
-            (tower_od / 2, tower_h),   # top outer
-            (cone_top_r, tower_h),      # top inner (rim of cone)
-            (cone_floor_r, 0),          # floor at shaft
-            (tower_od / 2, 0),          # floor outer
+            (0, tower_h),              # center top
+            (cone_top_r, tower_h),      # rim top (wide opening)
+            (cone_floor_r, 0),          # floor at shaft (narrow)
+            (0, 0),                     # center bottom
         ]
         cone_cutout = (
             cq.Workplane("XZ")
@@ -298,6 +302,22 @@ class SplashGuard(bpd.PrintedPart):
         )
 
         guard = guard.union(tower)
+
+        # --- Screw holes through tower (match SGB pattern) ---
+        # Add after union so they're not filled back in.
+        screw_r = la.bottom_screw_spacing()
+        screw_positions = [
+            (screw_r * math.cos(math.radians(a)),
+             screw_r * math.sin(math.radians(a)))
+            for a in (45, 135, 225, 315)
+        ]
+        guard = (
+            guard
+            .faces(">Z")
+            .workplane()
+            .pushPoints(screw_positions)
+            .hole(3.2, tower_h + la.SG_THICKNESS + 5)
+        )
 
         return guard
 
@@ -358,7 +378,32 @@ class SplashGuardBottom(bpd.PrintedPart):
                       centered=(True, True, False))
             .translate((0, 0, -marker_h))  # top at Z=0, extends downward
         )
-        bottom = bottom.union(drain_marker)
+        # --- Torus drain path ---
+        # 45° arc from drain position, bending downward and toward +X.
+        # Arc center at same Z, offset +X by radius. Union for visibility.
+        arc_r = 20.0
+        profile_r = la.SG_DRAIN_ID / 2
+        drain_x = la.sg_drain_offset()
+
+        # Endpoint of 45° arc from center at (drain_x + arc_r, 0, 0)
+        # Arc goes from 180° (start, pointing -X from center) to 225°
+        end_x = arc_r + arc_r * math.cos(math.radians(225))
+        end_z = arc_r * math.sin(math.radians(225))
+
+        path = (
+            cq.Workplane("XZ")
+            .transformed(offset=(drain_x, 0, 0))
+            .moveTo(0, 0)
+            .radiusArc((end_x, end_z), -arc_r)
+        )
+
+        torus_section = (
+            cq.Workplane("XY")
+            .circle(profile_r)
+            .sweep(path)
+        )
+
+        bottom = bottom.union(torus_section)
 
         return bottom
 
