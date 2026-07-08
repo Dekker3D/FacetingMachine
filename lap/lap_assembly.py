@@ -132,7 +132,7 @@ class LapHolderBottom(bpd.PrintedPart):
         return (self.name, self.axle_dia, self.lap_thickness, self.bore_dia)
 
     def cone_height(self) -> float:
-        return 20.0
+        return 15.0
 
     def get_object(self) -> cq.Workplane:
         """Create the bottom part of the faceting lap holder."""
@@ -264,6 +264,41 @@ class SplashGuard(bpd.PrintedPart):
 
         guard = guard.cut(cutout)
 
+        # --- Central tower ---
+        # Filled cylinder with inverted cone cutout, rising from the floor.
+        # Prevents water from reaching the shaft hole.
+        tower_od = 56.0
+        tower_h = 15.0
+        floor_z = la.SG_THICKNESS
+
+        # Inverted cone: wide at tower top, narrow at floor.
+        cone_top_r = la.LAP_HOLE_DIA / 2 + 5   # clears holder + adapter
+        cone_floor_r = la.LAP_AXLE_DIA / 2 + 1  # clears shaft
+
+        cone_cut_pts = [
+            (tower_od / 2, tower_h),   # top outer
+            (cone_top_r, tower_h),      # top inner (rim of cone)
+            (cone_floor_r, 0),          # floor at shaft
+            (tower_od / 2, 0),          # floor outer
+        ]
+        cone_cutout = (
+            cq.Workplane("XZ")
+            .polyline(cone_cut_pts)
+            .close()
+            .revolve(360, (0, 0, 0), (0, 1, 0))
+        )
+
+        tower = (
+            cq.Workplane("XY")
+            .cylinder(tower_h, tower_od / 2,
+                      centered=(True, True, False))
+            .translate((0, 0, floor_z))
+            .cut(cone_cutout.translate((0, 0, floor_z)))
+            .faces("<Z").workplane().hole(la.LAP_AXLE_DIA + 0.5)
+        )
+
+        guard = guard.union(tower)
+
         return guard
 
     def make(self, la: LapAssembly) -> cq.Workplane:
@@ -312,6 +347,18 @@ class SplashGuardBottom(bpd.PrintedPart):
             )
             .cboreHole(3.2, 6, 15)
         )
+
+        # Drain position marker — small cylinder at the SGT drain hole
+        # position, extending downward only. For alignment verification.
+        marker_h = la.SG_THICKNESS + 3
+        drain_marker = (
+            cq.Workplane("XY")
+            .transformed(offset=(la.sg_drain_offset(), 0, 0))
+            .cylinder(marker_h, la.SG_DRAIN_OD / 2 + 1,
+                      centered=(True, True, False))
+            .translate((0, 0, -marker_h))  # top at Z=0, extends downward
+        )
+        bottom = bottom.union(drain_marker)
 
         return bottom
 
