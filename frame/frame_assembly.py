@@ -3,6 +3,7 @@ import math
 import cadquery as cq
 from cadquery import Location
 import bom_part_data as bpd
+import bought_bits as bb
 import frame.frame_abstract as frame_abstract
 import lap.lap_abstract as lap_abstract
 import mast.mast_abstract as mast_abstract
@@ -89,7 +90,18 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
                 color=cq.Color("yellow"),
             )
             .add(
-                MastCarriage.make(self),
+                MastCarriage(
+                    carriage_length=cfg.MAST_CARRIAGE_LENGTH,
+                    carriage_clearance=cfg.MAST_CARRIAGE_CLEARANCE,
+                    carriage_thickness=cfg.MAST_CARRIAGE_THICKNESS,
+                    frame_rail_dia=cfg.FRAME_RAIL_DIA,
+                    mast_holder_thickness=cfg.MAST_HOLDER_THICKNESS,
+                    mast_holder_height=cfg.MAST_HOLDER_HEIGHT,
+                    frame_width_internal=self.frame_width_internal(),
+                    frame_rail_width=self.frame_rail_width(),
+                    mast_spine_ext_width=self.mast.spine_ext_width,  # type: ignore[union-attr]
+                    mast_spine_ext_thickness=self.mast.spine_ext_thickness,  # type: ignore[union-attr]
+                ).get_object(),
                 name="mast_carriage",
                 loc=Location((-self.frame_length() / 2 + self.mast_vis_x, 0, 20)),
                 color=cq.Color("red"),
@@ -119,7 +131,31 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
         return assembly
 
     def get_BOM(self) -> bpd.BOM:
-        return bpd.BOM()
+        assert self.lap is not None and self.mast is not None
+        bom = bpd.BOM()
+        # Printed parts
+        bom.add(MastCarriage(
+            carriage_length=cfg.MAST_CARRIAGE_LENGTH,
+            carriage_clearance=cfg.MAST_CARRIAGE_CLEARANCE,
+            carriage_thickness=cfg.MAST_CARRIAGE_THICKNESS,
+            frame_rail_dia=cfg.FRAME_RAIL_DIA,
+            mast_holder_thickness=cfg.MAST_HOLDER_THICKNESS,
+            mast_holder_height=cfg.MAST_HOLDER_HEIGHT,
+            frame_width_internal=self.frame_width_internal(),
+            frame_rail_width=self.frame_rail_width(),
+            mast_spine_ext_width=self.mast.spine_ext_width,
+            mast_spine_ext_thickness=self.mast.spine_ext_thickness,
+        ))
+        bom.add(FrameLeg(
+            ext_width=self.frame_ext_width,
+            ext_height=self.frame_ext_height,
+            leg_length=self.frame_leg_length,
+        ), 4)
+        # Off-the-shelf
+        bom.add(bb.TslotExtrusion2020(self.frame_width()), 2)
+        bom.add(bb.TslotExtrusion2020(self.frame_length() - 40), 2)
+        bom.add(bb.SmoothRod(diameter=cfg.FRAME_RAIL_DIA, length=self.mast_space()), 2)
+        return bom
 
 
 class FrameExtrusions:
@@ -170,37 +206,66 @@ class MastRails:
         return rail
 
 
-class MastCarriage:
-    """
-    Rides on the rails, holds 2020 extrusion of mast.
-    Z=0 is at the top of the frame.
-    """
+class MastCarriage(bpd.PrintedPart):
+    """Rides on the rails, holds 2020 extrusion of mast. Z=0 is at frame top."""
 
-    @classmethod
-    def make(cls, fa: FrameAssembly) -> cq.Workplane:
-        assert fa.mast is not None
-        rail_Z = -cfg.FRAME_RAIL_DIA / 2
+    def __init__(
+        self,
+        carriage_length: float,
+        carriage_clearance: float,
+        carriage_thickness: float,
+        frame_rail_dia: float,
+        mast_holder_thickness: float,
+        mast_holder_height: float,
+        frame_width_internal: float,
+        frame_rail_width: float,
+        mast_spine_ext_width: float,
+        mast_spine_ext_thickness: float,
+    ) -> None:
+        self.carriage_length = carriage_length
+        self.carriage_clearance = carriage_clearance
+        self.carriage_thickness = carriage_thickness
+        self.frame_rail_dia = frame_rail_dia
+        self.mast_holder_thickness = mast_holder_thickness
+        self.mast_holder_height = mast_holder_height
+        self.frame_width_internal = frame_width_internal
+        self.frame_rail_width = frame_rail_width
+        self.mast_spine_ext_width = mast_spine_ext_width
+        self.mast_spine_ext_thickness = mast_spine_ext_thickness
+        super().__init__(name="Mast Carriage")
 
-        holder_width = fa.mast.spine_ext_width + cfg.MAST_HOLDER_THICKNESS * 2
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name, self.carriage_length, self.carriage_clearance,
+            self.carriage_thickness, self.frame_rail_dia,
+            self.mast_holder_thickness, self.mast_holder_height,
+            self.frame_width_internal, self.frame_rail_width,
+            self.mast_spine_ext_width, self.mast_spine_ext_thickness,
+        )
+
+    def get_object(self) -> cq.Workplane:
+        """Create the mast carriage geometry."""
+        rail_Z = -self.frame_rail_dia / 2
+        holder_width = self.mast_spine_ext_width + self.mast_holder_thickness * 2
         holder_thickness = (
-            fa.mast.spine_ext_thickness + cfg.MAST_HOLDER_THICKNESS * 2
+            self.mast_spine_ext_thickness + self.mast_holder_thickness * 2
         )
 
         carriage = (
             cq.Workplane("XY", origin=(0, 0, rail_Z + 1))
             .box(
-                cfg.MAST_CARRIAGE_LENGTH,
-                fa.frame_width_internal() - cfg.MAST_CARRIAGE_CLEARANCE * 2,
-                cfg.MAST_CARRIAGE_THICKNESS + cfg.FRAME_RAIL_DIA / 2 - 1,
+                self.carriage_length,
+                self.frame_width_internal - self.carriage_clearance * 2,
+                self.carriage_thickness + self.frame_rail_dia / 2 - 1,
                 centered=(True, True, False),
             )
             # Rail slots
             .faces(">X")
             .workplane(origin=(0, 0, rail_Z))
-            .moveTo(fa.frame_rail_width() / 2, 0)
-            .hole(cfg.FRAME_RAIL_DIA)
-            .moveTo(-fa.frame_rail_width() / 2, 0)
-            .hole(cfg.FRAME_RAIL_DIA)
+            .moveTo(self.frame_rail_width / 2, 0)
+            .hole(self.frame_rail_dia)
+            .moveTo(-self.frame_rail_width / 2, 0)
+            .hole(self.frame_rail_dia)
         )
 
         # Structure to hold mast.
@@ -209,42 +274,56 @@ class MastCarriage:
             .box(
                 holder_thickness,
                 holder_width,
-                cfg.MAST_HOLDER_HEIGHT,
+                self.mast_holder_height,
                 centered=(True, True, False),
             )
         )
 
         cutoutPoints = [
-            (-fa.mast.spine_ext_thickness / 2, -fa.mast.spine_ext_width / 2),
-            (fa.mast.spine_ext_thickness / 2, -fa.mast.spine_ext_width / 2),
+            (-self.mast_spine_ext_thickness / 2, -self.mast_spine_ext_width / 2),
+            (self.mast_spine_ext_thickness / 2, -self.mast_spine_ext_width / 2),
             (40, -40),
             (40, 40),
-            (fa.mast.spine_ext_thickness / 2, fa.mast.spine_ext_width / 2),
-            (-fa.mast.spine_ext_thickness / 2, fa.mast.spine_ext_width / 2),
+            (self.mast_spine_ext_thickness / 2, self.mast_spine_ext_width / 2),
+            (-self.mast_spine_ext_thickness / 2, self.mast_spine_ext_width / 2),
         ]
         carriage = carriage.cut(
             cq.Workplane("XY", origin=(0, 0, 0))
             .polyline(cutoutPoints)
             .close()
-            .extrude(cfg.MAST_HOLDER_HEIGHT)
+            .extrude(self.mast_holder_height)
         )
 
         return carriage
 
 
-class FrameLeg:
-    """Just a leg for the machine to stand on."""
+class FrameLeg(bpd.PrintedPart):
+    """A single leg for the machine to stand on. Printed 4x."""
 
-    @classmethod
-    def make(cls, fa: FrameAssembly) -> cq.Workplane:
+    def __init__(
+        self,
+        ext_width: float,
+        ext_height: float,
+        leg_length: float,
+    ) -> None:
+        self.ext_width = ext_width
+        self.ext_height = ext_height
+        self.leg_length = leg_length
+        super().__init__(name="Frame Leg")
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name, self.ext_width, self.ext_height, self.leg_length)
+
+    def get_object(self) -> cq.Workplane:
+        """Return one printable leg."""
         leg_pts = [
-            (-fa.frame_ext_width, fa.frame_ext_height),
-            (0, fa.frame_ext_height),
+            (-self.ext_width, self.ext_height),
+            (0, self.ext_height),
             (20, 0),
-            (20, -fa.frame_leg_length),
-            (0, -fa.frame_leg_length),
+            (20, -self.leg_length),
+            (0, -self.leg_length),
             (0, -20),
-            (-fa.frame_ext_width, 0),
+            (-self.ext_width, 0),
         ]
 
         leg = (
@@ -259,16 +338,16 @@ class FrameLeg:
         )
 
         leg = leg.cut(
-            cq.Workplane("XY", origin=(0, -fa.frame_ext_width / 2, 0))
+            cq.Workplane("XY", origin=(0, -self.ext_width / 2, 0))
             .box(
-                20, fa.frame_ext_width, fa.frame_ext_height,
+                20, self.ext_width, self.ext_height,
                 centered=(True, True, False),
             )
         )
 
         leg = (
             leg.faces(">Y")
-            .workplane(origin=(0, 0, fa.frame_ext_height / 2))
+            .workplane(origin=(0, 0, self.ext_height / 2))
             .cboreHole(5.2, 8.0, 15.0, 20.0)
         )
 
@@ -282,7 +361,13 @@ class FrameLeg:
 
     @classmethod
     def make_legs(cls, fa: FrameAssembly) -> cq.Workplane:
-        legs = cls.make(fa).translate(
+        """Create the 4-leg compound for assembly visualization."""
+        leg_part = cls(
+            ext_width=fa.frame_ext_width,
+            ext_height=fa.frame_ext_height,
+            leg_length=fa.frame_leg_length,
+        )
+        legs = leg_part.get_object().translate(
             (
                 fa.frame_length() / 2 - 10 - fa.frame_ext_width,
                 fa.frame_width() / 2,

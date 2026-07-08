@@ -1,21 +1,42 @@
 from __future__ import annotations
 import cadquery as cq
+import bom_part_data as bpd
 
 
-class HandWheel:
-    """A handwheel to attach to the top of the leadscrew."""
+class HandWheel(bpd.PrintedPart):
+    """A handwheel to attach to the top of the leadscrew. Uses captive nut."""
 
-    wheel_height: float = 10.0
-    wheel_dia: float = 60.0
-    attachment_dia: float = 30.0
-    attachment_height: float = 10.0
-    axle_dia: float = 8.0
-    screw_dia: float = 3.2
-    nut_face_to_face: float = 5.6
-    nut_thickness: float = 2.5
+    def __init__(
+        self,
+        wheel_height: float = 10.0,
+        wheel_dia: float = 60.0,
+        attachment_dia: float = 30.0,
+        attachment_height: float = 10.0,
+        axle_dia: float = 8.0,
+        screw_dia: float = 3.2,
+        nut_face_to_face: float = 5.6,
+        nut_thickness: float = 2.5,
+    ) -> None:
+        self.wheel_height = wheel_height
+        self.wheel_dia = wheel_dia
+        self.attachment_dia = attachment_dia
+        self.attachment_height = attachment_height
+        self.axle_dia = axle_dia
+        self.screw_dia = screw_dia
+        self.nut_face_to_face = nut_face_to_face
+        self.nut_thickness = nut_thickness
+        super().__init__(name="Handwheel")
 
-    def make(self) -> cq.Workplane:
-        """Make the handwheel, centered on origin. Uses captive nut."""
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name, self.wheel_height, self.wheel_dia,
+            self.attachment_dia, self.attachment_height,
+            self.axle_dia, self.screw_dia,
+            self.nut_face_to_face, self.nut_thickness,
+        )
+
+    def get_object(self) -> cq.Workplane:
+        """Make the handwheel, centered on origin."""
         hw = (
             cq.Workplane("XY")
             .cylinder(

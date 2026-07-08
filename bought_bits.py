@@ -231,3 +231,15 @@ class StraightShankColletExtension(BoughtPartWithModel):
         return cq.Workplane("XZ").cylinder(
             self.dia, self.length, centered=(True, True, False)
         )
+
+
+class SmoothRod(bom.PartWithMetadata):
+    """A smooth rod (off-the-shelf). No geometry, just metadata for BOM."""
+
+    def __init__(self, diameter: float, length: float) -> None:
+        self.diameter = diameter
+        self.length = length
+        super().__init__(name=f"Smooth Rod {diameter}x{length}mm")
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name, self.diameter, self.length)

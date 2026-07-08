@@ -191,7 +191,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                 color=Color("purple"),
             )
             .add(
-                hw.make(),
+                hw.get_object(),
                 name="handwheel",
                 loc=Location(
                     self.leadscrew_x(), 0,
@@ -332,7 +332,29 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             return hinge
 
     def get_BOM(self) -> bpd.BOM:
-        return bpd.BOM()
+        bom = bpd.BOM()
+        # Printed parts
+        bom.add(BearingHolder(
+            spine_span=self.spine_ext_width,
+            leadscrew_dist=self.leadscrew_dist_from_spine(),
+            diagonal_length=self.bh_diagonal_length(),
+            diagonal_height=self.bh_diagonal_height(),
+            cylinder_height=self.bh_cylinder_height(),
+            bolt_head_height=self.bh_bolt_head_height(),
+            bolt_hole_length=self.BH_BOLT_HOLE_LENGTH,
+            bolt_hole_dia=self.BH_BOLT_HOLE_DIA,
+            bolt_head_dia=self.BH_BOLT_HEAD_DIA,
+            leadscrew_dia=self.leadscrew_dia,
+            leadscrew_hole_space=self.BH_LEADSCREW_HOLE_SPACE,
+            bearing_type=bb.Bearing608ZZ,
+        ), 2)  # top and bottom
+        bom.add(handwheel.HandWheel())
+        # Off-the-shelf
+        bom.add(bb.TslotExtrusion2020(self.spine_length()))
+        bom.add(bb.RailMGN15H(self.rail_length))
+        bom.add(bb.LeadScrewT8(self.leadscrew_length()))
+        bom.add(bb.Bearing608ZZ(name="608ZZ Bearing"), 2)  # bearings for leadscrew
+        return bom
 
 
 class BearingHolder(bpd.PrintedPart):

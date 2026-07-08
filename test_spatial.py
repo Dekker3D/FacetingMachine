@@ -128,7 +128,7 @@ def test_handwheel_doesnt_hit_bearing_holder() -> None:
     bh = ma.make_bearing_holder()
 
     from mast.handwheel import HandWheel
-    hw = HandWheel().make()
+    hw = HandWheel().get_object()
 
     hw_z = ma.rail_start_y() + ma.rail_length + ma.bh_total_height()
     hw_placed = hw.translate((ma.leadscrew_x(), 0, hw_z))
