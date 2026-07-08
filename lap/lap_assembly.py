@@ -352,60 +352,46 @@ class SplashGuard(bpd.PrintedPart):
 
         guard = guard.cut(cutout)
 
-        # --- Central tower ---
-        # Filled cylinder with inverted cone cutout. The solid ring between
-        # cone and outer wall provides material for screw holes from below.
-        tower_od = la.sg_tower_OD()  # e.g. 56mm
-        tower_id = la.SG_TOWER_ID    # e.g. 50mm
-
-        # The inverted cone cutout: wider at tower top, narrow at floor.
-        # Clears the lap holder bottom's cone profile.
-        holder_top_r = la.LAP_HOLE_DIA / 2 + 3  # clears holder + adapter
-        tower_top_r = tower_id / 2
-
-        # Cone cutout points (revolved in XZ): from tower top inward to floor
-        cone_cut_pts = [
-            (tower_top_r, la.SG_TOWER_HEIGHT),        # top outer (tower ID)
-            (holder_top_r, la.SG_TOWER_HEIGHT),       # top inner (clears holder)
-            (la.LAP_AXLE_DIA / 2 + 0.5, 0),           # floor at shaft
-            (tower_top_r, 0),                          # floor outer
-        ]
-        cone_cutout = (
-            cq.Workplane("XZ")
-            .polyline(cone_cut_pts)
-            .close()
-            .revolve(360, (0, 0, 0), (0, 1, 0))
-        )
-
+        # Central tower (prevents water from going down shaft hole)
         tower = (
             cq.Workplane("XY")
-            .cylinder(la.SG_TOWER_HEIGHT, tower_od / 2,
-                      centered=(True, True, False))
+            .cylinder(
+                la.SG_TOWER_HEIGHT,
+                la.sg_tower_OD() / 2,
+                centered=(True, True, False),
+            )
             .translate((0, 0, floor_z))
-            .cut(cone_cutout.translate((0, 0, floor_z)))
-            # Shaft hole through the floor
+            # Hollow out the tower
+            .faces(">Z")
+            .workplane()
+            .hole(la.SG_TOWER_ID)
+            # Shaft hole through the bottom
             .faces("<Z")
             .workplane()
             .hole(la.LAP_AXLE_DIA + 0.5)
         )
 
-        # Screw holes: 4x through the solid ring of the tower, for
-        # self-tapping screws coming up from the SGB below.
-        screw_r = la.sg_tower_screw_radius()
-        screw_positions = [
-            (screw_r * math.cos(math.radians(a)),
-             screw_r * math.sin(math.radians(a)))
+        # Screw bosses on top of tower for SGB attachment
+        screw_radius = la.sg_tower_screw_radius()
+        boss_positions = [
+            (screw_radius * math.cos(math.radians(a)),
+             screw_radius * math.sin(math.radians(a)))
             for a in (45, 135, 225, 315)
         ]
-        tower = (
-            tower
+        bosses = (
+            cq.Workplane("XY")
+            .pushPoints(boss_positions)
+            .circle(5.0)  # boss OD
+            .extrude(la.SG_TOWER_HEIGHT)
+            .translate((0, 0, floor_z))
+            # Pilot holes for self-tapping screws
             .faces(">Z")
             .workplane()
-            .pushPoints(screw_positions)
-            .hole(2.5, la.SG_TOWER_HEIGHT + 5)
+            .pushPoints(boss_positions)
+            .hole(2.5, la.SG_TOWER_HEIGHT + 5)  # pilot hole through boss
         )
 
-        guard = guard.union(tower)
+        guard = guard.union(tower).union(bosses)
 
         return guard
 
@@ -422,8 +408,9 @@ class SplashGuardBottom(bpd.PrintedPart):
     Splash guard bottom. Sits below the SGT, holds the lap shaft with
     two 608ZZ bearings, and provides a drain socket.
 
-    Cone-shaped body for printability (printed upside-down: flat top face
-    on the print bed, bearing housing and drain pointing upward).
+    Printed upside-down: the flat face that mates with the SGT is on
+    the print bed. The bearing housing and drain socket point upward
+    during printing (45° = no supports needed).
     """
 
     def __init__(self, la: LapAssembly) -> None:
@@ -436,126 +423,98 @@ class SplashGuardBottom(bpd.PrintedPart):
     def get_object(self) -> cq.Workplane:
         """Create the splash guard bottom."""
         la = self.la
-        bearing_od = bb.Bearing608ZZ.OD    # 22mm
-        bearing_w = bb.Bearing608ZZ.WIDTH   # 7mm
-        spacer_h = 10.0                     # between bearings
+        bearing_od = bb.Bearing608ZZ.OD   # 22mm
+        bearing_w = bb.Bearing608ZZ.WIDTH  # 7mm
+        spacer_h = 10.0  # spacer between bearings
 
+        # Total bearing stack depth
         bearing_stack_h = bearing_w * 2 + spacer_h
+        housing_od = bearing_od + 8.0  # ~30mm
 
-        # --- Cone body (revolved profile, like original) ---
-        # Top disc radius: covers the tower + some extra for screw landings
-        top_r = la.sg_tower_OD() / 2 + 5.0   # ~33mm
-        # Bottom of cone: bearing housing OD
-        cone_bottom_r = bearing_od / 2 + 4.0  # ~15mm
-        cone_height = bearing_stack_h + 8.0   # slope down to bearing section
+        # Base plate: flat annular disc that mates with SGT tower + floor
+        base_od = la.sg_tower_OD() + 20.0
+        base_thickness = 4.0
 
-        cone_pts = [
-            (0, 0),                     # center bottom
-            (top_r, 0),                 # wide flat top (mates with SGT)
-            (cone_bottom_r, -cone_height),  # cone slopes inward
-            (cone_bottom_r, -(cone_height + bearing_stack_h + 5)),  # bearing section
-            (0, -(cone_height + bearing_stack_h + 5)),  # center bottom
-        ]
-
-        body = (
-            cq.Workplane("XZ")
-            .polyline(cone_pts)
-            .close()
-            .revolve(360, (0, 0, 0), (0, 1, 0))
+        # --- Base plate ---
+        base = (
+            cq.Workplane("XY")
+            .circle(base_od / 2)
+            .extrude(base_thickness)
         )
 
-        # --- Shaft hole ---
-        body = (
-            body
+        # --- Bearing housing (extends downward from base, so -Z) ---
+        housing = (
+            cq.Workplane("XY")
+            .circle(housing_od / 2)
+            .extrude(bearing_stack_h + base_thickness)
+            .translate((0, 0, -bearing_stack_h))
+            # Shaft hole
             .faces("<Z")
-            .workplane(origin=(0, 0, 0))
+            .workplane()
             .hole(la.LAP_AXLE_DIA + 0.3)
-        )
-
-        # --- Upper bearing recess (closest to lap, at bottom of cone) ---
-        body = (
-            body
+            # Upper bearing recess (closest to lap)
+            .faces(">Z")
+            .workplane(offset=base_thickness + spacer_h)
+            .hole(bearing_od + 0.2, bearing_w)
+            # Lower bearing recess (bottom)
             .faces("<Z")
-            .workplane(origin=(0, 0, 0))
+            .workplane()
             .hole(bearing_od + 0.2, bearing_w)
         )
 
-        # --- Lower bearing recess (at very bottom) ---
-        body = (
-            body
-            .faces("<Z")
-            .workplane(origin=(0, 0, 0))
-            .hole(bearing_od + 0.2, bearing_stack_h + 5)
-        )
-
-        # --- Spacer cutout between bearings ---
-        # Remove material between the two bearing recesses
-        spacer_cutout_z = -(cone_height + bearing_w)
-        body = (
-            body
-            .faces("<Z")
-            .workplane(origin=(0, 0, spacer_cutout_z))
-            .hole(la.LAP_AXLE_DIA + 4.0, spacer_h)
-        )
-
-        # --- Screw holes (into SGT tower from below) ---
-        screw_r = la.sg_tower_screw_radius()
+        # --- Screw holes for attaching to SGT tower ---
+        screw_radius = la.sg_tower_screw_radius()
         screw_positions = [
-            (screw_r * math.cos(math.radians(a)),
-             screw_r * math.sin(math.radians(a)))
+            (screw_radius * math.cos(math.radians(a)),
+             screw_radius * math.sin(math.radians(a)))
             for a in (45, 135, 225, 315)
         ]
-        body = (
-            body
+        screws = (
+            base
             .faces(">Z")
-            .workplane(origin=(0, 0, 0))
+            .workplane()
             .pushPoints(screw_positions)
-            .cboreHole(3.2, 6.0, 3.0, top_r)  # through the flat top disc
+            .cboreHole(3.2, 6.0, 3.0, base_thickness)
         )
+        base = base.cut(screws)  # cut screw holes from base
 
-        # --- Drain: pad + channel + socket ---
+        # --- Drain socket ---
+        # Channel from the SGT drain hole position to the +X edge,
+        # ending in a 45° downward socket for the hose.
         drain_x = la.sg_drain_offset()
+        drain_y = 0.0
+        edge_x = base_od / 2 - 5
 
-        # Pad under the drain hole (provides material for channel)
-        pad_r = la.SG_DRAIN_OD / 2 + 5.0
-        pad = (
-            cq.Workplane("XY")
-            .workplane(offset=0)
-            .transformed(offset=(drain_x, 0, 0))
-            .circle(pad_r)
-            .extrude(la.SG_THICKNESS + 2.0)
-        )
-
-        # Channel from drain position to +X edge (cut into the pad + body)
+        # Channel: rectangular groove in the top face
         channel_w = la.SG_DRAIN_TUBE_OD + 2
-        channel_h = la.SG_DRAIN_TUBE_OD
-        edge_x = la.sg_tower_OD() / 2 + 20
+        channel_d = 4.0
         channel = (
-            cq.Workplane("XZ")
-            .transformed(offset=(drain_x, 0, 0))
-            .box(edge_x - drain_x + 10, channel_w, channel_h,
-                 centered=(False, True, False))
-            .translate((0, 0, -la.SG_THICKNESS))
+            cq.Workplane("XY")
+            .transformed(offset=(drain_x, -channel_w / 2, 0))
+            .box(edge_x - drain_x + 5, channel_w, channel_d,
+                 centered=(False, False, False))
         )
+        base = base.cut(channel)
 
-        # 45° socket at the +X edge
+        # Socket: 45° downward tube at the edge
         socket_len = 20.0
-        socket_r = la.SG_DRAIN_TUBE_OD / 2 + 1.0
-        socket_center_z = -(la.SG_THICKNESS + channel_h / 2)
-
-        # Build socket in its own coordinate system then translate
         socket = (
-            cq.Workplane("YZ")
-            .transformed(offset=(0, 0, 0))
-            .workplane(offset=edge_x - 5)
-            .center(0, socket_center_z)
-            .circle(socket_r)
+            cq.Workplane("XZ")
+            .workplane(offset=-(base_thickness + channel_d))
+            .transformed(
+                offset=(edge_x - 5, 0, 0),
+                rotate=(0, -45, 0),
+            )
+            .circle(la.SG_DRAIN_TUBE_OD / 2 + 1.0)
             .extrude(socket_len)
         )
+        # Cut the socket void from the base
+        base = base.cut(socket)
 
-        body = body.union(pad).cut(channel).cut(socket)
+        # --- Join base + housing ---
+        sgb = base.union(housing)
 
-        return body
+        return sgb
 
     def make(self, la: LapAssembly) -> cq.Workplane:
         return self.get_object()
