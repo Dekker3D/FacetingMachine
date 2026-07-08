@@ -1,11 +1,12 @@
-# This allows easier type-hinting.
 from __future__ import annotations
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from frame_mast_joint.frame_mast_joint_abstract import FrameMastJointBase
+    from mast.mast_abstract import MastAssemblyBase
+
 
 class MastAssemblyBase:
-    frame_joint: FrameMastJointBase = None
+    frame_joint: object | None = None
 
-    def set_frame_joint(self, frame_joint: FrameMastJointBase):
+    def set_frame_joint(self, frame_joint: object) -> None:
         self.frame_joint = frame_joint

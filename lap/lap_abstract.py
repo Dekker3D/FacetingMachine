@@ -1,5 +1,7 @@
-import bom_part_data as bom
+from __future__ import annotations
+import bom_part_data as bpd
 
-class LapAssemblyBase(bom.PartAssembly):
-    def required_frame_width():
+
+class LapAssemblyBase(bpd.PartAssembly):
+    def required_frame_width(self) -> float:
         raise NotImplementedError()

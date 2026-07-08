@@ -1,6 +1,8 @@
-import cadquery as cq
+from __future__ import annotations
 import math
+import cadquery as cq
 from cadquery import Location, Color
+
 import bought_bits as bb
 import bom_part_data as bpd
 import mast.mast_abstract as mast_abstract
@@ -12,101 +14,119 @@ import mast.handwheel as handwheel
 # The mast faces left (+X), the lap is to the left of the mast.
 
 
-
 class MastAssembly(mast_abstract.MastAssemblyBase):
     """Class representing the entire mast assembly with all components."""
 
-    quill: quill_abstract.QuillAssemblyBase = None
-    quill_joint: quill_joint_abstract.QuillHolderJointBase = None
+    quill: quill_abstract.QuillAssemblyBase | None = None
+    quill_joint: quill_joint_abstract.QuillHolderJointBase | None = None
 
-    desired_vertical_travel = 300.0
+    desired_vertical_travel: float = 300.0
+    rail_length: float = 400.0
+    leadscrew_dia: float = 8.0
+    handwheel_height: float = 10.0
 
-    rail_length = 400.0
+    spine_ext_width: float = 20.0
+    spine_ext_thickness: float = 20.0
 
-    leadscrew_dia = 8.0
-    def leadscrew_length(self):
-        return math.ceil((self.rail_length + self.bh_total_height() + self.bh_cylinder_height() + self.handwheel_height) / 50.0) * 50.0
+    QUILL_CARRIAGE_NUT_DEPTH: float = bb.LeadScrewT8.NUT_THICKNESS + 1.5
+    RAIL_CARRIAGE_Y_OFFSET: float = 10.0 + QUILL_CARRIAGE_NUT_DEPTH
 
-    def spine_length(self):
-        return math.ceil((self.bh_total_height() * 2 + self.rail_length) / 20.0) * 20.0
+    qc_joint_dia: float = 25.0
+    qc_joint_length: float = 80.0
 
-    handwheel_height = 10.0
+    BH_LEADSCREW_HOLE_SPACE: float = 4.0
+    BH_BOLT_HOLE_LENGTH: float = 8.0
+    BH_BOLT_HOLE_DIA: float = 5.0
+    BH_BOLT_HEAD_DIA: float = 10.0
 
-    # 20x20mm aluminum t-slot extrusion
-    spine_ext_width = 20.0
-    spine_ext_thickness = 20.0
+    def leadscrew_length(self) -> float:
+        return (
+            math.ceil(
+                (self.rail_length
+                 + self.bh_total_height()
+                 + self.bh_cylinder_height()
+                 + self.handwheel_height)
+                / 50.0
+            )
+            * 50.0
+        )
 
-    def rail_x(self):
+    def spine_length(self) -> float:
+        return (
+            math.ceil(
+                (self.bh_total_height() * 2 + self.rail_length) / 20.0
+            )
+            * 20.0
+        )
+
+    def rail_x(self) -> float:
         return self.spine_ext_thickness / 2
 
-    def rail_surface_x(self):
+    def rail_surface_x(self) -> float:
         return bb.RailMGN15H.total_height() + self.rail_x()
 
-    def leadscrew_rail_spacing(self):
+    def leadscrew_rail_spacing(self) -> float:
         return bb.LeadScrewT8.NUT_DIA / 2 + 5.0
 
-    def leadscrew_x(self):
+    def leadscrew_x(self) -> float:
         return self.leadscrew_rail_spacing() + self.rail_surface_x()
 
-    def quill_holder_x(self):
-        return self.leadscrew_x() + bb.LeadScrewT8.NUT_DIA / 2 + 3.0 + self.quill_joint.space_needed_carriage_x()
-    
-    def quill_holder_z(self):
+    def quill_holder_x(self) -> float:
+        assert self.quill_joint is not None
+        return (
+            self.leadscrew_x()
+            + bb.LeadScrewT8.NUT_DIA / 2
+            + 3.0
+            + self.quill_joint.space_needed_carriage_x()
+        )
+
+    def quill_holder_z(self) -> float:
+        assert self.quill_joint is not None
         return self.quill_joint.offset_carriage_z()
 
-    def rail_start_y(self):
+    def rail_start_y(self) -> float:
         return self.bh_total_height()
 
-    QUILL_CARRIAGE_NUT_DEPTH = bb.LeadScrewT8.NUT_THICKNESS + 1.5
-    RAIL_CARRIAGE_Y_OFFSET = 10.0 + QUILL_CARRIAGE_NUT_DEPTH
-
-    def quill_carriage_display_height(self):
-        # Height of the quill carriage for visualization.
+    def quill_carriage_display_height(self) -> float:
+        """Height of the quill carriage for visualization."""
         return self.rail_start_y() + 100.0
 
-    def screw_distance_from_mast(self):
-        # Distance from mast surface to center of leadscrew, includes clearance
-        return bb.RailMGN15H.total_height() + bb.LeadScrewT8.NUT_DIA / 2 + 5.0
+    def screw_distance_from_mast(self) -> float:
+        return (
+            bb.RailMGN15H.total_height()
+            + bb.LeadScrewT8.NUT_DIA / 2
+            + 5.0
+        )
 
-    # Quill carriage
-    qc_joint_dia = 25
-    qc_joint_length = 80
-
-    def leadscrew_dist_from_spine(self):
+    def leadscrew_dist_from_spine(self) -> float:
         return self.leadscrew_x() - self.rail_x()
 
-    def leadscrew_dist_from_rail(self):
+    def leadscrew_dist_from_rail(self) -> float:
         return self.leadscrew_x() - self.rail_surface_x()
-    
-    def quill_holder_distance(self):
+
+    def quill_holder_distance(self) -> float:
         return self.quill_holder_x() - self.rail_surface_x()
-    
-    # Bearing-holder stuff
-    BH_LEADSCREW_HOLE_SPACE = 4.0
-    BH_BOLT_HOLE_LENGTH = 8.0
-    BH_BOLT_HOLE_DIA = 5.0
-    BH_BOLT_HEAD_DIA = 10.0
-    
-    def bh_bolt_head_height(self):
+
+    def bh_bolt_head_height(self) -> float:
         return self.BH_BOLT_HEAD_DIA / 2 + 5.0
 
-    def bh_diagonal_length(self):
-        # Don't need to go diagonal all the way to the mast.
+    def bh_diagonal_length(self) -> float:
         return self.leadscrew_dist_from_spine() - self.BH_BOLT_HOLE_LENGTH
 
-    def bh_diagonal_height(self):
-        # Keep some space for bolt head.
-        return max(self.bh_diagonal_length(), self.bh_bolt_head_height() + self.BH_BOLT_HEAD_DIA / 2)
+    def bh_diagonal_height(self) -> float:
+        return max(
+            self.bh_diagonal_length(),
+            self.bh_bolt_head_height() + self.BH_BOLT_HEAD_DIA / 2,
+        )
 
-    def bh_cylinder_height(self):
+    def bh_cylinder_height(self) -> float:
         return bb.Bearing608ZZ.WIDTH + 5.0
 
-    def bh_total_height(self):
+    def bh_total_height(self) -> float:
         return self.bh_diagonal_height() + self.bh_cylinder_height()
 
-    def make_assembly(self):
+    def make_assembly(self) -> cq.Assembly:
         """Assemble the mast components with colors for visualization."""
-
         hw = handwheel.HandWheel()
 
         assembly = (
@@ -121,7 +141,8 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                 self.make_mgn9_rail(self.rail_length),
                 name="rail",
                 loc=Location((self.rail_x(), 0, self.rail_start_y())),
-                color=Color("green"))
+                color=Color("green"),
+            )
             .add(
                 self.make_bearing_holder(),
                 name="bottom_bearing",
@@ -137,7 +158,11 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             .add(
                 self.make_mgn9_carriage(True),
                 name="carriage1",
-                loc=Location((10, 0, self.quill_carriage_display_height() + self.RAIL_CARRIAGE_Y_OFFSET)),
+                loc=Location((
+                    10, 0,
+                    self.quill_carriage_display_height()
+                    + self.RAIL_CARRIAGE_Y_OFFSET,
+                )),
                 color=Color("yellow"),
             )
             .add(
@@ -149,33 +174,48 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             .add(
                 self.make_t8_nut(),
                 name="nut",
-                loc=Location((self.leadscrew_x(), 0, self.quill_carriage_display_height() + self.QUILL_CARRIAGE_NUT_DEPTH)),
+                loc=Location((
+                    self.leadscrew_x(), 0,
+                    self.quill_carriage_display_height()
+                    + self.QUILL_CARRIAGE_NUT_DEPTH,
+                )),
                 color=Color("orange"),
             )
             .add(
                 self.make_quill_carriage(),
                 name="hinge",
-                loc=Location((self.rail_surface_x(), 0, self.quill_carriage_display_height())),
+                loc=Location((
+                    self.rail_surface_x(), 0,
+                    self.quill_carriage_display_height(),
+                )),
                 color=Color("purple"),
             )
             .add(
                 hw.make(),
                 name="handwheel",
-                loc=Location(self.leadscrew_x(), 0, self.rail_start_y() + self.rail_length + self.bh_total_height()),
-                color=Color("orange")
+                loc=Location(
+                    self.leadscrew_x(), 0,
+                    self.rail_start_y() + self.rail_length
+                    + self.bh_total_height(),
+                ),
+                color=Color("orange"),
             )
         )
-        
-        if self.quill != None:
+
+        if self.quill is not None:
             assembly = assembly.add(
                 self.quill.make_assembly(),
                 name="quill_assembly",
-                loc=Location((self.quill_holder_x(), 0, self.quill_carriage_display_height() + self.quill_holder_z())),
+                loc=Location((
+                    self.quill_holder_x(), 0,
+                    self.quill_carriage_display_height()
+                    + self.quill_holder_z(),
+                )),
             )
 
         return assembly
 
-    def make_bearing_holder(self):
+    def make_bearing_holder(self) -> cq.Workplane:
         """Create a bearing holder instance for the current mast config."""
         return BearingHolder(
             spine_span=self.spine_ext_width,
@@ -192,45 +232,60 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             bearing_type=bb.Bearing608ZZ,
         ).get_object()
 
-    def make_mast_spine(self, length):
+    def make_mast_spine(self, length: float) -> cq.Workplane:
         """20x20 T-slot profile. Delegates to bought_bits."""
         return bb.TslotExtrusion2020(length).get_object()
 
-    def make_mgn9_rail(self, length, orient_for_assembly=True):
+    def make_mgn9_rail(
+        self, length: float, orient_for_assembly: bool = True
+    ) -> cq.Workplane:
         """MGN15H rail profile. Delegates to bought_bits."""
         rail = bb.RailMGN15H(length).get_object()
         if orient_for_assembly:
-            return (rail
-                    .rotate((0, 0, 0), (1, 0, 0), 90)
-                    .rotate((0, 0, 0), (0, 0, 1), 90))
+            return (
+                rail
+                .rotate((0, 0, 0), (1, 0, 0), 90)
+                .rotate((0, 0, 0), (0, 0, 1), 90)
+            )
         return rail
 
-    def make_mgn9_carriage(self, orient_for_assembly=True):
+    def make_mgn9_carriage(
+        self, orient_for_assembly: bool = True
+    ) -> cq.Workplane:
         """MGN15H carriage. Delegates to bought_bits."""
         carriage = bb.RailMGN15H.make_carriage()
         if orient_for_assembly:
-            return (carriage
-                    .rotate((0, 0, 0), (1, 0, 0), 90)
-                    .rotate((0, 0, 0), (0, 0, 1), 90))
+            return (
+                carriage
+                .rotate((0, 0, 0), (1, 0, 0), 90)
+                .rotate((0, 0, 0), (0, 0, 1), 90)
+            )
         return carriage
 
-    def make_t8_shaft(self):
+    def make_t8_shaft(self) -> cq.Workplane:
         """T8 leadscrew shaft. Delegates to bought_bits."""
         return bb.LeadScrewT8(self.leadscrew_length()).get_object()
 
-    def make_t8_nut(self):
+    def make_t8_nut(self) -> cq.Workplane:
         """T8 leadscrew nut. Delegates to bought_bits."""
         return bb.LeadScrewT8.make_nut()
 
+    def make_quill_carriage(
+        self, orient_for_assembly: bool = True
+    ) -> cq.Workplane:
+        """Vertical carriage with bearing hinge for quill holder."""
+        assert self.quill_joint is not None
 
-    def make_quill_carriage(self, orient_for_assembly=True):
-        """
-        Vertical carriage with bearing hinge for quill holder.
-        Designed to fit on MGN9 carriage.
-        """
-        hinge = (cq.Workplane("XY")
-                 .box(bb.RailMGN15H.CARRIAGE_WIDTH, self.quill_holder_distance(), bb.RailMGN15H.CARRIAGE_LENGTH + self.RAIL_CARRIAGE_Y_OFFSET, centered=(True, False, False))
-                 .translate((0, 0, 0)))
+        hinge = (
+            cq.Workplane("XY")
+            .box(
+                bb.RailMGN15H.CARRIAGE_WIDTH,
+                self.quill_holder_distance(),
+                bb.RailMGN15H.CARRIAGE_LENGTH + self.RAIL_CARRIAGE_Y_OFFSET,
+                centered=(True, False, False),
+            )
+            .translate((0, 0, 0))
+        )
         hinge = (
             hinge.faces("<Z")
             .workplane(offset=0)
@@ -240,25 +295,44 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             .faces("<Z")
             .workplane(offset=0)
             .move(0, -self.leadscrew_dist_from_rail())
-            .hole(bb.LeadScrewT8.NUT_DIA + 1.0, 1.5 + bb.LeadScrewT8.NUT_THICKNESS)
+            .hole(
+                bb.LeadScrewT8.NUT_DIA + 1.0,
+                1.5 + bb.LeadScrewT8.NUT_THICKNESS,
+            )
 
             .union(
-                self.quill_joint.add_shape(bb.RailMGN15H.CARRIAGE_WIDTH, self.quill_holder_distance() + 5.0)
-                .rotate((0, 0, 0), (0, 0, 1), -90)
-                .translate((0, self.quill_holder_distance(), self.quill_joint.offset_carriage_z()))
+                self.quill_joint.add_shape(
+                    bb.RailMGN15H.CARRIAGE_WIDTH,
+                    self.quill_holder_distance() + 5.0,
                 )
+                .rotate((0, 0, 0), (0, 0, 1), -90)
+                .translate((
+                    0,
+                    self.quill_holder_distance(),
+                    self.quill_joint.offset_carriage_z(),
+                ))
+            )
 
             .cut(
-                self.quill_joint.cut_shape(bb.RailMGN15H.CARRIAGE_WIDTH, self.quill_holder_distance() + 5.0)
+                self.quill_joint.cut_shape(
+                    bb.RailMGN15H.CARRIAGE_WIDTH,
+                    self.quill_holder_distance() + 5.0,
+                )
                 .rotate((0, 0, 0), (0, 0, 1), -90)
-                .translate((0, self.quill_holder_distance(), self.quill_joint.offset_carriage_z()))
+                .translate((
+                    0,
+                    self.quill_holder_distance(),
+                    self.quill_joint.offset_carriage_z(),
+                ))
             )
         )
         if orient_for_assembly:
-            return (hinge
-                    .rotate((0, 0, 0), (0, 0, 1), -90))
+            return hinge.rotate((0, 0, 0), (0, 0, 1), -90)
         else:
             return hinge
+
+    def get_BOM(self) -> bpd.BOM:
+        return bpd.BOM()
 
 
 class BearingHolder(bpd.PrintedPart):
@@ -269,46 +343,50 @@ class BearingHolder(bpd.PrintedPart):
     just builds geometry.
     """
 
-    def __init__(self, *,
-                 spine_span: float,
-                 leadscrew_dist: float,
-                 diagonal_length: float,
-                 diagonal_height: float,
-                 cylinder_height: float,
-                 bolt_head_height: float,
-                 bolt_hole_length: float,
-                 bolt_hole_dia: float,
-                 bolt_head_dia: float,
-                 leadscrew_dia: float,
-                 leadscrew_hole_space: float,
-                 bearing_type,
-                 ):
-        # spine_span = width of the mast spine in Y (this part spans that full width)
-        self.spine_span = spine_span
-        self.leadscrew_dist = leadscrew_dist
-        self.diagonal_length = diagonal_length
-        self.diagonal_height = diagonal_height
-        self.cylinder_height = cylinder_height
-        self.bolt_head_height = bolt_head_height
-        self.bolt_hole_length = bolt_hole_length
-        self.bolt_hole_dia = bolt_hole_dia
-        self.bolt_head_dia = bolt_head_dia
-        self.leadscrew_dia = leadscrew_dia
-        self.leadscrew_hole_space = leadscrew_hole_space
-        self.bearing_type = bearing_type
+    def __init__(
+        self,
+        *,
+        spine_span: float,
+        leadscrew_dist: float,
+        diagonal_length: float,
+        diagonal_height: float,
+        cylinder_height: float,
+        bolt_head_height: float,
+        bolt_hole_length: float,
+        bolt_hole_dia: float,
+        bolt_head_dia: float,
+        leadscrew_dia: float,
+        leadscrew_hole_space: float,
+        bearing_type: type[bb.BearingGeneric],
+    ) -> None:
+        self.spine_span: float = spine_span
+        self.leadscrew_dist: float = leadscrew_dist
+        self.diagonal_length: float = diagonal_length
+        self.diagonal_height: float = diagonal_height
+        self.cylinder_height: float = cylinder_height
+        self.bolt_head_height: float = bolt_head_height
+        self.bolt_hole_length: float = bolt_hole_length
+        self.bolt_hole_dia: float = bolt_hole_dia
+        self.bolt_head_dia: float = bolt_head_dia
+        self.leadscrew_dia: float = leadscrew_dia
+        self.leadscrew_hole_space: float = leadscrew_hole_space
+        self.bearing_type: type[bb.BearingGeneric] = bearing_type
         super().__init__(name="Bearing Holder")
 
-    def _comparables(self):
-        return (self.name, self.spine_span, self.leadscrew_dist,
-                self.diagonal_length, self.diagonal_height,
-                self.cylinder_height, self.bolt_head_height, self.bolt_hole_length,
-                self.bolt_hole_dia, self.bolt_head_dia, self.leadscrew_dia,
-                self.leadscrew_hole_space, self.bearing_type)
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name, self.spine_span, self.leadscrew_dist,
+            self.diagonal_length, self.diagonal_height,
+            self.cylinder_height, self.bolt_head_height,
+            self.bolt_hole_length, self.bolt_hole_dia,
+            self.bolt_head_dia, self.leadscrew_dia,
+            self.leadscrew_hole_space, self.bearing_type,
+        )
 
-    def total_height(self):
+    def total_height(self) -> float:
         return self.diagonal_height + self.cylinder_height
 
-    def get_object(self):
+    def get_object(self) -> cq.Workplane:
         block_shape_pts = [
             (0, 0),
             (self.leadscrew_dist - self.diagonal_length, 0),
@@ -329,7 +407,11 @@ class BearingHolder(bpd.PrintedPart):
             .faces(">Z")
             .workplane(offset=-(self.cylinder_height), origin=(0, 0, 0))
             .move(0, self.leadscrew_dist)
-            .cylinder(self.cylinder_height, self.bearing_type.OD / 2 + 4, centered=(True, True, False))
+            .cylinder(
+                self.cylinder_height,
+                self.bearing_type.OD / 2 + 4,
+                centered=(True, True, False),
+            )
             # Shaft hole
             .faces(">Z")
             .workplane()
@@ -344,10 +426,17 @@ class BearingHolder(bpd.PrintedPart):
 
         block = block.cut(
             cq.Workplane("top", origin=(0, 0, self.bolt_head_height))
-            .cylinder(self.bolt_hole_length, self.bolt_hole_dia / 2, centered=(True, True, False))
+            .cylinder(
+                self.bolt_hole_length,
+                self.bolt_hole_dia / 2,
+                centered=(True, True, False),
+            )
             .faces(">Y")
             .workplane()
-            .cylinder(100, self.bolt_head_dia / 2, centered=(True, True, False))
+            .cylinder(
+                100, self.bolt_head_dia / 2,
+                centered=(True, True, False),
+            )
         )
 
         # Rotate into display orientation (assembly will place it).

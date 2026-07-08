@@ -1,5 +1,4 @@
-import math
-import bought_bits as bb
+from __future__ import annotations
 
 
 class MachineConfig:
@@ -7,35 +6,26 @@ class MachineConfig:
 
     # General config.
     # 3D printer smallest dimension.
-    PRINTER_SIZE = 200.0
+    PRINTER_SIZE: float = 200.0
 
     @classmethod
-    def printer_safe_size(cls):
+    def printer_safe_size(cls) -> float:
         return cls.PRINTER_SIZE - 10.0  # Leave margin for brim, etc.
 
     # Quill holder
-    # Diameter of the swing joint.
-    QH_SWING_DIA = 15.0
-    # Height of the swing joint.
-    QH_SWING_HEIGHT = 50.0
-    # Thickness of the swing joint.
-    QH_SWING_JOINT_THICKNESS = 5.0
-    # Thickness of the pitch joint.
-    QH_PITCH_JOINT_THICKNESS = 8.0
+    QH_SWING_DIA: float = 15.0
+    QH_SWING_HEIGHT: float = 50.0
+    QH_SWING_JOINT_THICKNESS: float = 5.0
+    QH_PITCH_JOINT_THICKNESS: float = 8.0
 
     # Frame
-    # 20x20mm aluminum t-slot extrusion
-    FRAME_EXT_WIDTH = 20.0
-    FRAME_EXT_HEIGHT = 20.0
-    # Rails for the mast. Smooth rods, really.
-    FRAME_RAIL_DIA = 8.0
-    # Space between frame and rail.
-    FRAME_RAIL_SPACING = 10.0
-    MAST_CARRIAGE_LENGTH = 80.0
-    MAST_CARRIAGE_CLEARANCE = 2.0
-    MAST_CARRIAGE_THICKNESS = 10.0
-    # Desired space for mast and its horizontal travel.
-    MAST_DESIRED_SPACE = 250.0
-    # The piece holding the mast to the mast-carriage.
-    MAST_HOLDER_THICKNESS = 12.0
-    MAST_HOLDER_HEIGHT = 60.0
+    FRAME_EXT_WIDTH: float = 20.0
+    FRAME_EXT_HEIGHT: float = 20.0
+    FRAME_RAIL_DIA: float = 8.0
+    FRAME_RAIL_SPACING: float = 10.0
+    MAST_CARRIAGE_LENGTH: float = 80.0
+    MAST_CARRIAGE_CLEARANCE: float = 2.0
+    MAST_CARRIAGE_THICKNESS: float = 10.0
+    MAST_DESIRED_SPACE: float = 250.0
+    MAST_HOLDER_THICKNESS: float = 12.0
+    MAST_HOLDER_HEIGHT: float = 60.0

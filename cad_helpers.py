@@ -11,19 +11,22 @@ Test patterns:
     - assert_fits_printer(part)         → part exceeds 190x190 bed?
 """
 
+from __future__ import annotations
+from collections.abc import Callable
 import cadquery as cq
-import math
-from typing import Union, Callable
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # Boolean-based spatial assertions
 # ═══════════════════════════════════════════════════════════════════════
 
-def _resolve(obj: Union[cq.Workplane, cq.Assembly, cq.Shape]) -> cq.Shape:
+CadQueryObj = cq.Workplane | cq.Assembly | cq.Shape
+
+
+def _resolve(obj: CadQueryObj) -> cq.Shape:
     """Get a cq.Shape from various CadQuery types."""
     if isinstance(obj, cq.Assembly):
-        shapes = []
+        shapes: list[cq.Shape] = []
         for _name, child in obj.traverse():
             if child.obj is not None:
                 shapes.append(child.obj)
@@ -36,11 +39,11 @@ def _resolve(obj: Union[cq.Workplane, cq.Assembly, cq.Shape]) -> cq.Shape:
             result = result.fuse(s)
         return result
     if hasattr(obj, 'val'):
-        return obj.val()
-    return obj
+        return obj.val()  # type: ignore[no-any-return]
+    return obj  # type: ignore[return-value]
 
 
-def has_volume(obj: Union[cq.Workplane, cq.Shape], tolerance: float = 0.001) -> bool:
+def has_volume(obj: cq.Workplane | cq.Shape, tolerance: float = 0.001) -> bool:
     """True if the shape has measurable volume (> tolerance mm³)."""
     shape = _resolve(obj)
     # CadQuery/OCP uses isNull() (lowercase) on some shape types
@@ -53,13 +56,14 @@ def has_volume(obj: Union[cq.Workplane, cq.Shape], tolerance: float = 0.001) -> 
         return False
 
 
-def assert_no_overlap(a, b, *, msg: str = "", tolerance: float = 0.001):
-    """
-    Fail if parts A and B share any significant volume.
-
-    Uses CadQuery's native intersect: computes the exact overlap,
-    then checks if that overlap has volume > tolerance.
-    """
+def assert_no_overlap(
+    a: CadQueryObj,
+    b: CadQueryObj,
+    *,
+    msg: str = "",
+    tolerance: float = 0.001,
+) -> bool:
+    """Fail if parts A and B share any significant volume."""
     sa = _resolve(a)
     sb = _resolve(b)
     overlap = sa.intersect(sb)
@@ -73,13 +77,14 @@ def assert_no_overlap(a, b, *, msg: str = "", tolerance: float = 0.001):
     return True
 
 
-def assert_contained(part, container, *, msg: str = "", tolerance: float = 0.001):
-    """
-    Fail if any of 'part' extends outside 'container'.
-
-    Uses part.cut(container): whatever remains after cutting away the
-    container is the portion of 'part' that sticks out.
-    """
+def assert_contained(
+    part: CadQueryObj,
+    container: CadQueryObj,
+    *,
+    msg: str = "",
+    tolerance: float = 0.001,
+) -> bool:
+    """Fail if any of 'part' extends outside 'container'."""
     sp = _resolve(part)
     sc = _resolve(container)
     outside = sp.cut(sc)
@@ -92,13 +97,14 @@ def assert_contained(part, container, *, msg: str = "", tolerance: float = 0.001
     return True
 
 
-def assert_clearance(part, clearance_zone, *, msg: str = "", tolerance: float = 0.001):
-    """
-    Fail if 'part' intrudes into a clearance zone.
-
-    A clearance zone is a shape representing space that must stay empty
-    (e.g., a bolt path, a moving part's travel envelope, user hand space).
-    """
+def assert_clearance(
+    part: CadQueryObj,
+    clearance_zone: CadQueryObj,
+    *,
+    msg: str = "",
+    tolerance: float = 0.001,
+) -> bool:
+    """Fail if 'part' intrudes into a clearance zone."""
     sp = _resolve(part)
     sc = _resolve(clearance_zone)
     intrusion = sp.intersect(sc)
@@ -111,14 +117,15 @@ def assert_clearance(part, clearance_zone, *, msg: str = "", tolerance: float = 
     return True
 
 
-def assert_fits_printer(part, *, bed_x: float = 200, bed_y: float = 200,
-                        margin: float = 10, msg: str = ""):
-    """
-    Fail if any part exceeds the 3D printer bed dimensions (minus margin).
-
-    Default: 200x200mm bed, 10mm margin → 190x190mm usable area.
-    Checks X and Y extents. Z is not constrained (printer height).
-    """
+def assert_fits_printer(
+    part: CadQueryObj,
+    *,
+    bed_x: float = 200,
+    bed_y: float = 200,
+    margin: float = 10,
+    msg: str = "",
+) -> bool:
+    """Fail if any part exceeds the 3D printer bed dimensions."""
     sp = _resolve(part)
     bb = sp.BoundingBox()
     max_dim = max(bed_x, bed_y) - margin
@@ -142,33 +149,47 @@ def assert_fits_printer(part, *, bed_x: float = 200, bed_y: float = 200,
 # Shape factories for clearance zones
 # ═══════════════════════════════════════════════════════════════════════
 
-def clearance_cylinder(center: tuple = (0, 0, 0),
-                       axis: str = "Z",
-                       radius: float = 5.0,
-                       height: float = 50.0) -> cq.Workplane:
+def clearance_cylinder(
+    center: tuple[float, float, float] = (0, 0, 0),
+    axis: str = "Z",
+    radius: float = 5.0,
+    height: float = 50.0,
+) -> cq.Workplane:
     """Create a cylinder for bolt-hole or shaft clearance checking."""
     axes = {"X": "YZ", "Y": "XZ", "Z": "XY"}
     wp = axes.get(axis.upper(), "XY")
-    return (cq.Workplane(wp)
-            .cylinder(height, radius, centered=(True, True, False))
-            .translate(center))
+    return (
+        cq.Workplane(wp)
+        .cylinder(height, radius, centered=(True, True, False))
+        .translate(center)
+    )
 
 
-def clearance_box(center: tuple = (0, 0, 0),
-                  size: tuple = (10, 10, 10)) -> cq.Workplane:
-    """Create a box for clearance checking (e.g., component envelopes)."""
-    return (cq.Workplane("XY")
-            .box(*size, centered=(True, True, True))
-            .translate(center))
+def clearance_box(
+    center: tuple[float, float, float] = (0, 0, 0),
+    size: tuple[float, float, float] = (10, 10, 10),
+) -> cq.Workplane:
+    """Create a box for clearance checking."""
+    return (
+        cq.Workplane("XY")
+        .box(*size, centered=(True, True, True))
+        .translate(center)
+    )
 
 
-def printer_envelope(bed_x: float = 200, bed_y: float = 200,
-                     margin: float = 10, height: float = 500) -> cq.Workplane:
+def printer_envelope(
+    bed_x: float = 200,
+    bed_y: float = 200,
+    margin: float = 10,
+    height: float = 500,
+) -> cq.Workplane:
     """Create a box representing the usable printer volume."""
     usable = max(bed_x, bed_y) - margin
-    return (cq.Workplane("XY")
-            .box(usable, usable, height, centered=(True, True, False))
-            .translate((0, 0, height / 2)))
+    return (
+        cq.Workplane("XY")
+        .box(usable, usable, height, centered=(True, True, False))
+        .translate((0, 0, height / 2))
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -177,28 +198,36 @@ def printer_envelope(bed_x: float = 200, bed_y: float = 200,
 
 class RefFrame:
     """
-    A named reference frame with an origin and orientation.
+    A named reference frame with an origin.
 
     Instead of saying "in front of the mast" (ambiguous), you define a
     frame on the mast's +X face and offset from that. The frame's name
     documents the intent, and the origin provides exact coordinates.
     """
 
-    def __init__(self, name: str,
-                 origin: cq.Vector = None,
-                 parent_label: str = ""):
-        self.name = name
-        self.origin = origin or cq.Vector(0, 0, 0)
-        self.parent_label = parent_label
+    def __init__(
+        self,
+        name: str,
+        origin: cq.Vector | None = None,
+        parent_label: str = "",
+    ) -> None:
+        self.name: str = name
+        self.origin: cq.Vector = origin or cq.Vector(0, 0, 0)
+        self.parent_label: str = parent_label
 
     @classmethod
-    def world(cls) -> "RefFrame":
+    def world(cls) -> RefFrame:
         """The global coordinate frame."""
         return cls("world", cq.Vector(0, 0, 0))
 
     @classmethod
-    def on_face(cls, parent_label: str, shape, face_selector,
-                name: str = "") -> "RefFrame":
+    def on_face(
+        cls,
+        parent_label: str,
+        shape: cq.Workplane | cq.Shape,
+        face_selector: str,
+        name: str = "",
+    ) -> RefFrame:
         """
         Create a frame on a specific face of a shape.
 
@@ -206,10 +235,10 @@ class RefFrame:
         The frame's origin is the center of that extreme face.
         """
         if hasattr(shape, 'val'):
-            shape = shape.val()
+            shape = shape.val()  # type: ignore[assignment]
 
         direction = face_selector.upper()
-        direction_map = {
+        direction_map: dict[str, tuple[cq.Vector, bool]] = {
             "+X": (cq.Vector(1, 0, 0), True),
             "-X": (cq.Vector(-1, 0, 0), True),
             "+Y": (cq.Vector(0, 1, 0), True),
@@ -227,12 +256,12 @@ class RefFrame:
         frame_name = name or f"{parent_label}.{face_selector}"
         return cls(frame_name, center, parent_label)
 
-    def offset(self, x: float = 0, y: float = 0, z: float = 0) -> "RefFrame":
+    def offset(self, x: float = 0, y: float = 0, z: float = 0) -> RefFrame:
         """Return a new frame offset from this one in world coordinates."""
         new_origin = self.origin + cq.Vector(x, y, z)
         return RefFrame(
             f"{self.name}+({x},{y},{z})",
-            new_origin, self.parent_label
+            new_origin, self.parent_label,
         )
 
     def as_location(self) -> cq.Location:
@@ -243,7 +272,7 @@ class RefFrame:
         """Get the origin as a Vector."""
         return self.origin
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"RefFrame({self.name!r}, "
             f"origin=({self.origin.x:.1f}, {self.origin.y:.1f}, "
@@ -256,10 +285,6 @@ def gap_between(a: RefFrame, b: RefFrame, axis: str) -> float:
     Signed gap between two reference frames along a world axis.
 
     Returns a.origin - b.origin along the given axis.
-
-    Example:
-        assert gap_between(quill_frame, mast_frame, 'X') > 0, \
-            "Quill should be +X of mast face"
     """
     axis = axis.upper()
     val_a = getattr(a.origin, {'X': 'x', 'Y': 'y', 'Z': 'z'}[axis])
@@ -271,10 +296,10 @@ def gap_between(a: RefFrame, b: RefFrame, axis: str) -> float:
 # Lightweight test runner
 # ═══════════════════════════════════════════════════════════════════════
 
-_test_results = {"passed": 0, "failed": 0, "errors": []}
+_test_results: dict[str, object] = {"passed": 0, "failed": 0, "errors": []}
 
 
-def run_tests(test_funcs: list[Callable]) -> bool:
+def run_tests(test_funcs: list[Callable[[], None]]) -> bool:
     """Run a list of test functions, report results, return True if all pass."""
     global _test_results
     _test_results = {"passed": 0, "failed": 0, "errors": []}
@@ -282,12 +307,14 @@ def run_tests(test_funcs: list[Callable]) -> bool:
     for fn in test_funcs:
         try:
             fn()
-            _test_results["passed"] += 1
+            _test_results["passed"] = int(_test_results["passed"]) + 1
             print(f"  OK  {fn.__name__}")
         except AssertionError as e:
-            _test_results["failed"] += 1
-            _test_results["errors"].append((fn.__name__, str(e)))
+            _test_results["failed"] = int(_test_results["failed"]) + 1
+            _test_results["errors"] = list(_test_results["errors"]) + [(fn.__name__, str(e))]  # type: ignore[arg-type]
             print(f"  FAIL  {fn.__name__}: {e}")
 
-    print(f"\n{_test_results['passed']} passed, {_test_results['failed']} failed")
-    return _test_results["failed"] == 0
+    passed = int(_test_results["passed"])
+    failed = int(_test_results["failed"])
+    print(f"\n{passed} passed, {failed} failed")
+    return failed == 0

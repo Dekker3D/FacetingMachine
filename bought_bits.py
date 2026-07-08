@@ -1,11 +1,13 @@
-import bom_part_data as bom
-import cadquery as cq
+from __future__ import annotations
 import math
+import cadquery as cq
+import bom_part_data as bom
 
 
 class BoughtPartWithModel(bom.PartWithMetadata):
-    """Base class for all parts."""
-    _cached_obj: cq.Workplane = None
+    """Base class for off-the-shelf parts with a 3D model."""
+
+    _cached_obj: cq.Workplane | None = None
 
     def get_object(self) -> cq.Workplane:
         """Returns a cadquery object representing this part."""
@@ -19,11 +21,11 @@ class BoughtPartWithModel(bom.PartWithMetadata):
 
 
 class BearingGeneric(BoughtPartWithModel):
-    WIDTH = 0.0
-    ID = 0.0
-    OD = 0.0
+    WIDTH: float = 0.0
+    ID: float = 0.0
+    OD: float = 0.0
 
-    def _create_object(self):
+    def _create_object(self) -> cq.Workplane:
         return (
             cq.Workplane("XY")
             .circle(self.OD / 2)
@@ -55,30 +57,31 @@ class Bearing6001ZZ(BearingGeneric):
 
 
 class RailGeneric(BoughtPartWithModel):
-    RAIL_WIDTH = 0
-    RAIL_HEIGHT = 0
-    CARRIAGE_WIDTH = 0
-    CARRIAGE_LENGTH = 0
-    CARRIAGE_HEIGHT = 0
-    CARRIAGE_CLEARANCE = 0  # Below carriage
-    MOUNTING_HOLE_LR_SPACING = 0  # Left/right spacing
-    MOUNTING_HOLE_UD_SPACING = 0  # Up/down spacing
+    RAIL_WIDTH: float = 0.0
+    RAIL_HEIGHT: float = 0.0
+    CARRIAGE_WIDTH: float = 0.0
+    CARRIAGE_LENGTH: float = 0.0
+    CARRIAGE_HEIGHT: float = 0.0
+    CARRIAGE_CLEARANCE: float = 0.0
+    MOUNTING_HOLE_LR_SPACING: float = 0.0
+    MOUNTING_HOLE_UD_SPACING: float = 0.0
 
-    def __init__(self, length: float, name: str):
-        self.length = length
+    def __init__(self, length: float, name: str) -> None:
+        self.length: float = length
         super().__init__(name)
 
     @classmethod
-    def total_height(cls):
+    def total_height(cls) -> float:
         return cls.CARRIAGE_HEIGHT + cls.CARRIAGE_CLEARANCE
 
-    def _create_object(self):
-        """Rail profile in canonical orientation (along +Y, top at +Z, origin at start)."""
+    def _create_object(self) -> cq.Workplane:
+        """Rail profile in canonical orientation (along +Y, top at +Z)."""
         num_holes = int(self.length / 30) + 1
         hole_positions = [(0, -i * 30) for i in range(num_holes)]
         return (
             cq.Workplane("XY")
-            .box(self.RAIL_WIDTH, self.length, self.RAIL_HEIGHT, centered=(True, False, False))
+            .box(self.RAIL_WIDTH, self.length, self.RAIL_HEIGHT,
+                 centered=(True, False, False))
             .edges(">Z").fillet(0.8)
             .faces("<Z").workplane()
             .pushPoints(hole_positions)
@@ -88,7 +91,7 @@ class RailGeneric(BoughtPartWithModel):
 
     @classmethod
     def make_carriage(cls) -> cq.Workplane:
-        """Carriage in canonical orientation (along +Y, bottom at Z=clearance, top at +Z)."""
+        """Carriage in canonical orientation."""
         return (
             cq.Workplane("XY")
             .box(cls.CARRIAGE_WIDTH, cls.CARRIAGE_LENGTH, cls.CARRIAGE_HEIGHT,
@@ -108,7 +111,7 @@ class RailMGN9H(RailGeneric):
     MOUNTING_HOLE_LR_SPACING = 15.0
     MOUNTING_HOLE_UD_SPACING = 16.0
 
-    def __init__(self, length: float):
+    def __init__(self, length: float) -> None:
         super().__init__(length, f"MGN9H Rail {length}mm")
 
 
@@ -122,48 +125,56 @@ class RailMGN15H(RailGeneric):
     MOUNTING_HOLE_LR_SPACING = 25.0
     MOUNTING_HOLE_UD_SPACING = 25.0
 
-    def __init__(self, length: float):
+    def __init__(self, length: float) -> None:
         super().__init__(length, f"MGN15H Rail {length}mm")
 
 
 class LeadScrewGeneric(BoughtPartWithModel):
-    SCREW_DIA = 0
-    NUT_DIA = 0
-    NUT_THICKNESS = 0
-    NUT_HOLE_DIA = 0
-    NUT_HOLE_RADIUS = 0  # Distance from center to hole
+    SCREW_DIA: float = 0.0
+    NUT_DIA: float = 0.0
+    NUT_THICKNESS: float = 0.0
+    NUT_HOLE_DIA: float = 0.0
+    NUT_HOLE_RADIUS: float = 0.0
 
-    def __init__(self, length: float, name: str):
-        self.length = length
+    def __init__(self, length: float, name: str) -> None:
+        self.length: float = length
         super().__init__(name)
 
-    def _create_object(self):
+    def _create_object(self) -> cq.Workplane:
         """Leadscrew shaft along +Z, starting at origin."""
-        return cq.Workplane("XY").cylinder(self.length, self.SCREW_DIA / 2,
-                                            centered=(True, True, False))
+        return cq.Workplane("XY").cylinder(
+            self.length, self.SCREW_DIA / 2,
+            centered=(True, True, False)
+        )
 
     @classmethod
     def make_nut(cls) -> cq.Workplane:
         """T8 nut with flange and mounting holes, centered on origin."""
-        nut_body = (cq.Workplane("XY")
-                    .cylinder(15, 5.1, centered=(True, True, False))
-                    .translate((0, 0, -(1.5 + cls.NUT_THICKNESS)))
-                    .chamfer(0.25))
-        flange = (cq.Workplane("XY")
-                  .circle(11)
-                  .extrude(cls.NUT_THICKNESS)
-                  .translate((0, 0, -cls.NUT_THICKNESS))
-                  .chamfer(0.5))
+        nut_body = (
+            cq.Workplane("XY")
+            .cylinder(15, 5.1, centered=(True, True, False))
+            .translate((0, 0, -(1.5 + cls.NUT_THICKNESS)))
+            .chamfer(0.25)
+        )
+        flange = (
+            cq.Workplane("XY")
+            .circle(11)
+            .extrude(cls.NUT_THICKNESS)
+            .translate((0, 0, -cls.NUT_THICKNESS))
+            .chamfer(0.5)
+        )
         angles = [0, 90, 180, 270]
         hole_positions = [
             (cls.NUT_HOLE_RADIUS * math.cos(math.radians(a)),
              cls.NUT_HOLE_RADIUS * math.sin(math.radians(a)))
             for a in angles
         ]
-        flange = (flange.faces(">Z").workplane()
-                  .pushPoints(hole_positions)
-                  .circle(cls.NUT_HOLE_DIA / 2)
-                  .cutThruAll())
+        flange = (
+            flange.faces(">Z").workplane()
+            .pushPoints(hole_positions)
+            .circle(cls.NUT_HOLE_DIA / 2)
+            .cutThruAll()
+        )
         return nut_body.union(flange)
 
 
@@ -174,24 +185,26 @@ class LeadScrewT8(LeadScrewGeneric):
     NUT_HOLE_DIA = 3.5
     NUT_HOLE_RADIUS = 8.0
 
-    def __init__(self, length: float):
+    def __init__(self, length: float) -> None:
         super().__init__(length, f"T8 Leadscrew {length}mm")
 
 
 class TslotExtrusionGeneric(BoughtPartWithModel):
     """Generic T-slot aluminum extrusion profile."""
-    WIDTH = 0
-    HEIGHT = 0
 
-    def __init__(self, length: float, name: str):
-        self.length = length
+    WIDTH: float = 0.0
+    HEIGHT: float = 0.0
+
+    def __init__(self, length: float, name: str) -> None:
+        self.length: float = length
         super().__init__(name)
 
-    def _create_object(self):
-        """Extrusion along +Z, starting at origin. Edges chamfered."""
+    def _create_object(self) -> cq.Workplane:
+        """Extrusion along +Z, starting at origin."""
         return (
             cq.Workplane("XY")
-            .box(self.WIDTH, self.HEIGHT, self.length, centered=(True, True, False))
+            .box(self.WIDTH, self.HEIGHT, self.length,
+                 centered=(True, True, False))
             .edges("|Z").chamfer(3)
         )
 
@@ -200,22 +213,21 @@ class TslotExtrusion2020(TslotExtrusionGeneric):
     WIDTH = 20.0
     HEIGHT = 20.0
 
-    def __init__(self, length: float):
+    def __init__(self, length: float) -> None:
         super().__init__(length, f"2020 T-slot Extrusion {length}mm")
 
 
 class StraightShankColletExtension(BoughtPartWithModel):
-    def __init__(self, dia: float = 12.0, collet: float = 11, type: str = "M", length: float = 150):
-        self.name = F"C{dia}-ER{collet}{type}-{length}L"
-        self.dia = dia
-        self.collet = collet
-        self.type = type
-        self.length = length
+    def __init__(self, dia: float = 12.0, collet: float = 11,
+                 type: str = "M", length: float = 150) -> None:
+        self.name = f"C{dia}-ER{collet}{type}-{length}L"
+        self.dia: float = dia
+        self.collet: float = collet
+        self.type: str = type
+        self.length: float = length
+        super().__init__(name=self.name)
 
-    def _create_object(self):
-        obj = (
-            cq.Workplane("XZ")
-            .cylinder(self.dia, self.length, centered=(True, True, False))
+    def _create_object(self) -> cq.Workplane:
+        return cq.Workplane("XZ").cylinder(
+            self.dia, self.length, centered=(True, True, False)
         )
-
-        return obj

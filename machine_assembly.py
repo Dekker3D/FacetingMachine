@@ -1,44 +1,43 @@
+from __future__ import annotations
+import os
+import cadquery as cq
+
+import bom_part_data as bpd
 from lap.lap_assembly import LapAssembly
 from mast.mast_assembly import MastAssembly
 from frame.frame_assembly import FrameAssembly
 from quill_joint.quill_joint import QuillHolderJointAli
 from frame_mast_joint.frame_mast_joint import FrameMastJointSmoothRodRails
-import bom_part_data as bpd
-import os
 
 
 class MachineAssembly(bpd.PartAssembly):
     """Class representing the entire machine assembly."""
 
-    frame = FrameAssembly()
-    lap = LapAssembly()
-    mast = MastAssembly()
-    quill_joint = QuillHolderJointAli()
-    mast_joint = FrameMastJointSmoothRodRails()
+    frame: FrameAssembly = FrameAssembly()
+    lap: LapAssembly = LapAssembly()
+    mast: MastAssembly = MastAssembly()
+    quill_joint: QuillHolderJointAli = QuillHolderJointAli()
+    mast_joint: FrameMastJointSmoothRodRails = FrameMastJointSmoothRodRails()
 
     frame.lap = lap
     frame.mast = mast
     frame.mast_joint = mast_joint
     mast.quill_joint = quill_joint
 
-    def validate(self):
+    def validate(self) -> None:
         self.frame.validate()
 
-    def make_assembly(self):
+    def make_assembly(self) -> cq.Assembly:
         """Create the entire machine assembly."""
-
-        assembly = self.frame.make_assembly()
-
-        return assembly
+        return self.frame.make_assembly()
 
     def get_BOM(self) -> bpd.BOM:
         bom = bpd.BOM()
         bom.merge(self.frame.get_BOM())
         bom.merge(self.lap.get_BOM())
-        # TODO: Add other components as they are updated to support get_BOM.
         return bom
 
-    def export_everything(self, folder: str = "export"):
+    def export_everything(self, folder: str = "export") -> None:
         """Export all printable parts and the BOM."""
         bom = self.get_BOM()
         bom.export_parts(os.path.join(folder, "parts"))
@@ -50,9 +49,9 @@ if __name__ == "__cq_main__":
     # We're in CQ-Editor. Show the assembly.
     # show_object is a valid CQ-Editor function.
     machine = MachineAssembly()
-    machine.validate()  # Validate the configuration before building.
+    machine.validate()
     result = machine.make_assembly()
-    show_object(result)
+    show_object(result)  # type: ignore[name-defined]  # noqa: F821
     machine.export_everything()
     print(machine.get_BOM().tostring())
     print("done")
