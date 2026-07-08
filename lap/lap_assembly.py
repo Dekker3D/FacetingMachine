@@ -108,6 +108,12 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
             bom.add(self._sg)
         if self._sgb:
             bom.add(self._sgb)
+        # Off-the-shelf
+        bom.add(bb.Bearing608ZZ(name="608ZZ Bearing"))  # axle bearing
+        bom.add(bpd.PartWithMetadata(
+            name=f"Lap Disc {self.LAP_DIA:.0f}mm",
+            description="6-inch diamond grinding lap",
+        ))
         return bom
 
 

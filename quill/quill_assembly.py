@@ -60,6 +60,7 @@ class QuillAssembly(quill_abstract.QuillAssemblyBase):
             bearing_od=bb.Bearing608ZZ.OD,
             bearing_width=bb.Bearing608ZZ.WIDTH,
         ))
+        bom.add(bb.Bearing608ZZ(name="608ZZ Bearing"), 2)  # pitch joint bearings
         return bom
 
 
