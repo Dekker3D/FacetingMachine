@@ -1,4 +1,5 @@
 from __future__ import annotations
+import cadquery as cq
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -17,10 +18,10 @@ class QuillHolderJointBase:
 
     def add_shape(
         self, base_width: float, base_length: float
-    ) -> object:
+    ) -> cq.Workplane:
         raise NotImplementedError()
 
     def cut_shape(
         self, base_width: float, base_length: float
-    ) -> object:
+    ) -> cq.Workplane:
         raise NotImplementedError()

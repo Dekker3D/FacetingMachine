@@ -152,14 +152,14 @@ def test_lap_holder_bottom_contains_axle_hole() -> None:
     ).get_object()
 
     axle_path = ch.clearance_cylinder(
-        center=(0, 0, lhb.BoundingBox().zmin - 10),
+        center=(0, 0, lhb.BoundingBox().zmin - 10),  # type: ignore[attr-defined]
         axis="Z",
         radius=get_lap().LAP_AXLE_DIA / 2 - 0.1,
-        height=lhb.BoundingBox().zmax - lhb.BoundingBox().zmin + 20,
+        height=lhb.BoundingBox().zmax - lhb.BoundingBox().zmin + 20,  # type: ignore[attr-defined]
     )
 
-    axle_shape = axle_path.val()
-    outside = axle_shape.cut(lhb.val())
+    axle_shape = axle_path.val()  # type: ignore[assignment]
+    outside = axle_shape.cut(lhb.val())  # type: ignore[union-attr]
     if ch.has_volume(outside, 0.01):
         pass  # Might fail if bore geometry differs
 
@@ -174,7 +174,7 @@ def test_leadscrew_passes_through_bearing() -> None:
     shaft = ma.make_t8_shaft()
     bh = ma.make_bearing_holder()
 
-    overlap = shaft.val().intersect(bh.val())
+    overlap = shaft.val().intersect(bh.val())  # type: ignore[union-attr]
     assert ch.has_volume(overlap, tolerance=0.1), (
         "Leadscrew shaft does not intersect bearing holder — "
         "the shaft might be misaligned with the bearing recess."

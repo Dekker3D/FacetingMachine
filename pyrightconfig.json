@@ -1,0 +1,11 @@
+{
+  "venvPath": ".",
+  "venv": "venv",
+  "pythonVersion": "3.13",
+  "reportMissingImports": true,
+  "reportInvalidTypeForm": true,
+  "reportArgumentType": true,
+  "reportIncompatibleVariableOverride": true,
+  "reportAttributeAccessIssue": true,
+  "typeCheckingMode": "basic"
+}

@@ -29,11 +29,12 @@ def _resolve(obj: CadQueryObj) -> cq.Shape:
         shapes: list[cq.Shape] = []
         for _name, child in obj.traverse():
             if child.obj is not None:
-                shapes.append(child.obj)
+                shapes.append(child.obj)  # type: ignore[arg-type]
             if child.shape is not None:
-                shapes.append(child.shape)
+                shapes.append(child.shape)  # type: ignore[arg-type]
         if not shapes:
-            return cq.Shape()
+            # cq.Shape() takes no arg at runtime but stubs want one
+            return cq.Shape()  # type: ignore[call-arg]
         result = shapes[0]
         for s in shapes[1:]:
             result = result.fuse(s)
@@ -46,8 +47,9 @@ def _resolve(obj: CadQueryObj) -> cq.Shape:
 def has_volume(obj: cq.Workplane | cq.Shape, tolerance: float = 0.001) -> bool:
     """True if the shape has measurable volume (> tolerance mm³)."""
     shape = _resolve(obj)
-    # CadQuery/OCP uses isNull() (lowercase) on some shape types
-    is_null = shape.isNull() if hasattr(shape, 'isNull') else shape.IsNull()
+    # CadQuery/OCP uses isNull() (lowercase) on some shape types;
+    # the stubs only know about isNull(), not IsNull().
+    is_null = shape.isNull() if hasattr(shape, 'isNull') else shape.IsNull()  # type: ignore[attr-defined,union-attr]
     if is_null:
         return False
     try:
@@ -251,7 +253,7 @@ class RefFrame:
 
         vec, pick_max = direction_map[direction]
         face = shape.faces(cq.DirectionMinMaxSelector(vec, pick_max))
-        center = face.Center()
+        center = face.Center()  # type: ignore[attr-defined]
 
         frame_name = name or f"{parent_label}.{face_selector}"
         return cls(frame_name, center, parent_label)
@@ -296,25 +298,27 @@ def gap_between(a: RefFrame, b: RefFrame, axis: str) -> float:
 # Lightweight test runner
 # ═══════════════════════════════════════════════════════════════════════
 
-_test_results: dict[str, object] = {"passed": 0, "failed": 0, "errors": []}
+_tests_passed: int = 0
+_tests_failed: int = 0
+_tests_errors: list[tuple[str, str]] = []
 
 
 def run_tests(test_funcs: list[Callable[[], None]]) -> bool:
     """Run a list of test functions, report results, return True if all pass."""
-    global _test_results
-    _test_results = {"passed": 0, "failed": 0, "errors": []}
+    global _tests_passed, _tests_failed, _tests_errors
+    _tests_passed = 0
+    _tests_failed = 0
+    _tests_errors = []
 
     for fn in test_funcs:
         try:
             fn()
-            _test_results["passed"] = int(_test_results["passed"]) + 1
+            _tests_passed += 1
             print(f"  OK  {fn.__name__}")
         except AssertionError as e:
-            _test_results["failed"] = int(_test_results["failed"]) + 1
-            _test_results["errors"] = list(_test_results["errors"]) + [(fn.__name__, str(e))]  # type: ignore[arg-type]
+            _tests_failed += 1
+            _tests_errors.append((fn.__name__, str(e)))
             print(f"  FAIL  {fn.__name__}: {e}")
 
-    passed = int(_test_results["passed"])
-    failed = int(_test_results["failed"])
-    print(f"\n{passed} passed, {failed} failed")
-    return failed == 0
+    print(f"\n{_tests_passed} passed, {_tests_failed} failed")
+    return _tests_failed == 0

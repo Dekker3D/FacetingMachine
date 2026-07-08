@@ -3,10 +3,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mast.mast_abstract import MastAssemblyBase
+    from lap.lap_abstract import LapAssemblyBase
 
 
 class FrameAssemblyBase:
-    lap: object = None
+    lap: LapAssemblyBase | None = None
     mast: MastAssemblyBase | None = None
 
     def frame_width(self) -> float:
