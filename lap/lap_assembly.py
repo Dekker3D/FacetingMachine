@@ -305,6 +305,7 @@ class SplashGuard(bpd.PrintedPart):
 
         # --- Screw holes through tower (match SGB pattern) ---
         # Add after union so they're not filled back in.
+        # Start from bottom face (-Z), go up into tower but not through top.
         screw_r = la.bottom_screw_spacing()
         screw_positions = [
             (screw_r * math.cos(math.radians(a)),
@@ -313,10 +314,10 @@ class SplashGuard(bpd.PrintedPart):
         ]
         guard = (
             guard
-            .faces(">Z")
+            .faces("<Z")
             .workplane()
             .pushPoints(screw_positions)
-            .hole(3.2, tower_h + la.SG_THICKNESS + 5)
+            .hole(3.2, tower_h + la.SG_THICKNESS - 3)  # stop 3mm below top
         )
 
         return guard
@@ -385,22 +386,18 @@ class SplashGuardBottom(bpd.PrintedPart):
         profile_r = la.SG_DRAIN_ID / 2
         drain_x = la.sg_drain_offset()
 
-        # Endpoint of 45° arc from center at (drain_x + arc_r, 0, 0)
-        # Arc goes from 180° (start, pointing -X from center) to 225°
-        end_x = arc_r + arc_r * math.cos(math.radians(225))
-        end_z = arc_r * math.sin(math.radians(225))
-
-        path = (
-            cq.Workplane("XZ")
-            .transformed(offset=(drain_x, 0, 0))
-            .moveTo(0, 0)
-            .radiusArc((end_x, end_z), -arc_r)
+        # Build arc edge explicitly: center at (drain_x + arc_r, 0, 0),
+        # from 180° (pointing -X = straight down from drain) to 225°.
+        arc_center = cq.Vector(drain_x + arc_r, 0, 0)
+        arc_edge = cq.Edge.makeCircle(
+            arc_r, arc_center, cq.Vector(0, 1, 0), 180, 225
         )
+        arc_wire = cq.Wire.assembleEdges([arc_edge])
 
         torus_section = (
             cq.Workplane("XY")
             .circle(profile_r)
-            .sweep(path)
+            .sweep(arc_wire)
         )
 
         bottom = bottom.union(torus_section)
