@@ -396,6 +396,7 @@ class SplashGuardBottom(bpd.PrintedPart):
 
         torus_section = (
             cq.Workplane("XY")
+            .transformed(offset=(la.sg_drain_offset(), 0, 0))
             .circle(profile_r)
             .sweep(arc_wire)
         )
