@@ -22,15 +22,14 @@ class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
     pitch_joint_thickness: float = 8.0
     quill_width: float = 50.0
 
-    @classmethod
-    def make_assembly(cls) -> cq.Assembly:
+    def make_assembly(self) -> cq.Assembly:
         """Create the quill holder with swappable quill assembly."""
         qh = QuillHolder(
-            swing_dia=cls.swing_dia,
-            swing_height=cls.swing_height,
-            swing_joint_thickness=cls.swing_joint_thickness,
-            pitch_joint_thickness=cls.pitch_joint_thickness,
-            quill_width=cls.quill_width,
+            swing_dia=self.swing_dia,
+            swing_height=self.swing_height,
+            swing_joint_thickness=self.swing_joint_thickness,
+            pitch_joint_thickness=self.pitch_joint_thickness,
+            quill_width=self.quill_width,
             bearing_od=bb.Bearing608ZZ.OD,
             bearing_width=bb.Bearing608ZZ.WIDTH,
         )
@@ -49,15 +48,12 @@ class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
 
         # Only add the quill if one is configured (allows quill holder to
         # be visualized standalone without a quill).
-        if cls.quill is not None:
-            print("Making quill")
+        if self.quill is not None:
             assembly = assembly.add(
-                cls.quill.make_assembly(),
+                self.quill.make_assembly(),
                 name="quill_assembly",
                 loc=Location((qt_X, 0, qt_Z)),
             )
-        else:
-            print("Not making quill")
 
         return assembly
 

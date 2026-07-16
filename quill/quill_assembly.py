@@ -24,17 +24,16 @@ class QuillAssembly(quill_abstract.QuillAssemblyBase):
     chuck_dia: float = 12.0
     chuck_length: float = 30.0
 
-    @classmethod
-    def make_assembly(cls) -> cq.Assembly:
+    def make_assembly(self) -> cq.Assembly:
         """Create the entire quill assembly."""
         assembly = (
             cq.Assembly()
             .add(
                 QuillPitchJoint(
-                    axle_dia=cls.pitch_axle_dia,
-                    axle_length=cls.pitch_axle_length,
-                    shoulder_dia=cls.pitch_shoulder_dia,
-                    shoulder_thickness=cls.pitch_shoulder_thickness,
+                    axle_dia=self.pitch_axle_dia,
+                    axle_length=self.pitch_axle_length,
+                    shoulder_dia=self.pitch_shoulder_dia,
+                    shoulder_thickness=self.pitch_shoulder_thickness,
                 ).get_object(),
                 name="pitch_joint",
                 loc=Location((0, 0, 0)),
@@ -42,9 +41,9 @@ class QuillAssembly(quill_abstract.QuillAssemblyBase):
             )
             .add(
                 QuillArm(
-                    length=cls.quill_arm_length,
-                    width=cls.quill_arm_width,
-                    height=cls.quill_arm_height,
+                    length=self.quill_arm_length,
+                    width=self.quill_arm_width,
+                    height=self.quill_arm_height,
                 ).get_object(),
                 name="quill_arm",
                 loc=Location((0, 0, 0)),
@@ -52,11 +51,11 @@ class QuillAssembly(quill_abstract.QuillAssemblyBase):
             )
             .add(
                 DopChuck(
-                    dia=cls.chuck_dia,
-                    length=cls.chuck_length,
+                    dia=self.chuck_dia,
+                    length=self.chuck_length,
                 ).get_object(),
                 name="dop_chuck",
-                loc=Location((cls.quill_arm_length - cls.chuck_length / 2, 0, 0)),
+                loc=Location((self.quill_arm_length - self.chuck_length / 2, 0, 0)),
                 color=cq.Color("gray"),
             )
         )
