@@ -4,21 +4,27 @@ from cadquery import Location
 import bom_part_data as bpd
 import bought_bits as bb
 import quill_holder.quill_holder_abstract as quill_holder_abstract
+import quill.quill_abstract as quill_abstract
 
 
 class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
-    """Class representing the entire quill assembly. Owns quill dimensions."""
+    """Class representing the entire quill holder + quill assembly.
+    Owns the swing joint dimensions; the quill is swappable."""
 
-    # Dimensions (were split across QuillHolder and MachineConfig)
+    quill: quill_abstract.QuillAssemblyBase | None = None
+
+    # Swing joint dimensions
     swing_dia: float = 15.0
     swing_height: float = 50.0
     swing_joint_thickness: float = 5.0
+
+    # Pitch joint dimensions (interfaces with the quill's pitch axle)
     pitch_joint_thickness: float = 8.0
     quill_width: float = 50.0
 
     @classmethod
     def make_assembly(cls) -> cq.Assembly:
-        """Create the entire quill assembly."""
+        """Create the quill holder with swappable quill assembly."""
         qh = QuillHolder(
             swing_dia=cls.swing_dia,
             swing_height=cls.swing_height,
@@ -39,13 +45,19 @@ class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
                 loc=Location((0, 0, 0)),
                 color=cq.Color("orange"),
             )
-            .add(
-                QuillTilt().make(),
-                name="quill_tilt",
-                loc=Location((qt_X, 0, qt_Z)),
-                color=cq.Color("green"),
-            )
         )
+
+        # Only add the quill if one is configured (allows quill holder to
+        # be visualized standalone without a quill).
+        if cls.quill is not None:
+            print("Making quill")
+            assembly = assembly.add(
+                cls.quill.make_assembly(),
+                name="quill_assembly",
+                loc=Location((qt_X, 0, qt_Z)),
+            )
+        else:
+            print("Not making quill")
 
         return assembly
 
@@ -61,15 +73,9 @@ class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
             bearing_width=bb.Bearing608ZZ.WIDTH,
         ))
         bom.add(bb.Bearing608ZZ(name="608ZZ Bearing"), 2)  # pitch joint bearings
+        if self.quill is not None:
+            bom.merge(self.quill.get_BOM())
         return bom
-
-
-class QuillTilt:
-    """Represents the part of the quill that tilts up and down."""
-
-    def make(self) -> cq.Workplane:
-        """Create the quill tilt."""
-        return cq.Workplane("XY").box(10, 10, 10)
 
 
 class QuillHolder(bpd.PrintedPart):
