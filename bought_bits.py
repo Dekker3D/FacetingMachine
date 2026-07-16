@@ -228,8 +228,8 @@ class StraightShankColletExtension(BoughtPartWithModel):
         super().__init__(name=self.name)
 
     def _create_object(self) -> cq.Workplane:
-        return cq.Workplane("XZ").cylinder(
-            self.dia, self.length, centered=(True, True, False)
+        return cq.Workplane("XY").cylinder(
+            self.length, self.dia / 2, centered=(True, True, False)
         )
 
 
