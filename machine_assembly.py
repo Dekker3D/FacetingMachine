@@ -6,8 +6,8 @@ import bom_part_data as bpd
 from lap.lap_assembly import LapAssembly
 from mast.mast_assembly import MastAssembly
 from frame.frame_assembly import FrameAssembly
-from quill.quill_assembly import QuillAssembly
-from quill_joint.quill_joint import QuillHolderJointAli
+from quill_holder.quill_holder_assembly import QuillHolderAssembly
+from quill_holder_joint.quill_holder_joint import QuillHolderJointAli
 from frame_mast_joint.frame_mast_joint import FrameMastJointSmoothRodRails
 
 
@@ -17,7 +17,7 @@ class MachineAssembly(bpd.PartAssembly):
     frame: FrameAssembly = FrameAssembly()
     lap: LapAssembly = LapAssembly()
     mast: MastAssembly = MastAssembly()
-    quill: QuillAssembly = QuillAssembly()
+    quill: QuillHolderAssembly = QuillHolderAssembly()
     quill_joint: QuillHolderJointAli = QuillHolderJointAli()
     mast_joint: FrameMastJointSmoothRodRails = FrameMastJointSmoothRodRails()
 

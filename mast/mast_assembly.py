@@ -6,8 +6,8 @@ from cadquery import Location, Color
 import bought_bits as bb
 import bom_part_data as bpd
 import mast.mast_abstract as mast_abstract
-import quill.quill_abstract as quill_abstract
-import quill_joint.quill_joint_abstract as quill_joint_abstract
+import quill_holder.quill_holder_abstract as quill_holder_abstract
+import quill_holder_joint.quill_holder_joint_abstract as quill_holder_joint_abstract
 import mast.handwheel as handwheel
 
 # REMINDER: +X is left, +Y is forwards, +Z is up!
@@ -17,8 +17,8 @@ import mast.handwheel as handwheel
 class MastAssembly(mast_abstract.MastAssemblyBase):
     """Class representing the entire mast assembly with all components."""
 
-    quill: quill_abstract.QuillAssemblyBase | None = None
-    quill_joint: quill_joint_abstract.QuillHolderJointBase | None = None
+    quill: quill_holder_abstract.QuillHolderAssemblyBase | None = None
+    quill_joint: quill_holder_joint_abstract.QuillHolderJointBase | None = None
 
     desired_vertical_travel: float = 300.0
     rail_length: float = 400.0

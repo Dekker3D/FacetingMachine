@@ -3,10 +3,10 @@ import cadquery as cq
 from cadquery import Location
 import bom_part_data as bpd
 import bought_bits as bb
-import quill.quill_abstract as quill_abstract
+import quill_holder.quill_holder_abstract as quill_holder_abstract
 
 
-class QuillAssembly(quill_abstract.QuillAssemblyBase):
+class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
     """Class representing the entire quill assembly. Owns quill dimensions."""
 
     # Dimensions (were split across QuillHolder and MachineConfig)

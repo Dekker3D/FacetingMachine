@@ -3,7 +3,7 @@ import cadquery as cq
 import bom_part_data as bpd
 
 
-class QuillAssemblyBase:
+class QuillHolderAssemblyBase:
     @classmethod
     def make_assembly(cls) -> cq.Assembly:
         raise NotImplementedError()

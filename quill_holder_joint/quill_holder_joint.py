@@ -1,7 +1,7 @@
 from __future__ import annotations
 import cadquery as cq
 import bought_bits as bb
-import quill_joint.quill_joint_abstract as quill_joint_abstract
+import quill_holder_joint.quill_holder_joint_abstract as quill_joint_abstract
 
 
 class QuillHolderJointStandard(quill_joint_abstract.QuillHolderJointBase):
