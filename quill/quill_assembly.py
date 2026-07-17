@@ -6,6 +6,7 @@ import bom_part_data as bpd
 import bought_bits as bb
 import quill.quill_abstract as quill_abstract
 from quill.quill_joint import QuillJointAli
+from cadquery.func import text, compound, offset
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -37,7 +38,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     block_length_x: float = 70.0
     block_width_y: float = 56.0
     block_height_z: float = 40.0
-    block_x_offset: float = 15.0
+    block_x_offset: float = 45.0
     block_center_z: float = 25.0       # matches hinge center Z
 
     # ── Bearing positions (from collet end = +X end of block) ──
@@ -55,13 +56,13 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
 
     # ── Index gear ─────────────────────────────────────────────
     index_gear_od: float = 41.3
-    index_gear_thickness: float = 10.0
+    index_gear_teeth_width: float = 5.0
+    index_gear_numbers_width: float = 8.0
     index_gear_bore: float = 12.2
     index_gear_num_teeth: int = 96
     index_gear_slot_angle: float = 30.0
     index_gear_slot_depth: float = 3.0
     index_gear_slot_width: float = 1.5
-    index_gear_x_offset: float = 5.0
 
     # ── ER11 collet extension ──────────────────────────────────
     er11_shank_dia: float = 12.0
@@ -114,7 +115,8 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         return IndexGearStandardMk1(
             od=self.index_gear_od,
             bore_dia=self.index_gear_bore,
-            thickness=self.index_gear_thickness,
+            teeth_width=self.index_gear_teeth_width,
+            numbers_width=self.index_gear_numbers_width,
             num_teeth=self.index_gear_num_teeth,
             slot_angle=self.index_gear_slot_angle,
             slot_depth=self.index_gear_slot_depth,
@@ -153,8 +155,8 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
 
         # Index gear: printed flat (bore along Z), displayed facing +X.
         # Rotate 90° around Y so bore aligns with X axis.
-        gear_obj = gear.get_object().rotate((0, 0, 0), (0, 1, 0), 90)
-        gear_x = block_x - self.index_gear_x_offset
+        gear_obj = gear.get_object().rotate((0, 0, 0), (0, 0, 1), 180).rotate((0, 0, 0), (0, 1, 0), 90)
+        gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
         gear_loc = Location(Vector(gear_x, 0, self.block_center_z))
 
         assembly = (
@@ -272,7 +274,7 @@ class QuillMainBlock(bpd.PrintedPart):
         # Shank bore through entire block along X
         block = (
             block
-            .faces(">X").workplane()
+            .faces(">X").workplane(origin=(0, 0, self.height_z))
             .circle(self.shank_bore_dia / 2)
             .cutThruAll()
         )
@@ -370,7 +372,8 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         self,
         od: float,
         bore_dia: float,
-        thickness: float,
+        teeth_width: float,
+        numbers_width: float,
         num_teeth: int,
         slot_angle: float,
         slot_depth: float,
@@ -378,7 +381,8 @@ class IndexGearStandardMk1(bpd.PrintedPart):
     ) -> None:
         self.od = od
         self.bore_dia = bore_dia
-        self.thickness = thickness
+        self.teeth_width = teeth_width
+        self.numbers_width = numbers_width
         self.num_teeth = num_teeth
         self.slot_angle = slot_angle
         self.slot_depth = slot_depth
@@ -387,96 +391,89 @@ class IndexGearStandardMk1(bpd.PrintedPart):
 
     def _comparables(self) -> tuple[object, ...]:
         return (
-            self.name, self.od, self.bore_dia, self.thickness,
-            self.num_teeth, self.slot_angle, self.slot_depth,
-            self.slot_width,
+            self.name, self.od, self.bore_dia, self.teeth_width,
+            self.numbers_width, self.num_teeth, self.slot_angle,
+            self.slot_depth, self.slot_width,
         )
 
     def get_object(self) -> cq.Workplane:
         gear = (
             cq.Workplane("XY")
-            .cylinder(self.thickness, self.od / 2,
-                      centered=(True, True, False))
+            .cylinder(self.teeth_width + self.numbers_width,
+                      self.od / 2, centered=(True, True, False))
         )
 
         # Central bore
         gear = gear.faces(">Z").workplane().hole(self.bore_dia)
 
-        # Slots around perimeter
-        gear = self._cut_slots(gear)
+        # Tick marks on bottom face
+        gear = self._add_tick_marks(gear)
 
         # Captive M3 nut pocket + radial set-screw hole
         gear = self._add_nut_pocket(gear)
 
-        # Tick marks on bottom face
-        gear = self._add_tick_marks(gear)
+        # Slots around perimeter
+        gear = self._add_teeth(gear)
 
         return gear
+    
+    def _get_nut_hole_angle(self):
+        return 360 / 16.0 # between the numbers, and there's 8 numbers.
 
-    def _cut_slots(self, gear: cq.Workplane) -> cq.Workplane:
-        """Cut 96 angled V-notches into the outer perimeter."""
-        radius = self.od / 2
-        angle_per_tooth = 360.0 / self.num_teeth
-        slot_rad = math.radians(self.slot_angle)
+    def _add_teeth(self, gear: cq.Workplane) -> cq.Workplane:
+        verts = []
+        for x in range(self.num_teeth * 2):
+            angle = math.radians(x * 360.0 / (self.num_teeth * 2))
+            dist = self.od / 2 + (x % 2) * 0.8
+            verts.append([
+                math.sin(angle) * dist,
+                math.cos(angle) * dist
+                ])
 
-        # Build a wedge cutter that bites into the perimeter.
-        # The cutter is a thin triangular prism at the correct angle.
-        cutter_inner = radius - self.slot_depth
-        cutter_hw = self.slot_width / 2
-        cutter_pts = [
-            (cutter_inner, -cutter_hw),
-            (cutter_inner, cutter_hw),
-            (radius + 1, cutter_hw * 0.3),
-            (radius + 1, -cutter_hw * 0.3),
-        ]
-
-        # Rotate the profile by slot_angle
-        cos_a = math.cos(slot_rad)
-        sin_a = math.sin(slot_rad)
-        rotated_pts = [
-            (x * cos_a - y * sin_a, x * sin_a + y * cos_a)
-            for x, y in cutter_pts
-        ]
-
-        slot_cutter = (
+        teeth = (
             cq.Workplane("XY")
-            .polyline(rotated_pts)
-            .close()
-            .extrude(self.thickness + 2)
-            .translate((0, 0, -1))
+            .polyline(verts).close()
+            .extrude(self.teeth_width)
         )
-
-        for i in range(self.num_teeth):
-            angle = angle_per_tooth * i
-            rotated = slot_cutter.rotate((0, 0, 0), (0, 0, 1), angle)
-            gear = gear.cut(rotated)
-
-        return gear
+        return gear.union(teeth.translate((0, 0, self.numbers_width)))
 
     def _add_nut_pocket(self, gear: cq.Workplane) -> cq.Workplane:
         """Hex pocket for captive M3 nut + radial hole to bore."""
         radius = self.od / 2
-        mid_z = self.thickness / 2
+        numbers_mid_z = self.numbers_width / 2
         nut_flat = 5.8   # M3 nut across flats + clearance
         nut_depth = 3.0
+        nut_distance = radius - 10
 
         # Hex pocket cut into the outer surface
         pocket = (
-            cq.Workplane("XY")
-            .circle(nut_flat / 2)
+            cq.Workplane("YZ")
+            .polygon(6, nut_flat, circumscribed=True)
             .extrude(nut_depth)
-            .translate((radius - nut_depth / 2, 0, mid_z))
+            .rotate((0, 0, 0), (1, 0, 0), 0)
+            .translate((nut_distance, 0, numbers_mid_z))
         )
-        gear = gear.cut(pocket)
-
+        
+        pocket_shaft = (
+            cq.Workplane("YZ")
+            .box(nut_flat, numbers_mid_z * 2, nut_depth, centered=(True, True, False))
+            .translate((nut_distance, 0, 0))
+        )
+        pocket = pocket.union(pocket_shaft)
+        
         # Radial hole from pocket bottom to central bore
         radial = (
             cq.Workplane("YZ")
             .circle(3.2 / 2)
-            .extrude(radius)
-            .translate((0, 0, mid_z))
+            .extrude(self.od)
+            .translate((0, 0, numbers_mid_z))
         )
-        gear = gear.cut(radial)
+        pocket = pocket.union(radial).rotate(
+            (0, 0, 0),
+            (0, 0, 1),
+            -self._get_nut_hole_angle()
+        )
+        gear = gear.cut(pocket)
 
         return gear
 
@@ -488,22 +485,31 @@ class IndexGearStandardMk1(bpd.PrintedPart):
 
         for i in range(0, self.num_teeth, 3):
             angle = angle_per_tooth * i
-            rad = math.radians(angle)
             is_major = (i % 12 == 0)
-            line_len = 4.0 if is_major else 2.5
-            inner_r = radius - 1.0
-            outer_r = inner_r - line_len
-            mid_r = (inner_r + outer_r) / 2
-            x = mid_r * math.cos(rad)
-            y = mid_r * math.sin(rad)
+            is_mid = (i % 3 == 0)
+            line_len = 4.0 if is_major else 2.5 if is_mid else 1.5
 
             mark = (
                 cq.Workplane("XY")
-                .box(line_len, 0.6, mark_depth + 0.1,
+                .box(mark_depth * 2, 0.6, line_len,
                      centered=(True, True, False))
-                .translate((x, y, -0.05))
+                .translate((radius - mark_depth, 0, 0))
                 .rotate((0, 0, 0), (0, 0, 1), angle)
             )
             gear = gear.cut(mark)
+            
+            if is_major:
+                print(f"Making numbah {i}!")
+                #num = compound(text("15", 5))
+                num_mark = (
+                    cq.Workplane("XY")
+                    .add(offset(text(f"{((i - 1) % self.num_teeth) + 1}", 5), 2))
+                    #.extrude(2)
+                    #compound(offset(text("15", 3), 3, cap=True, both=True))
+                    .rotate((0, 0, 0), (0, 1, 0), 90)
+                    .translate((radius - mark_depth, 0, self.numbers_width * 2 / 3))
+                    .rotate((0, 0, 0), (0, 0, 1), angle)
+                )
+                gear = gear.cut(num_mark)
 
         return gear
