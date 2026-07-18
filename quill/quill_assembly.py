@@ -122,46 +122,29 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             length=self.er11_shank_length,
         )
 
-        # ── Build assembly ─────────────────────────────────────
+        # ── Assemble ────────────────────────────────────────────
         block_x = self.block_x_offset
-        er11_obj = er11.get_object().rotate((0, 0, 0), (0, 1, 0), 90)
         shank_start_x = block_x + self.block_length_x - self.er11_shank_length
         cap_z = self.block_center_z + self.block_height_z / 2
+        gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
+
+        self._add(joint, position=(0, 0, 0), color="orange")
+        self._add(block, position=(block_x, 0, 0), color="blue")
+        self._add(er11, position=(shank_start_x, 0, self.block_center_z),
+                  rotation=((0, 1, 0), 90), color="gray")
+        self._add(cap, position=(block_x + self.collet_side_bearing_x, 0, cap_z),
+                  color="green", name="bearing_cap_collet")
+        self._add(cap, position=(block_x + self.index_side_bearing_x, 0, cap_z),
+                  color="green", name="bearing_cap_index")
         gear_obj = (
             gear.get_object()
             .rotate((0, 0, 0), (0, 0, 1), 180)
             .rotate((0, 0, 0), (0, 1, 0), 90)
         )
-        gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
+        self._add(gear, obj=gear_obj,
+                  position=(gear_x, 0, self.block_center_z), color="red")
 
-        asm = cq.Assembly()
-        asm.add(joint.get_assembly(), name="quill_joint",
-                loc=Location(Vector(0, 0, 0)), color=cq.Color("orange"))
-        asm.add(block.get_assembly(), name="main_block",
-                loc=Location(Vector(block_x, 0, 0)), color=cq.Color("blue"))
-        asm.add(er11_obj, name="er11_shank",
-                loc=Location(Vector(shank_start_x, 0, self.block_center_z)),
-                color=cq.Color("gray"))
-        asm.add(cap.get_assembly(), name="bearing_cap_collet",
-                loc=Location(Vector(block_x + self.collet_side_bearing_x, 0, cap_z)),
-                color=cq.Color("green"))
-        asm.add(cap.get_assembly(), name="bearing_cap_index",
-                loc=Location(Vector(block_x + self.index_side_bearing_x, 0, cap_z)),
-                color=cq.Color("green"))
-        asm.add(gear_obj, name="index_gear",
-                loc=Location(Vector(gear_x, 0, self.block_center_z)),
-                color=cq.Color("red"))
-        self._assembly = asm
-
-        # ── Build BOM ──────────────────────────────────────────
-        bom = bpd.BOM()
-        bom.add(joint)
-        bom.add(block)
-        bom.add(cap, 2)
-        bom.add(gear)
-        bom.add(bb.Bearing6001ZZ.get(name="6001ZZ Bearing"), 2)
-        bom.add(er11)
-        self._bom = bom
+        self._bom.add(bb.Bearing6001ZZ.get(name="6001ZZ Bearing"), 2)
 
 
 # ═══════════════════════════════════════════════════════════════════════

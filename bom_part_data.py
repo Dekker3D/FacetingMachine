@@ -39,10 +39,11 @@ class PartWithMetadata:
     _bom: BOM | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        # Subclasses are expected to set these during __init__.
-        # We use field(default=None) above so the dataclass doesn't
-        # require them, then they stay None until the subclass sets them.
-        pass
+        # Every part starts with empty assembly and BOM.
+        # Simple parts overwrite these after super().__init__().
+        # Assemblies populate them with _add().
+        self._assembly = cq.Assembly(name=self.name)
+        self._bom = BOM()
 
     # ── cache ──────────────────────────────────────────────────────
 
@@ -62,11 +63,46 @@ class PartWithMetadata:
         return self._assembly
 
     def get_BOM(self) -> BOM:
-        """Return the pre-built BOM.  If the subclass didn't set
-        ``self._bom``, default to a BOM containing only this part."""
-        if self._bom is None:
-            self._bom = BOM(self)
-        return self._bom
+        """Return the BOM.  If nothing was added (simple part), default
+        to a BOM containing only this part."""
+        if self._bom is not None:
+            items = list(self._bom.items())
+            if len(items) > 0:
+                return self._bom
+        return BOM(self)
+
+    # ── assembly helper ─────────────────────────────────────────────
+
+    def _add(
+        self,
+        part: PartWithMetadata,
+        *,
+        position: tuple[float, float, float] = (0, 0, 0),
+        rotation: tuple[tuple[float, float, float], float] | None = None,
+        obj: cq.Workplane | cq.Shape | None = None,
+        color: str | None = None,
+        name: str | None = None,
+    ) -> None:
+        """Add a sub-part to both the assembly and the BOM.
+
+        ``rotation`` is ``(axis, degrees)``, e.g. ``((0, 1, 0), 90)``.
+        Pass ``obj`` to supply a pre-rotated shape (bypasses ``get_object()``
+        and ``rotation``).  ``name`` defaults to the part's own name, lowercased.
+        """
+        if obj is None:
+            obj = part.get_object()
+            if obj is None:
+                return  # non-geometric part, BOM-only
+            if rotation is not None:
+                axis, degrees = rotation
+                obj = obj.rotate((0, 0, 0), cq.Vector(*axis), degrees)
+        self._assembly.add(
+            obj,
+            name=name or part.name.lower().replace(" ", "_"),
+            loc=cq.Location(cq.Vector(*position)),
+            color=cq.Color(color) if color else None,
+        )
+        self._bom.merge(part.get_BOM())
 
     # ── geometry / identity ────────────────────────────────────────
 
