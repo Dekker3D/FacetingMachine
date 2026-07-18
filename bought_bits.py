@@ -32,6 +32,10 @@ class BearingGeneric(BoughtPartWithModel):
             .extrude(self.WIDTH)
             .edges()
             .fillet(1.0)
+            .faces(">Z")
+            .hole(self.ID)
+            .edges()
+            .fillet(0.5)
         )
 
 

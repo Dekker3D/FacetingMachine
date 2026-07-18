@@ -8,7 +8,6 @@ import quill.quill_abstract as quill_abstract
 from quill.quill_joint import QuillJointAli
 from cadquery.func import text, compound, offset
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # Assembly — owns all dimensions, injects into parts
 # ═══════════════════════════════════════════════════════════════════════
@@ -39,7 +38,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     block_width_y: float = 56.0
     block_height_z: float = 40.0
     block_x_offset: float = 45.0
-    block_center_z: float = 25.0       # matches hinge center Z
+    block_center_z: float = 25.0  # matches hinge center Z
 
     # ── Bearing positions (from collet end = +X end of block) ──
     collet_side_bearing_x: float = 18.0
@@ -52,7 +51,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cap_length_x: float = 34.0
     cap_width_y: float = 28.0
     cap_thickness: float = 4.0
-    cap_screw_spacing_y: float = 44.0   # M3 holes outside bearing OD
+    cap_screw_spacing_y: float = 44.0  # M3 holes outside bearing OD
 
     # ── Index gear ─────────────────────────────────────────────
     index_gear_od: float = 41.3
@@ -129,7 +128,8 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         cap = self._bearing_cap()
         gear = self._index_gear()
         er11 = bb.StraightShankColletExtension(
-            dia=self.er11_shank_dia, length=self.er11_shank_length,
+            dia=self.er11_shank_dia,
+            length=self.er11_shank_length,
         )
 
         # ER11 shank: bought_bits creates it along Z (XY workplane).
@@ -146,17 +146,31 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
 
         # Bearing caps sit on top of the block
         cap_z = self.block_center_z + self.block_height_z / 2
-        cap_loc_collet = Location(Vector(
-            block_x + self.collet_side_bearing_x, 0, cap_z,
-        ))
-        cap_loc_index = Location(Vector(
-            block_x + self.index_side_bearing_x, 0, cap_z,
-        ))
+        cap_loc_collet = Location(
+            Vector(
+                block_x + self.collet_side_bearing_x,
+                0,
+                cap_z,
+            )
+        )
+        cap_loc_index = Location(
+            Vector(
+                block_x + self.index_side_bearing_x,
+                0,
+                cap_z,
+            )
+        )
 
         # Index gear: printed flat (bore along Z), displayed facing +X.
         # Rotate 90° around Y so bore aligns with X axis.
-        gear_obj = gear.get_object().rotate((0, 0, 0), (0, 0, 1), 180).rotate((0, 0, 0), (0, 1, 0), 90)
-        gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
+        gear_obj = (
+            gear.get_object()
+            .rotate((0, 0, 0), (0, 0, 1), 180)
+            .rotate((0, 0, 0), (0, 1, 0), 90)
+        )
+        gear_x = (
+            block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
+        )
         gear_loc = Location(Vector(gear_x, 0, self.block_center_z))
 
         assembly = (
@@ -207,9 +221,12 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         bom.add(self._bearing_cap(), 2)
         bom.add(self._index_gear())
         bom.add(bb.Bearing6001ZZ(name="6001ZZ Bearing"), 2)
-        bom.add(bb.StraightShankColletExtension(
-            dia=self.er11_shank_dia, length=self.er11_shank_length,
-        ))
+        bom.add(
+            bb.StraightShankColletExtension(
+                dia=self.er11_shank_dia,
+                length=self.er11_shank_length,
+            )
+        )
         return bom
 
 
@@ -218,9 +235,73 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class QuillMainBlock(bpd.PrintedPart):
-    """Printed part: main body of the quill. Houses two 6001ZZ bearings
-    in top-loading pockets, has a through-bore for the ER11 shank, and
+class QuillBlockBase(bpd.PrintedPart):
+    """Base class for quill main blocks. Creates a rectangular block with
+    a stepped cylindrical cavity: wide at both ends for bearings, narrow
+    in the middle for the collet shank. Subclasses add screw holes,
+    mounting features, etc."""
+
+    def __init__(
+        self,
+        length: float,
+        width: float,
+        height: float,
+        split_height: float,
+        split_space: float,
+        bearing_type: type[bb.BearingGeneric],
+        collet_shank: bb.StraightShankColletExtension,
+        name: str = "Quill Block",
+    ) -> None:
+        self.length = length
+        self.width = width
+        self.height = height
+        self.split_height = split_height
+        self.split_space = split_space
+        self.bearing_type = bearing_type
+        self.collet_shank = collet_shank
+        super().__init__(name=name)
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name, self.length, self.width, self.height,
+            self.split_height, self.split_space,
+            self.bearing_type, self.collet_shank,
+        )
+
+    def get_base_shape(self) -> cq.Workplane:
+        """Solid block minus the bearing + shank cavity."""
+        internal_length = self.length - self.bearing_type.WIDTH * 2
+        block_cut = (
+            cq.Workplane("YZ")
+            .cylinder(
+                self.bearing_type.WIDTH,
+                self.bearing_type.OD / 2,
+                centered=(True, True, False),
+            )
+            .faces(">X")
+            .cylinder(
+                internal_length, self.collet_shank.dia / 2 + 1, centered=(True, True, False)
+            )
+            .faces(">X")
+            .cylinder(
+                self.bearing_type.WIDTH,
+                self.bearing_type.OD / 2,
+                centered=(True, True, False),
+            )
+            .translate((0, 0, self.split_height))
+        )
+
+        block = (
+            cq.Workplane("XY")
+            .box(self.length, self.width, self.height, centered=(False, True, False))
+            .cut(block_cut)
+        )
+
+        return block
+
+
+class QuillMainBlock(QuillBlockBase):
+    """Printed part: main body of the quill. Extends QuillBlockBase to add
     M3 screw holes for bearing caps on either side of each bearing."""
 
     def __init__(
@@ -236,9 +317,6 @@ class QuillMainBlock(bpd.PrintedPart):
         shank_bore_dia: float,
         cap_screw_spacing_y: float,
     ) -> None:
-        self.length_x = length_x
-        self.width_y = width_y
-        self.height_z = height_z
         self.center_z = center_z
         self.collet_side_bearing_x = collet_side_bearing_x
         self.index_side_bearing_x = index_side_bearing_x
@@ -246,66 +324,59 @@ class QuillMainBlock(bpd.PrintedPart):
         self.bearing_pocket_depth = bearing_pocket_depth
         self.shank_bore_dia = shank_bore_dia
         self.cap_screw_spacing_y = cap_screw_spacing_y
-        super().__init__(name="Quill Main Block")
+
+        # Derive QuillBlockBase params from our own.
+        # split_height: Z of the cavity center, relative to block bottom (Z=0).
+        # Block bottom = center_z - height_z/2, cavity center = center_z,
+        # so split_height = center_z - (center_z - height_z/2) = height_z/2.
+        split_height = height_z / 2
+        super().__init__(
+            length=length_x,
+            width=width_y,
+            height=height_z,
+            split_height=split_height,
+            split_space=0.0,
+            bearing_type=bb.Bearing6001ZZ,
+            collet_shank=bb.StraightShankColletExtension(
+                dia=shank_bore_dia, length=length_x,
+            ),
+            name="Quill Main Block",
+        )
 
     def _comparables(self) -> tuple[object, ...]:
         return (
-            self.name, self.length_x, self.width_y, self.height_z,
+            self.name, self.length, self.width, self.height,
             self.center_z, self.collet_side_bearing_x,
             self.index_side_bearing_x, self.bearing_pocket_dia,
             self.bearing_pocket_depth, self.shank_bore_dia,
             self.cap_screw_spacing_y,
+            self.split_height, self.bearing_type, self.collet_shank,
         )
 
     def _block_bottom_z(self) -> float:
-        return self.center_z - self.height_z / 2
+        return self.center_z - self.height / 2
 
     def _block_top_z(self) -> float:
-        return self.center_z + self.height_z / 2
+        return self.center_z + self.height / 2
 
     def get_object(self) -> cq.Workplane:
-        block = (
-            cq.Workplane("XY")
-            .box(self.length_x, self.width_y, self.height_z,
-                 centered=(True, True, False))
-            .translate((self.length_x / 2, 0, self._block_bottom_z()))
-        )
-
-        # Shank bore through entire block along X
-        block = (
-            block
-            .faces(">X").workplane(origin=(0, 0, self.height_z))
-            .circle(self.shank_bore_dia / 2)
-            .cutThruAll()
-        )
-
-        # Bearing pockets — open upward
-        block = self._cut_bearing_pocket(block, self.collet_side_bearing_x)
-        block = self._cut_bearing_pocket(block, self.index_side_bearing_x)
+        # Start from the base shape (block with bearing + shank cavity)
+        block = self.get_base_shape()
+        # Translate to the correct Z (block sits on base plate, not bed)
+        block = block.translate((0, 0, self._block_bottom_z()))
 
         # M3 screw holes — one on each Y side of each bearing
         screw_y = self.cap_screw_spacing_y / 2
         for bx in (self.collet_side_bearing_x, self.index_side_bearing_x):
             for sy in (-screw_y, screw_y):
                 block = (
-                    block
-                    .faces(">Z").workplane()
-                    .center(bx - self.length_x / 2, sy)
-                    .hole(3.2, self.height_z)
+                    block.faces(">Z")
+                    .workplane()
+                    .center(bx - self.length / 2, sy)
+                    .hole(3.2, self.height)
                 )
 
         return block
-
-    def _cut_bearing_pocket(
-        self, block: cq.Workplane, x_center: float,
-    ) -> cq.Workplane:
-        """Cut a blind bearing pocket from the top face, open upward."""
-        return (
-            block
-            .faces(">Z").workplane()
-            .center(x_center - self.length_x / 2, 0)
-            .hole(self.bearing_pocket_dia, self.bearing_pocket_depth)
-        )
 
 
 class BearingCap(bpd.PrintedPart):
@@ -328,15 +399,19 @@ class BearingCap(bpd.PrintedPart):
         super().__init__(name="Bearing Cap")
 
     def _comparables(self) -> tuple[object, ...]:
-        return (self.name, self.length_x, self.width_y, self.thickness,
-                self.screw_spacing_y, self.bearing_pocket_dia)
+        return (
+            self.name,
+            self.length_x,
+            self.width_y,
+            self.thickness,
+            self.screw_spacing_y,
+            self.bearing_pocket_dia,
+        )
 
     def get_object(self) -> cq.Workplane:
         # Flat plate centered on bearing
-        cap = (
-            cq.Workplane("XY")
-            .box(self.length_x, self.width_y, self.thickness,
-                 centered=(True, True, False))
+        cap = cq.Workplane("XY").box(
+            self.length_x, self.width_y, self.thickness, centered=(True, True, False)
         )
 
         # Semi-circular cutout on the bottom to cradle the bearing
@@ -344,8 +419,7 @@ class BearingCap(bpd.PrintedPart):
         bearing_r = self.bearing_pocket_dia / 2 + 0.5
         cradle = (
             cq.Workplane("XY")
-            .cylinder(self.thickness + 2, bearing_r,
-                      centered=(True, True, False))
+            .cylinder(self.thickness + 2, bearing_r, centered=(True, True, False))
             .translate((0, 0, -1))
         )
         cap = cap.cut(cradle)
@@ -353,12 +427,7 @@ class BearingCap(bpd.PrintedPart):
         # M3 clearance holes on either Y side
         screw_y = self.screw_spacing_y / 2
         for sy in (-screw_y, screw_y):
-            cap = (
-                cap
-                .faces(">Z").workplane()
-                .center(0, sy)
-                .hole(3.4, self.thickness)
-            )
+            cap = cap.faces(">Z").workplane().center(0, sy).hole(3.4, self.thickness)
 
         return cap
 
@@ -391,16 +460,22 @@ class IndexGearStandardMk1(bpd.PrintedPart):
 
     def _comparables(self) -> tuple[object, ...]:
         return (
-            self.name, self.od, self.bore_dia, self.teeth_width,
-            self.numbers_width, self.num_teeth, self.slot_angle,
-            self.slot_depth, self.slot_width,
+            self.name,
+            self.od,
+            self.bore_dia,
+            self.teeth_width,
+            self.numbers_width,
+            self.num_teeth,
+            self.slot_angle,
+            self.slot_depth,
+            self.slot_width,
         )
 
     def get_object(self) -> cq.Workplane:
-        gear = (
-            cq.Workplane("XY")
-            .cylinder(self.teeth_width + self.numbers_width,
-                      self.od / 2, centered=(True, True, False))
+        gear = cq.Workplane("XY").cylinder(
+            self.teeth_width + self.numbers_width,
+            self.od / 2,
+            centered=(True, True, False),
         )
 
         # Central bore
@@ -416,32 +491,25 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         gear = self._add_teeth(gear)
 
         return gear
-    
+
     def _get_nut_hole_angle(self):
-        return 360 / 16.0 # between the numbers, and there's 8 numbers.
+        return 360 / 16.0  # between the numbers, and there's 8 numbers.
 
     def _add_teeth(self, gear: cq.Workplane) -> cq.Workplane:
         verts = []
         for x in range(self.num_teeth * 2):
             angle = math.radians(x * 360.0 / (self.num_teeth * 2))
             dist = self.od / 2 + (x % 2) * 0.8
-            verts.append([
-                math.sin(angle) * dist,
-                math.cos(angle) * dist
-                ])
+            verts.append([math.sin(angle) * dist, math.cos(angle) * dist])
 
-        teeth = (
-            cq.Workplane("XY")
-            .polyline(verts).close()
-            .extrude(self.teeth_width)
-        )
+        teeth = cq.Workplane("XY").polyline(verts).close().extrude(self.teeth_width)
         return gear.union(teeth.translate((0, 0, self.numbers_width)))
 
     def _add_nut_pocket(self, gear: cq.Workplane) -> cq.Workplane:
         """Hex pocket for captive M3 nut + radial hole to bore."""
         radius = self.od / 2
         numbers_mid_z = self.numbers_width / 2
-        nut_flat = 5.8   # M3 nut across flats + clearance
+        nut_flat = 5.8  # M3 nut across flats + clearance
         nut_depth = 3.0
         nut_distance = radius - 10
 
@@ -453,14 +521,14 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             .rotate((0, 0, 0), (1, 0, 0), 0)
             .translate((nut_distance, 0, numbers_mid_z))
         )
-        
+
         pocket_shaft = (
             cq.Workplane("YZ")
             .box(nut_flat, numbers_mid_z * 2, nut_depth, centered=(True, True, False))
             .translate((nut_distance, 0, 0))
         )
         pocket = pocket.union(pocket_shaft)
-        
+
         # Radial hole from pocket bottom to central bore
         radial = (
             cq.Workplane("YZ")
@@ -469,9 +537,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             .translate((0, 0, numbers_mid_z))
         )
         pocket = pocket.union(radial).rotate(
-            (0, 0, 0),
-            (0, 0, 1),
-            -self._get_nut_hole_angle()
+            (0, 0, 0), (0, 0, 1), -self._get_nut_hole_angle()
         )
         gear = gear.cut(pocket)
 
@@ -485,27 +551,26 @@ class IndexGearStandardMk1(bpd.PrintedPart):
 
         for i in range(0, self.num_teeth, 3):
             angle = angle_per_tooth * i
-            is_major = (i % 12 == 0)
-            is_mid = (i % 3 == 0)
+            is_major = i % 12 == 0
+            is_mid = i % 3 == 0
             line_len = 4.0 if is_major else 2.5 if is_mid else 1.5
 
             mark = (
                 cq.Workplane("XY")
-                .box(mark_depth * 2, 0.6, line_len,
-                     centered=(True, True, False))
+                .box(mark_depth * 2, 0.6, line_len, centered=(True, True, False))
                 .translate((radius - mark_depth, 0, 0))
                 .rotate((0, 0, 0), (0, 0, 1), angle)
             )
             gear = gear.cut(mark)
-            
+
             if is_major:
                 print(f"Making numbah {i}!")
-                #num = compound(text("15", 5))
+                # num = compound(text("15", 5))
                 num_mark = (
                     cq.Workplane("XY")
                     .add(offset(text(f"{((i - 1) % self.num_teeth) + 1}", 5), 2))
-                    #.extrude(2)
-                    #compound(offset(text("15", 3), 3, cap=True, both=True))
+                    # .extrude(2)
+                    # compound(offset(text("15", 3), 3, cap=True, both=True))
                     .rotate((0, 0, 0), (0, 1, 0), 90)
                     .translate((radius - mark_depth, 0, self.numbers_width * 2 / 3))
                     .rotate((0, 0, 0), (0, 0, 1), angle)
