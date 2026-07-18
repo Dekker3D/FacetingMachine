@@ -12,6 +12,37 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
     Printed flat on the bed — the base plate at Z=0, joint rising upward.
     Nubs and shoulders are along the Y axis (hinge = pitch axis)."""
 
+    @classmethod
+    def create(
+        cls,
+        shoulder_dia: float,
+        shoulder_gap: float,
+        user_nub_dia: float,
+        user_nub_length: float,
+        away_nub_dia: float,
+        away_nub_length: float,
+        hinge_height: float,
+        angle_indicator_height: float,
+        angle_indicator_thickness: float,
+        base_plate_thickness: float,
+        base_plate_x: float,
+        base_plate_y: float,
+    ) -> QuillJointAli:
+        return cls.get(
+            shoulder_dia=shoulder_dia,
+            shoulder_gap=shoulder_gap,
+            user_nub_dia=user_nub_dia,
+            user_nub_length=user_nub_length,
+            away_nub_dia=away_nub_dia,
+            away_nub_length=away_nub_length,
+            hinge_height=hinge_height,
+            angle_indicator_height=angle_indicator_height,
+            angle_indicator_thickness=angle_indicator_thickness,
+            base_plate_thickness=base_plate_thickness,
+            base_plate_x=base_plate_x,
+            base_plate_y=base_plate_y,
+        )
+
     def __init__(
         self,
         shoulder_dia: float,
@@ -40,6 +71,19 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         self.base_plate_x = base_plate_x
         self.base_plate_y = base_plate_y
         super().__init__(name="Quill Joint")
+        # Build geometry once
+        obj = (
+            self._make_base_plate()
+            .union(self._make_pillar(+self._half_gap()))
+            .union(self._make_pillar(-self._half_gap()))
+            .union(self._make_shoulder(+self._half_gap()))
+            .union(self._make_shoulder(-self._half_gap()))
+            .union(self._make_user_nub())
+            .union(self._make_away_nub())
+            .union(self._make_angle_indicator())
+        )
+        self._object = obj
+        self._assembly = cq.Assembly(obj, name=self.name)
 
     def _comparables(self) -> tuple[object, ...]:
         return (
@@ -60,20 +104,7 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         """Z of the hinge centerline above the bed."""
         return self.base_plate_thickness + self.hinge_height
 
-    # ── geometry ───────────────────────────────────────────────────
-
-    def get_object(self) -> cq.Workplane:
-        result = (
-            self._make_base_plate()
-            .union(self._make_pillar(+self._half_gap()))
-            .union(self._make_pillar(-self._half_gap()))
-            .union(self._make_shoulder(+self._half_gap()))
-            .union(self._make_shoulder(-self._half_gap()))
-            .union(self._make_user_nub())
-            .union(self._make_away_nub())
-            .union(self._make_angle_indicator())
-        )
-        return result
+    # ── geometry helpers ────────────────────────────────────────────
 
     def _make_base_plate(self) -> cq.Workplane:
         """Base plate: extends in +X to also support the main block."""

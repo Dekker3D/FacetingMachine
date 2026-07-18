@@ -1,20 +1,80 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import cadquery as cq
 import os
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Global part cache — same kwargs → same instance, across all files
+# ═══════════════════════════════════════════════════════════════════════
+
+_cache: dict[tuple[type, tuple[tuple[str, object], ...]], PartWithMetadata] = {}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PartWithMetadata — single base for parts AND assemblies
+# ═══════════════════════════════════════════════════════════════════════
+
+
 @dataclass
 class PartWithMetadata:
-    """Holds metadata for a single type of part."""
+    """Base class for every part and assembly in the project.
 
-    name: str
+    Parts set ``self._assembly`` in ``__init__`` to their geometry
+    (a single-shape assembly for simple parts, multi-shape for
+    assemblies).  ``get_assembly()`` and ``get_BOM()`` return what
+    was stored — geometry is built once, at construction time.
+
+    Use ``PartWithMetadata.get(**kwargs)`` to get-or-create a cached
+    instance.  Two call-sites with the same kwargs get the same object.
+    """
+
+    name: str = ""
     description: str = ""
     price: float = 0.0
 
-    def get_object(self) -> cq.Workplane | None:
-        """Returns the CadQuery object for this part, if it has one."""
-        return None
+    # Non-dataclass fields — set in __post_init__ or subclass __init__
+    _object: cq.Workplane | cq.Shape | None = field(default=None, repr=False, compare=False)
+    _assembly: cq.Assembly | None = field(default=None, repr=False, compare=False)
+    _bom: BOM | None = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        # Subclasses are expected to set these during __init__.
+        # We use field(default=None) above so the dataclass doesn't
+        # require them, then they stay None until the subclass sets them.
+        pass
+
+    # ── cache ──────────────────────────────────────────────────────
+
+    @classmethod
+    def get(cls, **kwargs: object) -> PartWithMetadata:
+        """Get or create: same kwargs → same instance, globally cached."""
+        key = (cls, tuple(sorted(kwargs.items())))
+        if key not in _cache:
+            _cache[key] = cls(**kwargs)
+        return _cache[key]
+
+    # ── assembly / BOM ─────────────────────────────────────────────
+
+    def get_assembly(self) -> cq.Assembly | None:
+        """Return the pre-built assembly.  Subclass __init__ must set
+        ``self._assembly``."""
+        return self._assembly
+
+    def get_BOM(self) -> BOM:
+        """Return the pre-built BOM.  If the subclass didn't set
+        ``self._bom``, default to a BOM containing only this part."""
+        if self._bom is None:
+            self._bom = BOM(self)
+        return self._bom
+
+    # ── geometry / identity ────────────────────────────────────────
+
+    def get_object(self) -> cq.Workplane | cq.Shape | None:
+        """Returns the exportable shape for this part.
+        Set ``self._object`` in ``__init__``; return ``None`` for
+        non-printable parts (assemblies, off-the-shelf without models)."""
+        return self._object
 
     def _comparables(self) -> tuple[object, ...]:
         """Override in subclasses to include all dimension fields.
@@ -34,6 +94,11 @@ class PartWithMetadata:
         return self._comparables() == other._comparables()  # type: ignore[attr-defined]
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# PrintedPart — a PartWithMetadata that can export STL/STEP
+# ═══════════════════════════════════════════════════════════════════════
+
+
 class PrintedPart(PartWithMetadata):
     """A printed part with metadata."""
 
@@ -43,6 +108,15 @@ class PrintedPart(PartWithMetadata):
             formats = ["stl", "step"]
 
         obj = self.get_object()
+        # Fallback: if get_object() wasn't overridden but _assembly
+        # has a single shape, extract it for export.
+        if obj is None and self._assembly is not None:
+            shapes: list[cq.Shape] = []
+            for _, child in self._assembly.traverse():
+                if child.shape is not None:
+                    shapes.append(child.shape)  # type: ignore[arg-type]
+            if len(shapes) == 1:
+                obj = shapes[0]  # type: ignore[assignment]
         if obj is None:
             print(f"Warning: No object found for printed part {self.name}")
             return
@@ -66,9 +140,9 @@ class PrintedPart(PartWithMetadata):
                 print(f"Warning: Unsupported format {fmt} for {self.name}")
 
 
-class PartAssembly:
-    def get_BOM(self) -> BOM:
-        raise NotImplementedError()
+# ═══════════════════════════════════════════════════════════════════════
+# BOM — bill of materials
+# ═══════════════════════════════════════════════════════════════════════
 
 
 class BOM:

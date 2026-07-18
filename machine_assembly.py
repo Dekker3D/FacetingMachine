@@ -12,7 +12,7 @@ from quill_holder_joint.quill_holder_joint import QuillHolderJointAli
 from frame_mast_joint.frame_mast_joint import FrameMastJointSmoothRodRails
 
 
-class MachineAssembly(bpd.PartAssembly):
+class MachineAssembly(bpd.PartWithMetadata):
     """Class representing the entire machine assembly."""
 
     frame: FrameAssembly = FrameAssembly()

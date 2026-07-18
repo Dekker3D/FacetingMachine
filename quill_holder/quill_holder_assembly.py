@@ -50,7 +50,7 @@ class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
         # be visualized standalone without a quill).
         if self.quill is not None:
             assembly = assembly.add(
-                self.quill.make_assembly(),
+                self.quill.get_assembly(),
                 name="quill_assembly",
                 loc=Location((qt_X, 0, qt_Z)),
             )

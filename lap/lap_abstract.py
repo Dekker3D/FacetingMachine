@@ -3,7 +3,7 @@ import cadquery as cq
 import bom_part_data as bpd
 
 
-class LapAssemblyBase(bpd.PartAssembly):
+class LapAssemblyBase(bpd.PartWithMetadata):
     def required_frame_width(self) -> float:
         raise NotImplementedError()
 
