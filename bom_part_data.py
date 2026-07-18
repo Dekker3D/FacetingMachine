@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from typing import Self
 import cadquery as cq
 import os
 
@@ -48,12 +49,12 @@ class PartWithMetadata:
     # ── cache ──────────────────────────────────────────────────────
 
     @classmethod
-    def get(cls, **kwargs: object) -> PartWithMetadata:
+    def get(cls, **kwargs: object) -> Self:
         """Get or create: same kwargs → same instance, globally cached."""
         key = (cls, tuple(sorted(kwargs.items())))
         if key not in _cache:
-            _cache[key] = cls(**kwargs)
-        return _cache[key]
+            _cache[key] = cls(**kwargs)  # type: ignore[arg-type]
+        return _cache[key]  # type: ignore[return-value]
 
     # ── assembly / BOM ─────────────────────────────────────────────
 
@@ -89,6 +90,8 @@ class PartWithMetadata:
         Pass ``obj`` to supply a pre-rotated shape (bypasses ``get_object()``
         and ``rotation``).  ``name`` defaults to the part's own name, lowercased.
         """
+        assert self._assembly is not None, "_assembly not initialized"
+        assert self._bom is not None, "_bom not initialized"
         if obj is None:
             obj = part.get_object()
             if obj is None:

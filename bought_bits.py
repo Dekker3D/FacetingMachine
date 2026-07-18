@@ -247,3 +247,95 @@ class SmoothRod(bom.PartWithMetadata):
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.diameter, self.length)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Bolts, nuts, washers
+# ═══════════════════════════════════════════════════════════════════════
+
+# Standard dimensions for ISO metric fasteners (mm).
+# Keys are nominal sizes; values are (head_dia_across_flats, head_height,
+# nut_width_across_flats, nut_thickness, washer_od, washer_thickness).
+_FASTENER_DIMS: dict[int, tuple[float, float, float, float, float, float]] = {
+    3:  (5.5, 3.0, 5.5, 2.4, 7.0, 0.5),
+    4:  (7.0, 4.0, 7.0, 3.2, 9.0, 0.8),
+    5:  (8.0, 5.0, 8.0, 4.0, 10.0, 1.0),
+    6:  (10.0, 6.0, 10.0, 5.0, 12.0, 1.6),
+    8:  (13.0, 8.0, 13.0, 6.5, 16.0, 1.6),
+    10: (17.0, 10.0, 17.0, 8.0, 20.0, 2.0),
+    12: (19.0, 12.0, 19.0, 10.0, 24.0, 2.5),
+}
+
+
+class Bolt(BoughtPartWithModel):
+    """ISO metric hex-head bolt.  Shaft along +Z, head at origin.
+    Use ``Bolt.get(size=3, length=30)``."""
+
+    def __init__(self, size: float, length: float) -> None:
+        self.size = size
+        self.length = length
+        self._head_dia, self._head_h, *_ = _FASTENER_DIMS.get(
+            int(size), (size * 1.8, size, 0, 0, 0, 0),
+        )
+        super().__init__(name=f"M{size:.0f}×{length:.0f}mm Bolt")
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name, self.size, self.length)
+
+    def _create_object(self) -> cq.Workplane:
+        head = (
+            cq.Workplane("XY")
+            .polygon(6, self._head_dia / 2, circumscribed=True)
+            .extrude(self._head_h)
+            .faces("<Z").workplane()
+            .cylinder(self.length, self.size / 2, centered=(True, True, False))
+        )
+        return head
+
+
+class Nut(BoughtPartWithModel):
+    """ISO metric hex nut.  Flat on XY, bore along Z.
+    Use ``Nut.get(size=3)``."""
+
+    def __init__(self, size: float) -> None:
+        self.size = size
+        _, _, self._width, self._thick, _, _ = _FASTENER_DIMS.get(
+            int(size), (0, 0, size * 1.8, size * 0.8, 0, 0),
+        )
+        super().__init__(name=f"M{size:.0f} Nut")
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name, self.size)
+
+    def _create_object(self) -> cq.Workplane:
+        return (
+            cq.Workplane("XY")
+            .polygon(6, self._width / 2, circumscribed=True)
+            .extrude(self._thick)
+            .faces(">Z").workplane()
+            .hole(self.size + 0.3)
+        )
+
+
+class Washer(BoughtPartWithModel):
+    """ISO metric flat washer.  Flat on XY, bore along Z.
+    Use ``Washer.get(size=3)``."""
+
+    def __init__(self, size: float) -> None:
+        self.size = size
+        _, _, _, _, self._od, self._thick = _FASTENER_DIMS.get(
+            int(size), (0, 0, 0, 0, size * 2.2, size * 0.15),
+        )
+        super().__init__(name=f"M{size:.0f} Washer")
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name, self.size)
+
+    def _create_object(self) -> cq.Workplane:
+        return (
+            cq.Workplane("XY")
+            .cylinder(self._thick, self._od / 2,
+                      centered=(True, True, False))
+            .faces(">Z").workplane()
+            .hole(self.size + 0.3)
+        )

@@ -138,13 +138,13 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                   color="green", name="bearing_cap_index")
         gear_obj = (
             gear.get_object()
-            .rotate((0, 0, 0), (0, 0, 1), 180)
-            .rotate((0, 0, 0), (0, 1, 0), 90)
+            .rotate((0, 0, 0), (0, 0, 1), 180)  # type: ignore[union-attr]
+            .rotate((0, 0, 0), (0, 1, 0), 90)    # type: ignore[union-attr]
         )
         self._add(gear, obj=gear_obj,
                   position=(gear_x, 0, self.block_center_z), color="red")
 
-        self._bom.add(bb.Bearing6001ZZ.get(name="6001ZZ Bearing"), 2)
+        self._bom.add(bb.Bearing6001ZZ.get(name="6001ZZ Bearing"), 2)  # type: ignore[union-attr]
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -537,7 +537,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
                     # compound(offset(text("15", 3), 3, cap=True, both=True))
                     .rotate((0, 0, 0), (0, 1, 0), 90)
                     .translate((radius - mark_depth, 0, self.numbers_width * 2 / 3))
-                    .rotate((0, 0, 0), (0, 0, 1), angle)
+                    .rotate((0, 0, 0), (0, 0, 1), -angle)
                 )
                 gear = gear.cut(num_mark)
 
