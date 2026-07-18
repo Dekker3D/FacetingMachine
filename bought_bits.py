@@ -254,8 +254,10 @@ class SmoothRod(bom.PartWithMetadata):
 # ═══════════════════════════════════════════════════════════════════════
 
 # Standard dimensions for ISO metric fasteners (mm).
-# Keys are nominal sizes; values are (head_dia_across_flats, head_height,
-# nut_width_across_flats, nut_thickness, washer_od, washer_thickness).
+# Keys are nominal sizes; values are:
+#   (head_dia_across_flats, head_height,
+#    nut_width_across_flats, nut_thickness,
+#    washer_od, washer_thickness)
 _FASTENER_DIMS: dict[int, tuple[float, float, float, float, float, float]] = {
     3:  (5.5, 3.0, 5.5, 2.4, 7.0, 0.5),
     4:  (7.0, 4.0, 7.0, 3.2, 9.0, 0.8),
@@ -267,30 +269,96 @@ _FASTENER_DIMS: dict[int, tuple[float, float, float, float, float, float]] = {
 }
 
 
-class Bolt(BoughtPartWithModel):
-    """ISO metric hex-head bolt.  Shaft along +Z, head at origin.
-    Use ``Bolt.get(size=3, length=30)``."""
+# ── Bolt / screw ─────────────────────────────────────────────────────
 
-    def __init__(self, size: float, length: float) -> None:
+
+class Bolt(BoughtPartWithModel):
+    """Threaded fastener.  Shaft along +Z, head at origin.
+    Use ``Bolt.get(size=3, length=30)`` for hex, or pass ``head``:
+
+    - ``"hex"`` — ISO metric hex-head bolt (default)
+    - ``"countersunk"`` — flat countersunk head
+    - ``"pan"`` — pan / button head
+
+    Dimension accessors let surrounding geometry query sizes without
+    knowing the head type, so you can swap ``head="hex"`` for
+    ``head="countersunk"`` and all clearances stay correct."""
+
+    def __init__(self, size: float, length: float, head: str = "hex") -> None:
         self.size = size
         self.length = length
-        self._head_dia, self._head_h, *_ = _FASTENER_DIMS.get(
+        self.head = head
+        hd, hh, *_ = _FASTENER_DIMS.get(
             int(size), (size * 1.8, size, 0, 0, 0, 0),
         )
-        super().__init__(name=f"M{size:.0f}×{length:.0f}mm Bolt")
+        if head == "hex":
+            self._head_dia = hd
+            self._head_h = hh
+        elif head == "countersunk":
+            self._head_dia = size * 2.0
+            self._head_h = size * 0.5
+        elif head == "pan":
+            self._head_dia = size * 1.8
+            self._head_h = size * 0.7
+        else:
+            raise ValueError(f"Unknown head type: {head}")
+        super().__init__(name=f"M{size:.0f}×{length:.0f}mm {head} Bolt")
 
     def _comparables(self) -> tuple[object, ...]:
-        return (self.name, self.size, self.length)
+        return (self.name, self.size, self.length, self.head)
+
+    # ── dimension accessors ────────────────────────────────────────
+
+    def diameter(self) -> float:
+        """Nominal thread diameter (shaft)."""
+        return self.size
+
+    def head_diameter(self) -> float:
+        """Widest part of the head (across-flats for hex, OD for pan)."""
+        return self._head_dia
+
+    def head_height(self) -> float:
+        """Height of the head along the shaft axis."""
+        return self._head_h
+
+    def shaft_length(self) -> float:
+        """Length of the threaded shaft (below the head)."""
+        return self.length
+
+    def total_length(self) -> float:
+        """Head height + shaft length."""
+        return self._head_h + self.length
+
+    # ── geometry ───────────────────────────────────────────────────
 
     def _create_object(self) -> cq.Workplane:
-        head = (
-            cq.Workplane("XY")
-            .polygon(6, self._head_dia / 2, circumscribed=True)
-            .extrude(self._head_h)
-            .faces("<Z").workplane()
-            .cylinder(self.length, self.size / 2, centered=(True, True, False))
+        if self.head == "hex":
+            head_shape = (
+                cq.Workplane("XY")
+                .polygon(6, self._head_dia / 2, circumscribed=True)
+                .extrude(self._head_h)
+            )
+        elif self.head == "countersunk":
+            head_shape = (
+                cq.Workplane("XY")
+                .circle(self._head_dia / 2)
+                .workplane(offset=self._head_h)
+                .circle(self.size / 2)
+                .loft()
+            )
+        else:  # pan
+            head_shape = (
+                cq.Workplane("XY")
+                .cylinder(self._head_h, self._head_dia / 2,
+                          centered=(True, True, False))
+            )
+        return head_shape.faces("<Z").workplane().cylinder(
+            self.length, self.size / 2,
+            centered=(True, True, False),
         )
-        return head
+
+
+# ── Nut ──────────────────────────────────────────────────────────────
 
 
 class Nut(BoughtPartWithModel):
@@ -307,14 +375,37 @@ class Nut(BoughtPartWithModel):
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.size)
 
+    # ── dimension accessors ────────────────────────────────────────
+
+    def diameter(self) -> float:
+        """Bore diameter (clearance for shaft)."""
+        return self.size + 0.3
+
+    def width_across_flats(self) -> float:
+        """Width across opposite flat faces (wrench size)."""
+        return self._width
+
+    def width_across_corners(self) -> float:
+        """Width across opposite corners (clearance circle)."""
+        return self._width / math.cos(math.radians(30))
+
+    def height(self) -> float:
+        """Thickness of the nut."""
+        return self._thick
+
+    # ── geometry ───────────────────────────────────────────────────
+
     def _create_object(self) -> cq.Workplane:
         return (
             cq.Workplane("XY")
             .polygon(6, self._width / 2, circumscribed=True)
             .extrude(self._thick)
             .faces(">Z").workplane()
-            .hole(self.size + 0.3)
+            .hole(self.diameter())
         )
+
+
+# ── Washer ───────────────────────────────────────────────────────────
 
 
 class Washer(BoughtPartWithModel):
@@ -331,11 +422,27 @@ class Washer(BoughtPartWithModel):
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.size)
 
+    # ── dimension accessors ────────────────────────────────────────
+
+    def diameter(self) -> float:
+        """Bore diameter (clearance for shaft)."""
+        return self.size + 0.3
+
+    def outer_diameter(self) -> float:
+        """Outside diameter of the washer."""
+        return self._od
+
+    def height(self) -> float:
+        """Thickness of the washer."""
+        return self._thick
+
+    # ── geometry ───────────────────────────────────────────────────
+
     def _create_object(self) -> cq.Workplane:
         return (
             cq.Workplane("XY")
             .cylinder(self._thick, self._od / 2,
                       centered=(True, True, False))
             .faces(">Z").workplane()
-            .hole(self.size + 0.3)
+            .hole(self.diameter())
         )
