@@ -92,7 +92,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             length_x=self.block_length_x,
             width_y=self.block_width_y,
             height_z=self.block_height_z,
-            center_z=self.block_center_z,
+            split_height=self.block_center_z,
             collet_side_bearing_x=self.collet_side_bearing_x,
             index_side_bearing_x=self.index_side_bearing_x,
             bearing_pocket_dia=self.bearing_pocket_dia,
@@ -128,13 +128,13 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         cap_z = self.block_center_z + self.block_height_z / 2
         gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
 
-        self._add(joint, position=(0, 0, 0), color="orange")
-        self._add(block, position=(block_x, 0, 0), color="blue")
-        self._add(er11, position=(shank_start_x, 0, self.block_center_z),
+        self._add(joint, position=(0, 0, -self.block_center_z), color="orange")
+        self._add(block, position=(block_x, 0, -self.block_center_z), color="blue")
+        self._add(er11, position=(shank_start_x, 0, 0),
                   rotation=((0, 1, 0), 90), color="gray")
-        self._add(cap, position=(block_x + self.collet_side_bearing_x, 0, cap_z),
+        self._add(cap, position=(block_x + self.collet_side_bearing_x, 0, cap_z - self.block_center_z),
                   color="green", name="bearing_cap_collet")
-        self._add(cap, position=(block_x + self.index_side_bearing_x, 0, cap_z),
+        self._add(cap, position=(block_x + self.index_side_bearing_x, 0, cap_z - self.block_center_z),
                   color="green", name="bearing_cap_index")
         gear_obj = (
             gear.get_object()
@@ -142,9 +142,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             .rotate((0, 0, 0), (0, 1, 0), 90)    # type: ignore[union-attr]
         )
         self._add(gear, obj=gear_obj,
-                  position=(gear_x, 0, self.block_center_z), color="red")
-
-        self._bom.add(bb.Bearing6001ZZ.get(name="6001ZZ Bearing"), 2)  # type: ignore[union-attr]
+                  position=(gear_x, 0, 0), color="red")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -227,7 +225,7 @@ class QuillMainBlock(QuillBlockBase):
         length_x: float,
         width_y: float,
         height_z: float,
-        center_z: float,
+        split_height: float,
         collet_side_bearing_x: float,
         index_side_bearing_x: float,
         bearing_pocket_dia: float,
@@ -239,7 +237,7 @@ class QuillMainBlock(QuillBlockBase):
             length_x=length_x,
             width_y=width_y,
             height_z=height_z,
-            center_z=center_z,
+            split_height=split_height,
             collet_side_bearing_x=collet_side_bearing_x,
             index_side_bearing_x=index_side_bearing_x,
             bearing_pocket_dia=bearing_pocket_dia,
@@ -253,7 +251,7 @@ class QuillMainBlock(QuillBlockBase):
         length_x: float,
         width_y: float,
         height_z: float,
-        center_z: float,
+        split_height: float,
         collet_side_bearing_x: float,
         index_side_bearing_x: float,
         bearing_pocket_dia: float,
@@ -261,7 +259,7 @@ class QuillMainBlock(QuillBlockBase):
         shank_bore_dia: float,
         cap_screw_spacing_y: float,
     ) -> None:
-        self.center_z = center_z
+        self.split_height = split_height
         self.collet_side_bearing_x = collet_side_bearing_x
         self.index_side_bearing_x = index_side_bearing_x
         self.bearing_pocket_dia = bearing_pocket_dia
@@ -271,9 +269,6 @@ class QuillMainBlock(QuillBlockBase):
 
         # Derive QuillBlockBase params from our own.
         # split_height: Z of the cavity center, relative to block bottom (Z=0).
-        # Block bottom = center_z - height_z/2, cavity center = center_z,
-        # so split_height = center_z - (center_z - height_z/2) = height_z/2.
-        split_height = height_z / 2
         super().__init__(
             length=length_x,
             width=width_y,
@@ -288,24 +283,31 @@ class QuillMainBlock(QuillBlockBase):
         )
         # Build geometry once
         obj = self.get_base_shape()
-        obj = obj.translate((0, 0, self._block_bottom_z()))
         # M3 screw holes
         screw_y = self.cap_screw_spacing_y / 2
-        for bx in (self.collet_side_bearing_x, self.index_side_bearing_x):
+        for bx in (self.length - self.bearing_type.WIDTH / 2, self.bearing_type.WIDTH / 2):
             for sy in (-screw_y, screw_y):
                 obj = (
                     obj.faces(">Z")
-                    .workplane()
+                    .workplane(origin=(bx, sy, 0))
                     .center(bx - self.length / 2, sy)
                     .hole(3.2, self.height)
                 )
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        # Block shape (manually — it IS the part, not a sub-part)
+        assert self._assembly is not None
+        self._assembly.add(obj, name="body", color=cq.Color("blue"))
+        # Bearings via _add (one call handles assembly + BOM)
+        bearing = bb.Bearing6001ZZ.get(name="6001ZZ Bearing")
+        for bx in (self.length, 0):
+            self._add(bearing,
+                      position=(bx, 0, self.split_height + 20), rotation=((0, 1, 0), 90),
+                      color="gray", name=f"bearing_{bx:.0f}")
 
     def _comparables(self) -> tuple[object, ...]:
         return (
             self.name, self.length, self.width, self.height,
-            self.center_z, self.collet_side_bearing_x,
+            self.split_height, self.collet_side_bearing_x,
             self.index_side_bearing_x, self.bearing_pocket_dia,
             self.bearing_pocket_depth, self.shank_bore_dia,
             self.cap_screw_spacing_y,
@@ -313,10 +315,10 @@ class QuillMainBlock(QuillBlockBase):
         )
 
     def _block_bottom_z(self) -> float:
-        return self.center_z - self.height / 2
+        return self.split_height - self.height / 2
 
     def _block_top_z(self) -> float:
-        return self.center_z + self.height / 2
+        return self.split_height + self.height / 2
 
 
 class BearingCap(bpd.PrintedPart):
