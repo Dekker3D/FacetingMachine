@@ -291,7 +291,6 @@ class QuillMainBlock(QuillBlockBase):
                 obj = (
                     obj.faces(">Z")
                     .workplane(origin=(bx, sy, 0))
-                    .center(bx - self.length / 2, sy)
                     .hole(3.2, self.height)
                 )
         self._object = obj

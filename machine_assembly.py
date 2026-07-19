@@ -19,7 +19,7 @@ class MachineAssembly(bpd.PartWithMetadata):
     lap: LapAssembly = LapAssembly()
     mast: MastAssembly = MastAssembly()
     quill: QuillAssemblyStandardMk1 = QuillAssemblyStandardMk1()
-    quill_holder: QuillHolderAssembly = QuillHolderAssembly()
+    quill_holder: QuillHolderAssembly = QuillHolderAssembly(quill=quill)
     quill_joint: QuillHolderJointAli = QuillHolderJointAli()
     mast_joint: FrameMastJointSmoothRodRails = FrameMastJointSmoothRodRails()
 
@@ -28,7 +28,6 @@ class MachineAssembly(bpd.PartWithMetadata):
     frame.mast_joint = mast_joint
     mast.quill = quill_holder
     mast.quill_joint = quill_joint
-    quill_holder.quill = quill
 
     def validate(self) -> None:
         self.frame.validate()

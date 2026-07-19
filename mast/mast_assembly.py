@@ -204,7 +204,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
 
         if self.quill is not None:
             assembly = assembly.add(
-                self.quill.make_assembly(),
+                self.quill.get_assembly(),
                 name="quill_assembly",
                 loc=Location((
                     self.quill_holder_x(), 0,
