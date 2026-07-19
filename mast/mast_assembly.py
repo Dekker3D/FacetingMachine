@@ -114,6 +114,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         quill_joint: quill_holder_joint_abstract.QuillHolderJointBase | None = None,
     ) -> None:
         super().__init__(name="Mast Assembly")
+        self._current_group = self.name
         self._quill_joint = quill_joint
 
         # Spine extrusion

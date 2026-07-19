@@ -63,6 +63,7 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
         mast_joint: frame_mast_joint.FrameMastJointBase | None = None,
     ) -> None:
         super().__init__(name="Frame Assembly")
+        self._current_group = self.name
         self.lap = lap
         self.mast = mast
         self.mast_joint = mast_joint
@@ -117,9 +118,14 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
                   name="mast_assembly")
 
         # Off-the-shelf
-        self._bom.add(bb.TslotExtrusion2020.get(length=self.frame_width()), 2)  # type: ignore[union-attr]
-        self._bom.add(bb.TslotExtrusion2020.get(length=self.frame_length() - 40), 2)  # type: ignore[union-attr]
-        self._bom.add(bb.SmoothRod(diameter=cfg.FRAME_RAIL_DIA, length=self.mast_space()), 2)  # type: ignore[union-attr]
+        ext_w = bb.TslotExtrusion2020.get(length=self.frame_width())
+        ext_l = bb.TslotExtrusion2020.get(length=self.frame_length() - 40)
+        rod = bb.SmoothRod(diameter=cfg.FRAME_RAIL_DIA, length=self.mast_space())
+        self._bom.add(ext_w, 2)  # type: ignore[union-attr]
+        self._bom.add(ext_l, 2)  # type: ignore[union-attr]
+        self._bom.add(rod, 2)    # type: ignore[union-attr]
+        for p in (ext_w, ext_l, rod):
+            self._bom._groups[p] = self.name  # type: ignore[union-attr]
 
     # ── inline geometry ─────────────────────────────────────────
 

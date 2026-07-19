@@ -47,6 +47,7 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
 
     def __init__(self) -> None:
         super().__init__(name="Lap Assembly")
+        self._current_group = self.name
         lhb = LapHolderBottom.create(
             axle_dia=self.LAP_AXLE_DIA,
             lap_thickness=self.LAP_THICKNESS,

@@ -24,6 +24,7 @@ class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
         quill: quill_abstract.QuillAssemblyBase | None = None,
     ) -> None:
         super().__init__(name="Quill Holder Assembly")
+        self._current_group = self.name
         holder = QuillHolder.create(
             swing_dia=self.swing_dia,
             swing_height=self.swing_height,
