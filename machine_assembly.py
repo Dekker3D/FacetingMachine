@@ -15,30 +15,24 @@ from frame_mast_joint.frame_mast_joint import FrameMastJointSmoothRodRails
 class MachineAssembly(bpd.PartWithMetadata):
     """Class representing the entire machine assembly."""
 
-    frame: FrameAssembly = FrameAssembly()
     lap: LapAssembly = LapAssembly()
     quill: QuillAssemblyStandardMk1 = QuillAssemblyStandardMk1()
     quill_holder: QuillHolderAssembly = QuillHolderAssembly(quill=quill)
     quill_joint: QuillHolderJointAli = QuillHolderJointAli()
     mast: MastAssembly = MastAssembly(quill=quill_holder, quill_joint=quill_joint)
     mast_joint: FrameMastJointSmoothRodRails = FrameMastJointSmoothRodRails()
-
-    frame.lap = lap
-    frame.mast = mast
-    frame.mast_joint = mast_joint
+    frame: FrameAssembly = FrameAssembly(lap=lap, mast=mast, mast_joint=mast_joint)
 
     def validate(self) -> None:
         self.frame.validate()
 
     def make_assembly(self) -> cq.Assembly:
         """Create the entire machine assembly."""
-        return self.frame.make_assembly()
+        return self.frame.get_assembly()
 
     def get_BOM(self) -> bpd.BOM:
         bom = bpd.BOM()
         bom.merge(self.frame.get_BOM())
-        bom.merge(self.lap.get_BOM())
-        bom.merge(self.mast.get_BOM())
         return bom
     def export_everything(self, folder: str = "export") -> None:
         """Export all printable parts and the BOM."""

@@ -1,12 +1,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+import bom_part_data as bpd
 
 if TYPE_CHECKING:
     from mast.mast_abstract import MastAssemblyBase
     from lap.lap_abstract import LapAssemblyBase
 
 
-class FrameAssemblyBase:
+class FrameAssemblyBase(bpd.PartWithMetadata):
     lap: LapAssemblyBase | None = None
     mast: MastAssemblyBase | None = None
 
