@@ -1,12 +1,13 @@
 from __future__ import annotations
 import cadquery as cq
+import bom_part_data as bpd
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mast.mast_abstract import MastAssemblyBase
 
 
-class QuillHolderJointBase:
+class QuillHolderJointBase(bpd.PartWithMetadata):
     mast: MastAssemblyBase | None = None
     quill: object | None = None
 

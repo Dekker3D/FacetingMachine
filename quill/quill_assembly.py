@@ -72,6 +72,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
 
     def __init__(self) -> None:
         super().__init__(name="Quill Assembly")
+        self._current_group = self.name  # group sub-parts under this assembly
 
         # Sub-parts (cached via create() → get())
         joint = QuillJointAli.create(

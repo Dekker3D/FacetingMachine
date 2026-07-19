@@ -13,6 +13,7 @@ class BoughtPartWithModel(bom.PartWithMetadata):
         """Returns a cadquery object representing this part."""
         if self._cached_obj is None:
             self._cached_obj = self._create_object()
+            self._object = self._cached_obj  # sync with BOM visibility
         return self._cached_obj
 
     def _create_object(self) -> cq.Workplane:

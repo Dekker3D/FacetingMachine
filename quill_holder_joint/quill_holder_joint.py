@@ -10,6 +10,13 @@ class QuillHolderJointStandard(quill_joint_abstract.QuillHolderJointBase):
     carriage_joint_thickness_below: float = 8.0
     carriage_joint_length: float = 50.0
 
+    def __init__(self, name: str = "Quill Holder Joint (Standard)") -> None:
+        super().__init__(name=name)
+
+    @classmethod
+    def create(cls) -> QuillHolderJointStandard:
+        return cls.get()
+
     def space_needed_carriage_x(self) -> float:
         return self.carriage_joint_radius() + self.carriage_joint_clearance_radial
 
@@ -55,6 +62,13 @@ class QuillHolderJointAli(QuillHolderJointStandard):
     carriage_joint_thickness_radial: float = (
         (15.0 - 24.6) / 2  # negative — indicates the Ali part is undersized
     )
+
+    def __init__(self) -> None:
+        super().__init__(name="Quill Holder Joint (Ali)")
+
+    @classmethod
+    def create(cls) -> QuillHolderJointAli:
+        return cls.get()
 
     def carriage_joint_radius(self) -> float:
         return 24.6 / 2

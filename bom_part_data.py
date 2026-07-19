@@ -38,11 +38,9 @@ class PartWithMetadata:
     _object: cq.Workplane | cq.Shape | None = field(default=None, repr=False, compare=False)
     _assembly: cq.Assembly | None = field(default=None, repr=False, compare=False)
     _bom: BOM | None = field(default=None, repr=False, compare=False)
+    _current_group: str | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        # Every part starts with empty assembly and BOM.
-        # Simple parts overwrite these after super().__init__().
-        # Assemblies populate them with _add().
         self._assembly = cq.Assembly(name=self.name)
         self._bom = BOM()
 
@@ -64,13 +62,14 @@ class PartWithMetadata:
         return self._assembly
 
     def get_BOM(self) -> BOM:
-        """Return the BOM.  If nothing was added (simple part), default
-        to a BOM containing only this part."""
+        """Return the BOM.  Includes this part itself (if it has
+        exportable geometry) plus any sub-parts added via _add()."""
+        bom = BOM()
+        if self.get_object() is not None:
+            bom.add(self)
         if self._bom is not None:
-            items = list(self._bom.items())
-            if len(items) > 0:
-                return self._bom
-        return BOM(self)
+            bom.merge(self._bom)
+        return bom
 
     # ── assembly helper ─────────────────────────────────────────────
 
@@ -96,7 +95,7 @@ class PartWithMetadata:
         """
         assert self._assembly is not None, "_assembly not initialized"
         assert self._bom is not None, "_bom not initialized"
-        self._bom.merge(part.get_BOM())
+        self._bom.merge(part.get_BOM(), group=self._current_group)
 
         # Resolve location
         if loc is None:
@@ -216,36 +215,85 @@ class PrintedPart(PartWithMetadata):
 class BOM:
     def __init__(self, singlePart: PartWithMetadata | None = None) -> None:
         self._items: dict[PartWithMetadata, int] = {}
+        self._groups: dict[PartWithMetadata, str] = {}  # part → group name
         if singlePart is not None:
             self._items[singlePart] = 1
 
     def add(self, part: PartWithMetadata, qty: int = 1) -> None:
         self._items[part] = self._items.get(part, 0) + qty
 
-    def merge(self, other: BOM, qty: int = 1) -> None:
+    def merge(self, other: BOM, qty: int = 1, group: str | None = None) -> None:
         for part, part_qty in other._items.items():
             self.add(part, part_qty * qty)
+        for part, grp in other._groups.items():
+            if part not in self._groups:
+                self._groups[part] = grp
+        if group is not None:
+            for part in other._items:
+                if part not in self._groups:
+                    self._groups[part] = group
 
     def items(self):
         return self._items.items()
 
+    # ── output ──────────────────────────────────────────────────
+
     def tostring(self) -> str:
-        """Returns a formatted string of the BOM items."""
+        """Sorted alphabetically — all items merged regardless of group."""
+        return self._format_sorted()
+
+    def tostring_grouped(self) -> str:
+        """Grouped by assembly — items listed under their group header."""
+        return self._format_grouped()
+
+    def _format_sorted(self) -> str:
         lines = [f"{'Name':<40} | {'Qty':<5} | {'Price':<8}"]
         lines.append("-" * 60)
-
         total_price = 0.0
-        for part, qty in self._items.items():
+        for part, qty in sorted(self._items.items(), key=lambda x: x[0].name.lower()):
             line = f"{part.name:<40} | {qty:<5}"
             if part.price != 0:
                 line += f" | {part.price:<8.2f}"
                 total_price += part.price * qty
             lines.append(line)
-
         if total_price > 0:
             lines.append("-" * 60)
             lines.append(f"{'Total':<40} | {'':<5} | {total_price:<8.2f}")
+        return "\n".join(lines)
 
+    def _format_grouped(self) -> str:
+        # Collect items by group, ungrouped first
+        grouped: dict[str | None, list[tuple[PartWithMetadata, int]]] = {}
+        for part, qty in self._items.items():
+            grp = self._groups.get(part)
+            grouped.setdefault(grp, []).append((part, qty))
+        lines: list[str] = []
+        total_price = 0.0
+        # Ungrouped first
+        if None in grouped:
+            lines.append("--- Ungrouped ---")
+            for part, qty in sorted(grouped[None], key=lambda x: x[0].name.lower()):
+                line = f"  {part.name:<38} | {qty:<5}"
+                if part.price != 0:
+                    line += f" | {part.price:<8.2f}"
+                    total_price += part.price * qty
+                lines.append(line)
+        # Then each group alphabetically
+        for grp_name in sorted(g for g in grouped if g is not None):
+            lines.append(f"--- {grp_name} ---")
+            for part, qty in sorted(grouped[grp_name], key=lambda x: x[0].name.lower()):
+                line = f"  {part.name:<38} | {qty:<5}"
+                if part.price != 0:
+                    line += f" | {part.price:<8.2f}"
+                    total_price += part.price * qty
+                lines.append(line)
+        # Header
+        header = f"{'Name':<40} | {'Qty':<5} | {'Price':<8}"
+        lines.insert(0, header)
+        lines.insert(1, "=" * 60)
+        if total_price > 0:
+            lines.append("-" * 60)
+            lines.append(f"{'Total':<40} | {'':<5} | {total_price:<8.2f}")
         return "\n".join(lines)
 
     def export_text(self, filename: str) -> None:

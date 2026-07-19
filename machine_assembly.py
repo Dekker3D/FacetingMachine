@@ -26,7 +26,7 @@ class MachineAssembly(bpd.PartWithMetadata):
     def validate(self) -> None:
         self.frame.validate()
 
-    def make_assembly(self) -> cq.Assembly:
+    def make_assembly(self) -> cq.Assembly | None:
         """Create the entire machine assembly."""
         return self.frame.get_assembly()
 
@@ -55,6 +55,8 @@ if __name__ == "__cq_main__":
     machine.export_everything()
     t3 = time.perf_counter()
     print(machine.get_BOM().tostring())
+    print("\n=== Grouped ===")
+    print(machine.get_BOM().tostring_grouped())
 
     print(f"\nTiming: init={t1-t0:.2f}s  assembly={t2-t1:.2f}s  export={t3-t2:.2f}s  total={t3-t0:.2f}s")
     print("done")
