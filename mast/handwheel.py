@@ -6,6 +6,29 @@ import bom_part_data as bpd
 class HandWheel(bpd.PrintedPart):
     """A handwheel to attach to the top of the leadscrew. Uses captive nut."""
 
+    @classmethod
+    def create(
+        cls,
+        wheel_height: float = 10.0,
+        wheel_dia: float = 60.0,
+        attachment_dia: float = 30.0,
+        attachment_height: float = 10.0,
+        axle_dia: float = 8.0,
+        screw_dia: float = 3.2,
+        nut_face_to_face: float = 5.6,
+        nut_thickness: float = 2.5,
+    ) -> HandWheel:
+        return cls.get(
+            wheel_height=wheel_height,
+            wheel_dia=wheel_dia,
+            attachment_dia=attachment_dia,
+            attachment_height=attachment_height,
+            axle_dia=axle_dia,
+            screw_dia=screw_dia,
+            nut_face_to_face=nut_face_to_face,
+            nut_thickness=nut_thickness,
+        )
+
     def __init__(
         self,
         wheel_height: float = 10.0,
@@ -26,17 +49,7 @@ class HandWheel(bpd.PrintedPart):
         self.nut_face_to_face = nut_face_to_face
         self.nut_thickness = nut_thickness
         super().__init__(name="Handwheel")
-
-    def _comparables(self) -> tuple[object, ...]:
-        return (
-            self.name, self.wheel_height, self.wheel_dia,
-            self.attachment_dia, self.attachment_height,
-            self.axle_dia, self.screw_dia,
-            self.nut_face_to_face, self.nut_thickness,
-        )
-
-    def get_object(self) -> cq.Workplane:
-        """Make the handwheel, centered on origin."""
+        # Build geometry once
         hw = (
             cq.Workplane("XY")
             .cylinder(
@@ -59,30 +72,23 @@ class HandWheel(bpd.PrintedPart):
             .workplane()
             .hole(self.axle_dia)
         )
-
         hw = hw.cut(
-            cq.Workplane(
-                "bottom", origin=(0, 0, self.attachment_height / 2)
-            )
+            cq.Workplane("bottom", origin=(0, 0, self.attachment_height / 2))
             .circle(self.screw_dia / 2)
             .extrude(self.attachment_dia)
         )
-
         hw = hw.cut(
             cq.Workplane(
                 "bottom",
-                origin=(0, -(self.axle_dia / 2 + 3.0),
-                        self.attachment_height / 2),
+                origin=(0, -(self.axle_dia / 2 + 3.0), self.attachment_height / 2),
             )
             .polygon(6, self.nut_face_to_face, circumscribed=True)
             .extrude(self.nut_thickness)
         )
-
         hw = hw.cut(
             cq.Workplane(
                 "bottom",
-                origin=(0, -(self.axle_dia / 2 + 3.0),
-                        self.attachment_height / 2),
+                origin=(0, -(self.axle_dia / 2 + 3.0), self.attachment_height / 2),
             )
             .box(
                 self.nut_face_to_face,
@@ -92,5 +98,13 @@ class HandWheel(bpd.PrintedPart):
             )
             .translate((0, 0, -self.attachment_height))
         )
+        self._object = hw
+        self._assembly = cq.Assembly(hw, name=self.name)
 
-        return hw
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name, self.wheel_height, self.wheel_dia,
+            self.attachment_dia, self.attachment_height,
+            self.axle_dia, self.screw_dia,
+            self.nut_face_to_face, self.nut_thickness,
+        )

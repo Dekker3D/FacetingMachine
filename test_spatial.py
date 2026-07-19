@@ -106,8 +106,22 @@ def test_bearing_holder_fits_printer() -> None:
 def test_bearing_holder_not_inside_spine() -> None:
     """Document intent: bearing holder wraps around spine cutout."""
     ma = get_mast()
-    spine = ma.make_mast_spine(ma.spine_length())
-    bh = ma.make_bearing_holder()
+    spine = bb.TslotExtrusion2020.get(length=ma.spine_length()).get_object()
+    from mast.mast_assembly import BearingHolder
+    bh = BearingHolder.create(
+        spine_span=ma.spine_ext_width,
+        leadscrew_dist=ma.leadscrew_dist_from_spine(),
+        diagonal_length=ma.bh_diagonal_length(),
+        diagonal_height=ma.bh_diagonal_height(),
+        cylinder_height=ma.bh_cylinder_height(),
+        bolt_head_height=ma.bh_bolt_head_height(),
+        bolt_hole_length=ma.BH_BOLT_HOLE_LENGTH,
+        bolt_hole_dia=ma.BH_BOLT_HOLE_DIA,
+        bolt_head_dia=ma.BH_BOLT_HEAD_DIA,
+        leadscrew_dia=ma.leadscrew_dia,
+        leadscrew_hole_space=ma.BH_LEADSCREW_HOLE_SPACE,
+        bearing_type=bb.Bearing608ZZ,
+    ).get_object()
 
     spine_face_zone = ch.clearance_box(
         center=(0, 0, ma.bh_total_height() / 2),
@@ -125,10 +139,24 @@ def test_bearing_holder_not_inside_spine() -> None:
 def test_handwheel_doesnt_hit_bearing_holder() -> None:
     """Handwheel sits above top bearing holder — must not overlap."""
     ma = get_mast()
-    bh = ma.make_bearing_holder()
+    from mast.mast_assembly import BearingHolder
+    bh = BearingHolder.create(
+        spine_span=ma.spine_ext_width,
+        leadscrew_dist=ma.leadscrew_dist_from_spine(),
+        diagonal_length=ma.bh_diagonal_length(),
+        diagonal_height=ma.bh_diagonal_height(),
+        cylinder_height=ma.bh_cylinder_height(),
+        bolt_head_height=ma.bh_bolt_head_height(),
+        bolt_hole_length=ma.BH_BOLT_HOLE_LENGTH,
+        bolt_hole_dia=ma.BH_BOLT_HOLE_DIA,
+        bolt_head_dia=ma.BH_BOLT_HEAD_DIA,
+        leadscrew_dia=ma.leadscrew_dia,
+        leadscrew_hole_space=ma.BH_LEADSCREW_HOLE_SPACE,
+        bearing_type=bb.Bearing608ZZ,
+    ).get_object()
 
     from mast.handwheel import HandWheel
-    hw = HandWheel().get_object()
+    hw = HandWheel.create().get_object()
 
     hw_z = ma.rail_start_y() + ma.rail_length + ma.bh_total_height()
     hw_placed = hw.translate((ma.leadscrew_x(), 0, hw_z))

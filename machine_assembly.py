@@ -17,17 +17,15 @@ class MachineAssembly(bpd.PartWithMetadata):
 
     frame: FrameAssembly = FrameAssembly()
     lap: LapAssembly = LapAssembly()
-    mast: MastAssembly = MastAssembly()
     quill: QuillAssemblyStandardMk1 = QuillAssemblyStandardMk1()
     quill_holder: QuillHolderAssembly = QuillHolderAssembly(quill=quill)
     quill_joint: QuillHolderJointAli = QuillHolderJointAli()
+    mast: MastAssembly = MastAssembly(quill=quill_holder, quill_joint=quill_joint)
     mast_joint: FrameMastJointSmoothRodRails = FrameMastJointSmoothRodRails()
 
     frame.lap = lap
     frame.mast = mast
     frame.mast_joint = mast_joint
-    mast.quill = quill_holder
-    mast.quill_joint = quill_joint
 
     def validate(self) -> None:
         self.frame.validate()
@@ -41,8 +39,6 @@ class MachineAssembly(bpd.PartWithMetadata):
         bom.merge(self.frame.get_BOM())
         bom.merge(self.lap.get_BOM())
         bom.merge(self.mast.get_BOM())
-        if self.mast.quill is not None:
-            bom.merge(self.mast.quill.get_BOM())
         return bom
     def export_everything(self, folder: str = "export") -> None:
         """Export all printable parts and the BOM."""

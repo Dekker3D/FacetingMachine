@@ -120,7 +120,7 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
                 ),
             )
             .add(
-                self.mast.make_assembly(),
+                self.mast.get_assembly(),
                 name="mast_assembly",
                 loc=Location(
                     (-self.frame_length() / 2 + self.mast_vis_x, 0, 20)
