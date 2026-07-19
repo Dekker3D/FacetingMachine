@@ -113,7 +113,7 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
                 color=cq.Color("green"),
             )
             .add(
-                self.lap.make_assembly(),
+                self.lap.get_assembly(),
                 name="lap_assembly",
                 loc=Location(
                     (self.frame_length() / 2 - self.lap_pos_from_left(), 0, 20)

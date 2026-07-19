@@ -49,12 +49,18 @@ class MachineAssembly(bpd.PartWithMetadata):
 
 
 if __name__ == "__cq_main__":
-    # We're in CQ-Editor. Show the assembly.
-    # show_object is a valid CQ-Editor function.
+    import time
+    t0 = time.perf_counter()
+
     machine = MachineAssembly()
+    t1 = time.perf_counter()
     machine.validate()
     result = machine.make_assembly()
+    t2 = time.perf_counter()
     show_object(result)  # type: ignore[name-defined]  # noqa: F821
     machine.export_everything()
+    t3 = time.perf_counter()
     print(machine.get_BOM().tostring())
+
+    print(f"\nTiming: init={t1-t0:.2f}s  assembly={t2-t1:.2f}s  export={t3-t2:.2f}s  total={t3-t0:.2f}s")
     print("done")

@@ -9,6 +9,3 @@ class LapAssemblyBase(bpd.PartWithMetadata):
 
     def sg_OD(self) -> float:
         raise NotImplementedError()
-
-    def make_assembly(self) -> cq.Assembly:
-        raise NotImplementedError()
