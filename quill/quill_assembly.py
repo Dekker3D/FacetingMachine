@@ -123,18 +123,19 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         )
 
         # ── Assemble ────────────────────────────────────────────
+        # Reminder: we're subtracing self.block_center_z from the Z of all parts, to line up with the joint.
         block_x = self.block_x_offset
         shank_start_x = block_x + self.block_length_x - self.er11_shank_length
         cap_z = self.block_center_z + self.block_height_z / 2
         gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
 
-        self._add(joint, position=(0, 0, -self.block_center_z), color="orange")
-        self._add(block, position=(block_x, 0, -self.block_center_z), color="blue")
-        self._add(er11, position=(shank_start_x, 0, 0),
-                  rotation=((0, 1, 0), 90), color="gray")
-        self._add(cap, position=(block_x + self.collet_side_bearing_x, 0, cap_z - self.block_center_z),
+        self._add(joint, loc=Location(0, 0, -self.block_center_z), color="orange")
+        self._add(block, loc=Location(block_x, 0, -self.block_center_z), color="blue")
+        self._add(er11, loc=Location(Vector(shank_start_x, 0, 0), Vector(0, 1, 0), 90),
+                  color="gray")
+        self._add(cap, loc=Location(block_x + self.collet_side_bearing_x, 0, cap_z - self.block_center_z),
                   color="green", name="bearing_cap_collet")
-        self._add(cap, position=(block_x + self.index_side_bearing_x, 0, cap_z - self.block_center_z),
+        self._add(cap, loc=Location(block_x + self.index_side_bearing_x, 0, cap_z - self.block_center_z),
                   color="green", name="bearing_cap_index")
         gear_obj = (
             gear.get_object()
@@ -142,7 +143,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             .rotate((0, 0, 0), (0, 1, 0), 90)    # type: ignore[union-attr]
         )
         self._add(gear, obj=gear_obj,
-                  position=(gear_x, 0, 0), color="red")
+                  loc=Location(gear_x, 0, 0), color="red")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -299,9 +300,9 @@ class QuillMainBlock(QuillBlockBase):
         self._assembly.add(obj, name="body", color=cq.Color("blue"))
         # Bearings via _add (one call handles assembly + BOM)
         bearing = bb.Bearing6001ZZ.get(name="6001ZZ Bearing")
-        for bx in (self.length, 0):
+        for bx in (self.length - self.bearing_type.WIDTH, 0):
             self._add(bearing,
-                      position=(bx, 0, self.split_height + 20), rotation=((0, 1, 0), 90),
+                      loc=Location(Vector(bx, 0, self.split_height), Vector(0, 1, 0), 90),
                       color="gray", name=f"bearing_{bx:.0f}")
 
     def _comparables(self) -> tuple[object, ...]:

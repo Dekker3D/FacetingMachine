@@ -78,34 +78,63 @@ class PartWithMetadata:
         self,
         part: PartWithMetadata,
         *,
-        position: tuple[float, float, float] = (0, 0, 0),
-        rotation: tuple[tuple[float, float, float], float] | None = None,
+        loc: cq.Location | tuple[float, float, float] | None = None,
         obj: cq.Workplane | cq.Shape | None = None,
         color: str | None = None,
         name: str | None = None,
     ) -> None:
         """Add a sub-part to both the assembly and the BOM.
 
-        ``rotation`` is ``(axis, degrees)``, e.g. ``((0, 1, 0), 90)``.
-        Pass ``obj`` to supply a pre-rotated shape (bypasses ``get_object()``
-        and ``rotation``).  ``name`` defaults to the part's own name, lowercased.
+        ``loc`` is a ``cq.Location`` (position + rotation in one object).
+        ``Location(x, y, z)`` for translation only,
+        ``Location(x, y, z, rx, ry, rz)`` for Euler rotation, or
+        ``Location(Vector, Vector, angle)`` for axis-angle.
+        A plain ``(x, y, z)`` tuple is also accepted (no rotation).
+        Pass ``obj`` to supply a pre-rotated shape (bypasses
+        ``get_object()``).  ``name`` defaults to the part's own name,
+        lowercased.
         """
         assert self._assembly is not None, "_assembly not initialized"
         assert self._bom is not None, "_bom not initialized"
+        self._bom.merge(part.get_BOM())
+
+        # Resolve location
+        if loc is None:
+            loc = cq.Location()
+        elif isinstance(loc, tuple):
+            loc = cq.Location(cq.Vector(*loc))
+
+        # Explicit shape override
+        if obj is not None:
+            self._assembly.add(
+                obj,
+                name=name or part.name.lower().replace(" ", "_"),
+                loc=loc,
+                color=cq.Color(color) if color else None,
+            )
+            return
+
+        # Try the part's display assembly (preserves sub-parts, colors)
+        asm = part.get_assembly()
+        if asm is not None and (asm.obj is not None or len(asm.children) > 0):
+            self._assembly.add(
+                asm,
+                name=name or part.name.lower().replace(" ", "_"),
+                loc=loc,
+                color=cq.Color(color) if color else None,
+            )
+            return
+
+        # Fall back to raw export shape
+        obj = part.get_object()
         if obj is None:
-            obj = part.get_object()
-            if obj is None:
-                return  # non-geometric part, BOM-only
-            if rotation is not None:
-                axis, degrees = rotation
-                obj = obj.rotate((0, 0, 0), cq.Vector(*axis), degrees)
+            return  # non-geometric part, BOM-only
         self._assembly.add(
             obj,
             name=name or part.name.lower().replace(" ", "_"),
-            loc=cq.Location(cq.Vector(*position)),
+            loc=loc,
             color=cq.Color(color) if color else None,
         )
-        self._bom.merge(part.get_BOM())
 
     # ── geometry / identity ────────────────────────────────────────
 
