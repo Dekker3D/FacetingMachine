@@ -8,6 +8,7 @@ import quill.quill_abstract as quill_abstract
 from quill.quill_joint import QuillJointAli
 from cadquery.func import text, compound, offset
 
+
 # ═══════════════════════════════════════════════════════════════════════
 # Assembly — owns all dimensions, injects into parts
 # ═══════════════════════════════════════════════════════════════════════
@@ -23,6 +24,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     # ── Joint (fits into quill holder's U-slot) ─────────────────
     joint_shoulder_dia: float = 12.0
     joint_shoulder_gap: float = 47.5
+    joint_shoulder_thickness: float = 3.0
     joint_user_nub_dia: float = 6.5
     joint_user_nub_length: float = 8.0
     joint_away_nub_dia: float = 5.5
@@ -39,7 +41,9 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     # ── Main block ─────────────────────────────────────────────
     block_length_x: float = 70.0
     block_width_y: float = 56.0
-    block_height_z: float = 40.0
+    # Bearing centre is at Z=25; 39.2 leaves 0.1 mm radial clearance above
+    # a 28 mm bearing when the cap closes the top-loading pocket.
+    block_height_z: float = 39.2
     block_x_offset: float = 45.0
     block_center_z: float = 25.0
 
@@ -51,8 +55,8 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     shank_bore_dia: float = 12.2
 
     # ── Bearing caps ───────────────────────────────────────────
-    cap_length_x: float = 34.0
-    cap_width_y: float = 28.0
+    cap_length_x: float = 16.0
+    cap_width_y: float = 56.0
     cap_thickness: float = 4.0
     cap_screw_spacing_y: float = 44.0
 
@@ -78,6 +82,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         joint = QuillJointAli.create(
             shoulder_dia=self.joint_shoulder_dia,
             shoulder_gap=self.joint_shoulder_gap,
+            shoulder_thickness=self.joint_shoulder_thickness,
             user_nub_dia=self.joint_user_nub_dia,
             user_nub_length=self.joint_user_nub_length,
             away_nub_dia=self.joint_away_nub_dia,
@@ -127,16 +132,16 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         # Reminder: we're subtracing self.block_center_z from the Z of all parts, to line up with the joint.
         block_x = self.block_x_offset
         shank_start_x = block_x + self.block_length_x - self.er11_shank_length
-        cap_z = self.block_center_z + self.block_height_z / 2
+        block_top_z = self.block_height_z - self.block_center_z
         gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
 
         self._add(joint, loc=Location(0, 0, -self.block_center_z))
         self._add(block, loc=Location(block_x, 0, -self.block_center_z))
         self._add(er11, loc=Location(Vector(shank_start_x, 0, 0), Vector(0, 1, 0), 90),
                   color="gray")
-        self._add(cap, loc=Location(block_x + self.collet_side_bearing_x, 0, cap_z - self.block_center_z),
+        self._add(cap, loc=Location(block_x + self.collet_side_bearing_x, 0, block_top_z),
                   name="bearing_cap_collet")
-        self._add(cap, loc=Location(block_x + self.index_side_bearing_x, 0, cap_z - self.block_center_z),
+        self._add(cap, loc=Location(block_x + self.index_side_bearing_x, 0, block_top_z),
                   name="bearing_cap_index")
         gear_obj = (
             gear.get_object()
@@ -283,25 +288,42 @@ class QuillMainBlock(QuillBlockBase):
             ),
             name="Quill Main Block",
         )
-        # Build geometry once
+        # Restore the original stepped cavity: a 6001ZZ bearing pocket at
+        # each end, joined by the narrower ER11 extension-shank bore.
         obj = self.get_base_shape()
-        # M3 screw holes
+
+        bearing_positions = (
+            self.length - self.bearing_type.WIDTH,
+            0.0,
+        )
         screw_y = self.cap_screw_spacing_y / 2
-        for bx in (self.length - self.bearing_type.WIDTH / 2, self.bearing_type.WIDTH / 2):
-            for sy in (-screw_y, screw_y):
-                obj = (
-                    obj.faces(">Z")
-                    .workplane(origin=(bx, sy, 0))
-                    .hole(3.2, self.height)
-                )
+        screw_x_positions = (
+            self.length - self.bearing_type.WIDTH / 2,
+            self.bearing_type.WIDTH / 2,
+        )
+        screw_positions = [
+            (screw_x, side_y)
+            for screw_x in screw_x_positions
+            for side_y in (-screw_y, screw_y)
+        ]
+        obj = (
+            obj.faces(">Z")
+            .workplane()
+            .pushPoints(screw_positions)
+            .hole(3.2, self.height)
+        )
         self._object = obj
         self._assembly.add(obj, name="body", color=cq.Color("yellow"))
         # Bearings via _add (one call handles assembly + BOM)
         bearing = bb.Bearing6001ZZ.get(name="6001ZZ Bearing")
-        for bx in (self.length - self.bearing_type.WIDTH, 0):
+        for bearing_x in bearing_positions:
             self._add(bearing,
-                      loc=Location(Vector(bx, 0, self.split_height), Vector(0, 1, 0), 90),
-                      color="gray", name=f"bearing_{bx:.0f}")
+                      loc=Location(
+                          Vector(bearing_x, 0, self.split_height),
+                          Vector(0, 1, 0),
+                          90,
+                      ),
+                      color="gray", name=f"bearing_{bearing_x:.0f}")
 
     def _comparables(self) -> tuple[object, ...]:
         return (
@@ -359,16 +381,13 @@ class BearingCap(bpd.PrintedPart):
         obj = cq.Workplane("XY").box(
             self.length_x, self.width_y, self.thickness, centered=(True, True, False)
         )
-        bearing_r = self.bearing_pocket_dia / 2 + 0.5
-        cradle = (
-            cq.Workplane("XY")
-            .cylinder(self.thickness + 2, bearing_r, centered=(True, True, False))
-            .translate((0, 0, -1))
-        )
-        obj = obj.cut(cradle)
         screw_y = self.screw_spacing_y / 2
-        for sy in (-screw_y, screw_y):
-            obj = obj.faces(">Z").workplane().center(0, sy).hole(3.4, self.thickness)
+        obj = (
+            obj.faces(">Z")
+            .workplane()
+            .pushPoints([(0, -screw_y), (0, screw_y)])
+            .hole(3.4, self.thickness)
+        )
         self._object = obj
         self._assembly.add(obj, name="body", color=cq.Color("red"))
 
@@ -441,6 +460,17 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         obj = self._add_tick_marks(obj)
         obj = self._add_nut_pocket(obj)
         obj = self._add_teeth(obj)
+        # After the gear is rotated into the assembly, local +Z becomes +X.
+        # This 2 mm ring fills the old washer gap and bears against the inner
+        # race of the adjacent 6001ZZ bearing.
+        spacer_ring = (
+            cq.Workplane("XY")
+            .circle(18.0 / 2)
+            .circle(self.bore_dia / 2)
+            .extrude(2.0)
+            .translate((0, 0, self.teeth_width + self.numbers_width))
+        )
+        obj = obj.union(spacer_ring)
         self._object = obj
         self._assembly.add(obj, name="body", color=cq.Color("red"))
 
