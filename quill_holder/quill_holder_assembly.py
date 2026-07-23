@@ -37,13 +37,11 @@ class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
         qt_X = holder.pitch_joint_X_offset()
         qt_Z = holder.pitch_joint_Z_offset()
 
-        self._add(holder, loc=Location(0, 0, 0), color="orange",
+        self._add(holder, loc=Location(0, 0, 0),
                   name="quill_holder")
         if quill is not None:
             self._add(quill, loc=Location(qt_X, 0, qt_Z),
                       name="quill_assembly")
-
-        self._bom.add(bb.Bearing608ZZ.get(name="608ZZ Bearing"), 2)  # type: ignore[union-attr]
 
 
 class QuillHolder(bpd.PrintedPart):
@@ -121,7 +119,12 @@ class QuillHolder(bpd.PrintedPart):
             .box(self.pitch_joint_OD(), 100, self.quill_width)
         )
         self._object = holder
-        self._assembly = cq.Assembly(holder, name=self.name)
+        self._assembly.add(holder, name="body", color=cq.Color("green"))
+        # Pitch joint bearings
+        self._add(bb.Bearing608ZZ.get(name="608ZZ Bearing"),
+                  name="pitch_bearing_1")
+        self._add(bb.Bearing608ZZ.get(name="608ZZ Bearing"),
+                  name="pitch_bearing_2")
 
     def _comparables(self) -> tuple[object, ...]:
         return (

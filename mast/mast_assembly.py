@@ -127,12 +127,12 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         rail_obj = rail.get_object().rotate((0, 0, 0), (1, 0, 0), 90).rotate((0, 0, 0), (0, 0, 1), 90)
         self._add(rail, obj=rail_obj,
                   loc=Location(self.rail_x(), 0, self.rail_start_y()),
-                  color="green", name="rail")
+                  color="gray", name="rail")
 
         # Bearing holders (bottom + top)
         bh_bottom = self._make_bearing_holder()
         bh_top = self._make_bearing_holder()
-        self._add(bh_bottom, loc=Location(10, 0, 0), color="red",
+        self._add(bh_bottom, loc=Location(10, 0, 0),
                   name="bottom_bearing")
         self._add(bh_top, loc=Location(10, 0, self.rail_start_y() + self.rail_length),
                   color="red", name="top_bearing")
@@ -147,13 +147,13 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             carriage_obj, name="carriage1",
             loc=Location(10, 0,
                          self.quill_carriage_display_height() + self.RAIL_CARRIAGE_Y_OFFSET),
-            color=cq.Color("yellow"),
+            color=cq.Color("gray"),
         )
 
         # Leadscrew
         leadscrew = bb.LeadScrewT8.get(length=self.leadscrew_length())
         self._add(leadscrew, loc=Location(self.leadscrew_x(), 0, 0),
-                  color="blue", name="leadscrew")
+                  color="gray", name="leadscrew")
 
         # T8 nut
         nut_obj = bb.LeadScrewT8.make_nut()
@@ -161,7 +161,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
             nut_obj, name="nut",
             loc=Location(self.leadscrew_x(), 0,
                          self.quill_carriage_display_height() + self.QUILL_CARRIAGE_NUT_DEPTH),
-            color=cq.Color("orange"),
+            color=cq.Color("gray"),
         )
 
         # Quill carriage (hinge)
@@ -175,7 +175,7 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
         self._add(hw,
                   loc=Location(self.leadscrew_x(), 0,
                                self.rail_start_y() + self.rail_length + self.bh_total_height()),
-                  color="orange", name="handwheel")
+                  name="handwheel")
 
         # Optional quill holder assembly
         if quill is not None:
@@ -184,8 +184,6 @@ class MastAssembly(mast_abstract.MastAssemblyBase):
                                    self.quill_carriage_display_height() + self.quill_holder_z()),
                       name="quill_assembly")
 
-        # BOM: bearings for leadscrew
-        self._bom.add(bb.Bearing608ZZ.get(name="608ZZ Bearing"), 2)  # type: ignore[union-attr]
 
     # ── Part factories ──────────────────────────────────────────
 
@@ -336,7 +334,11 @@ class BearingHolder(bpd.PrintedPart):
         )
         obj = obj.rotate((0, 0, 0), (0, 0, 1), -90)
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("red"))
+        # Each holder contains one 608ZZ bearing
+        self._add(self.bearing_type.get(name="608ZZ Bearing"),
+                  loc=cq.Location((self.leadscrew_dist, 0, self.diagonal_height + self.cylinder_height - self.bearing_type.WIDTH)),
+                  name="leadscrew_bearing")
 
     def _comparables(self) -> tuple[object, ...]:
         return (
@@ -410,7 +412,7 @@ class QuillCarriage(bpd.PrintedPart):
         # Build geometry
         obj = self._build()
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("red"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (

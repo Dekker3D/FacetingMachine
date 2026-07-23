@@ -36,7 +36,7 @@ class PartWithMetadata:
 
     # Non-dataclass fields — set in __post_init__ or subclass __init__
     _object: cq.Workplane | cq.Shape | None = field(default=None, repr=False, compare=False)
-    _assembly: cq.Assembly | None = field(default=None, repr=False, compare=False)
+    _assembly: cq.Assembly = field(default=None, repr=False, compare=False)  # type: ignore[assignment]
     _bom: BOM | None = field(default=None, repr=False, compare=False)
     _current_group: str | None = field(default=None, repr=False, compare=False)
 
@@ -93,7 +93,6 @@ class PartWithMetadata:
         ``get_object()``).  ``name`` defaults to the part's own name,
         lowercased.
         """
-        assert self._assembly is not None, "_assembly not initialized"
         assert self._bom is not None, "_bom not initialized"
         self._bom.merge(part.get_BOM(), group=self._current_group)
 
@@ -214,8 +213,8 @@ class PrintedPart(PartWithMetadata):
 
 class BOM:
     def __init__(self, singlePart: PartWithMetadata | None = None) -> None:
-        self._items: dict[PartWithMetadata, int] = {}
-        self._groups: dict[PartWithMetadata, str] = {}  # part → group name
+        self._items: dict[PartWithMetadata, int] = {}  # part → total qty (sorted view)
+        self._group_items: dict[str, dict[PartWithMetadata, int]] = {}  # group → part → qty
         if singlePart is not None:
             self._items[singlePart] = 1
 
@@ -225,13 +224,20 @@ class BOM:
     def merge(self, other: BOM, qty: int = 1, group: str | None = None) -> None:
         for part, part_qty in other._items.items():
             self.add(part, part_qty * qty)
-        for part, grp in other._groups.items():
-            if part not in self._groups:
-                self._groups[part] = grp
+        # Inherit existing groups from sub-BOM
+        for grp_name, grp_items in other._group_items.items():
+            target = self._group_items.setdefault(grp_name, {})
+            for part, part_qty in grp_items.items():
+                target[part] = target.get(part, 0) + part_qty * qty
+        # Tag remaining ungrouped items with caller's group
         if group is not None:
-            for part in other._items:
-                if part not in self._groups:
-                    self._groups[part] = group
+            target = self._group_items.setdefault(group, {})
+            for part, part_qty in other._items.items():
+                already_grouped = any(
+                    part in grp for grp in other._group_items.values()
+                )
+                if not already_grouped:
+                    target[part] = target.get(part, 0) + part_qty * qty
 
     def items(self):
         return self._items.items()
@@ -262,32 +268,31 @@ class BOM:
         return "\n".join(lines)
 
     def _format_grouped(self) -> str:
-        # Collect items by group, ungrouped first
-        grouped: dict[str | None, list[tuple[PartWithMetadata, int]]] = {}
-        for part, qty in self._items.items():
-            grp = self._groups.get(part)
-            grouped.setdefault(grp, []).append((part, qty))
         lines: list[str] = []
         total_price = 0.0
-        # Ungrouped first
-        if None in grouped:
+        # Ungrouped items (in _items but not in any _group_items group)
+        grouped_parts: set[PartWithMetadata] = set()
+        for grp_items in self._group_items.values():
+            grouped_parts.update(grp_items.keys())
+        ungrouped = [(p, q) for p, q in self._items.items() if p not in grouped_parts]
+        if ungrouped:
             lines.append("--- Ungrouped ---")
-            for part, qty in sorted(grouped[None], key=lambda x: x[0].name.lower()):
+            for part, qty in sorted(ungrouped, key=lambda x: x[0].name.lower()):
                 line = f"  {part.name:<38} | {qty:<5}"
                 if part.price != 0:
                     line += f" | {part.price:<8.2f}"
                     total_price += part.price * qty
                 lines.append(line)
-        # Then each group alphabetically
-        for grp_name in sorted(g for g in grouped if g is not None):
+        # Each group alphabetically
+        for grp_name in sorted(self._group_items):
             lines.append(f"--- {grp_name} ---")
-            for part, qty in sorted(grouped[grp_name], key=lambda x: x[0].name.lower()):
+            for part, qty in sorted(self._group_items[grp_name].items(),
+                                     key=lambda x: x[0].name.lower()):
                 line = f"  {part.name:<38} | {qty:<5}"
                 if part.price != 0:
                     line += f" | {part.price:<8.2f}"
                     total_price += part.price * qty
                 lines.append(line)
-        # Header
         header = f"{'Name':<40} | {'Qty':<5} | {'Price':<8}"
         lines.insert(0, header)
         lines.insert(1, "=" * 60)

@@ -83,7 +83,7 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
             .union(self._make_angle_indicator())
         )
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("blue"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (

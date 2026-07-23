@@ -99,7 +99,7 @@ class HandWheel(bpd.PrintedPart):
             .translate((0, 0, -self.attachment_height))
         )
         self._object = hw
-        self._assembly = cq.Assembly(hw, name=self.name)
+        self._assembly.add(hw, name="body", color=cq.Color("green"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (

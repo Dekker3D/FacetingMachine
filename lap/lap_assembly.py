@@ -47,6 +47,7 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
 
     def __init__(self) -> None:
         super().__init__(name="Lap Assembly")
+        self._object = None  # assembly-only, not printable
         self._current_group = self.name
         lhb = LapHolderBottom.create(
             axle_dia=self.LAP_AXLE_DIA,
@@ -57,17 +58,16 @@ class LapAssembly(lap_abstract.LapAssemblyBase):
         sg = SplashGuard.create(la=self)
         sgb = SplashGuardBottom.create(la=self)
 
-        self._add(lhb, loc=Location(0, 0, 0), color="red",
+        self._add(lhb, loc=Location(0, 0, 0),
                   name="lap_holder_bottom")
-        self._add(lht, loc=Location(0, 0, lhb.top_height()), color="yellow",
+        self._add(lht, loc=Location(0, 0, lhb.top_height()),
                   name="lap_holder_top")
-        self._add(sg, loc=Location(0, 0, 0), color="blue",
+        self._add(sg, loc=Location(0, 0, 0),
                   name="splash_guard")
-        self._add(sgb, loc=Location(0, 0, 0), color="green",
+        self._add(sgb, loc=Location(0, 0, 0),
                   name="splash_guard_bottom")
 
         # Off-the-shelf
-        self._bom.add(bb.Bearing608ZZ.get(name="608ZZ Bearing"))  # type: ignore[union-attr]
         self._bom.add(bpd.PartWithMetadata(  # type: ignore[union-attr]
             name=f"Lap Disc {self.LAP_DIA:.0f}mm",
             description="6-inch diamond grinding lap",
@@ -111,7 +111,7 @@ class LapHolderBottom(bpd.PrintedPart):
             .revolve(360, (0, 0, 0), (0, 1, 0))
         )
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("yellow"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.axle_dia, self.lap_thickness, self.bore_dia)
@@ -147,7 +147,7 @@ class LapHolderTop(bpd.PrintedPart):
             .revolve(360, (0, 0, 0), (0, 1, 0))
         )
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("green"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.axle_dia)
@@ -169,14 +169,7 @@ class SplashGuard(bpd.PrintedPart):
     def __init__(self, la: LapAssembly) -> None:
         self.la = la
         super().__init__(name="Splash Guard")
-        obj = self._build()
-        self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
-
-    def _comparables(self) -> tuple[object, ...]:
-        return (self.name,)
-
-    def _build(self) -> cq.Workplane:
+        # Build geometry
         la = self.la
         guard = cq.Workplane("XY").cylinder(
             la.SG_HEIGHT + la.SG_THICKNESS,
@@ -205,7 +198,6 @@ class SplashGuard(bpd.PrintedPart):
             .edges().fillet(1.0)
         )
         guard = guard.cut(cutout)
-
         # Central tower
         tower_od = 56.0
         tower_h = 15.0
@@ -229,7 +221,6 @@ class SplashGuard(bpd.PrintedPart):
             .faces("<Z").workplane().hole(la.LAP_AXLE_DIA + 0.5)
         )
         guard = guard.union(tower)
-
         # Screw holes through tower
         screw_r = la.bottom_screw_spacing()
         screw_positions = [
@@ -241,7 +232,11 @@ class SplashGuard(bpd.PrintedPart):
             .pushPoints(screw_positions)
             .hole(3.2, tower_h + la.SG_THICKNESS - 3)
         )
-        return guard
+        self._object = guard
+        self._assembly.add(guard, name="body", color=cq.Color("red"))
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name,)
 
 
 class SplashGuardBottom(bpd.PrintedPart):
@@ -256,7 +251,10 @@ class SplashGuardBottom(bpd.PrintedPart):
         super().__init__(name="Splash Guard Bottom")
         obj = self._build()
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("green"))
+        # Contains one 608ZZ bearing for the axle
+        self._add(bb.Bearing608ZZ.get(name="608ZZ Bearing"),
+                  name="axle_bearing")
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name,)

@@ -109,7 +109,7 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
         for name, (sx, sy) in corners.items():
             rot_z = 180 if sy < 0 else 0
             self._add(leg, loc=Location(lx * sx, ly * sy, 0, 0, 0, rot_z),
-                      color="green", name=name)
+                      name=name)
 
         # Lap + mast assemblies
         self._add(lap, loc=Location(self.frame_length() / 2 - self.lap_pos_from_left(), 0, 20),
@@ -125,7 +125,7 @@ class FrameAssembly(frame_abstract.FrameAssemblyBase):
         self._bom.add(ext_l, 2)  # type: ignore[union-attr]
         self._bom.add(rod, 2)    # type: ignore[union-attr]
         for p in (ext_w, ext_l, rod):
-            self._bom._groups[p] = self.name  # type: ignore[union-attr]
+            self._bom._group_items.setdefault(self.name, {})[p] = 2  # type: ignore[union-attr]
 
     # ── inline geometry ─────────────────────────────────────────
 
@@ -247,7 +247,7 @@ class MastCarriage(bpd.PrintedPart):
             .polyline(cutout_pts).close().extrude(self.mast_holder_height)
         )
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("green"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (
@@ -302,7 +302,7 @@ class FrameLeg(bpd.PrintedPart):
             .cboreHole(5.2, 8.0, 15.0, 20.0)
         )
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("red"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.ext_width, self.ext_height, self.leg_length)

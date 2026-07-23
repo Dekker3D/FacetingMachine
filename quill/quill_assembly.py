@@ -130,21 +130,21 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         cap_z = self.block_center_z + self.block_height_z / 2
         gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
 
-        self._add(joint, loc=Location(0, 0, -self.block_center_z), color="orange")
-        self._add(block, loc=Location(block_x, 0, -self.block_center_z), color="blue")
+        self._add(joint, loc=Location(0, 0, -self.block_center_z))
+        self._add(block, loc=Location(block_x, 0, -self.block_center_z))
         self._add(er11, loc=Location(Vector(shank_start_x, 0, 0), Vector(0, 1, 0), 90),
                   color="gray")
         self._add(cap, loc=Location(block_x + self.collet_side_bearing_x, 0, cap_z - self.block_center_z),
-                  color="green", name="bearing_cap_collet")
+                  name="bearing_cap_collet")
         self._add(cap, loc=Location(block_x + self.index_side_bearing_x, 0, cap_z - self.block_center_z),
-                  color="green", name="bearing_cap_index")
+                  name="bearing_cap_index")
         gear_obj = (
             gear.get_object()
             .rotate((0, 0, 0), (0, 0, 1), 180)  # type: ignore[union-attr]
             .rotate((0, 0, 0), (0, 1, 0), 90)    # type: ignore[union-attr]
         )
         self._add(gear, obj=gear_obj,
-                  loc=Location(gear_x, 0, 0), color="red")
+                  loc=Location(gear_x, 0, 0))
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -295,9 +295,7 @@ class QuillMainBlock(QuillBlockBase):
                     .hole(3.2, self.height)
                 )
         self._object = obj
-        # Block shape (manually — it IS the part, not a sub-part)
-        assert self._assembly is not None
-        self._assembly.add(obj, name="body", color=cq.Color("blue"))
+        self._assembly.add(obj, name="body", color=cq.Color("yellow"))
         # Bearings via _add (one call handles assembly + BOM)
         bearing = bb.Bearing6001ZZ.get(name="6001ZZ Bearing")
         for bx in (self.length - self.bearing_type.WIDTH, 0):
@@ -372,7 +370,7 @@ class BearingCap(bpd.PrintedPart):
         for sy in (-screw_y, screw_y):
             obj = obj.faces(">Z").workplane().center(0, sy).hole(3.4, self.thickness)
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("red"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (
@@ -444,7 +442,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         obj = self._add_nut_pocket(obj)
         obj = self._add_teeth(obj)
         self._object = obj
-        self._assembly = cq.Assembly(obj, name=self.name)
+        self._assembly.add(obj, name="body", color=cq.Color("red"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (
