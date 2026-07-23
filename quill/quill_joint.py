@@ -81,8 +81,8 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
 
         obj = (
             self._make_base_plate()
-            .union(self._make_pillar(+1))
-            .union(self._make_pillar(-1))
+            .union(self._make_support_block())
+            .union(self._make_hinge_barrel())
             .union(self._make_shoulder(+1))
             .union(self._make_shoulder(-1))
             .union(self._make_user_nub())
@@ -129,24 +129,18 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
             .translate((x_center, 0, 0))
         )
 
-    def _make_pillar(self, side: int) -> cq.Workplane:
-        """Narrow support under a shoulder, kept inside the holder cheeks."""
-        pillar_x = self.shoulder_dia + 4.0
+    def _make_support_block(self) -> cq.Workplane:
+        """Solid support spanning the full width beneath the hinge barrel."""
+        support_x = self.shoulder_dia + 4.0
         return (
             cq.Workplane("XY")
             .box(
-                pillar_x,
-                self.shoulder_thickness,
+                support_x,
+                self.shoulder_gap,
                 self.hinge_height,
                 centered=(True, True, False),
             )
-            .translate(
-                (
-                    0,
-                    self._shoulder_center_y(side),
-                    self.base_plate_thickness,
-                )
-            )
+            .translate((0, 0, self.base_plate_thickness))
         )
 
     def _make_shoulder(self, side: int) -> cq.Workplane:
@@ -160,25 +154,36 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
             .translate((0, self._shoulder_center_y(side), self._hinge_z()))
         )
 
+    def _make_hinge_barrel(self) -> cq.Workplane:
+        """Solid core between the two outer shoulder faces."""
+        return (
+            cq.Workplane("XZ")
+            .circle(self.shoulder_dia / 2)
+            .extrude(self.shoulder_gap)
+            .translate((0, self.shoulder_gap / 2, self._hinge_z()))
+        )
+
     def _make_user_nub(self) -> cq.Workplane:
+        # XZ's positive normal points toward -Y, so a negative extrusion
+        # sends this +Y/user-side nub outward from the shoulder face.
         return (
             cq.Workplane("XZ")
             .circle(self.user_nub_dia / 2)
-            .extrude(self.user_nub_length)
+            .extrude(-self.user_nub_length)
             .translate((0, self.shoulder_gap / 2, self._hinge_z()))
         )
 
     def _make_away_nub(self) -> cq.Workplane:
+        # Positive XZ extrusion points toward -Y, outward on the away side.
         return (
             cq.Workplane("XZ")
             .circle(self.away_nub_dia / 2)
             .extrude(self.away_nub_length)
-            .rotate((0, 0, 0), (1, 0, 0), 180)
             .translate((0, -self.shoulder_gap / 2, self._hinge_z()))
         )
 
     def _make_angle_indicator(self) -> cq.Workplane:
-        """Tapered tab above the outer end of the away-facing nub."""
+        """Tapered tab inside the joint, above the away-side support."""
         # Start at the nub centreline so the tab overlaps the upper half of
         # the nub instead of becoming a separate, merely face-touching solid.
         base_z = self._hinge_z()
@@ -187,8 +192,7 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         base_half_width = self.shoulder_dia / 2
         mid_half_width = self.shoulder_dia / 4
         tip_half_width = 1.0
-        nub_outer_y = -self.shoulder_gap / 2 - self.away_nub_length
-        y_start = nub_outer_y + 0.5
+        away_inner_y = -self.shoulder_gap / 2 + self.shoulder_thickness
 
         profile = (
             cq.Workplane("XZ")
@@ -203,7 +207,8 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
                 ]
             )
             .close()
-            .extrude(self.angle_indicator_thickness)
-            .translate((0, y_start, 0))
+            # Negative XZ extrusion points toward +Y, into the joint.
+            .extrude(-self.angle_indicator_thickness)
+            .translate((0, away_inner_y, 0))
         )
         return profile
