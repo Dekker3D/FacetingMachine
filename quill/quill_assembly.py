@@ -119,6 +119,16 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             shank_bore_dia=self.shank_bore_dia,
             cap_screw_spacing_y=self.cap_screw_spacing_y,
         )
+        away_shoulder_inner_y = (
+            -self.joint_shoulder_gap / 2 + self.joint_shoulder_thickness
+        )
+        body = QuillBody(
+            main_block=block,
+            joint=joint,
+            angle_indicator=angle_indicator,
+            block_x=self.block_x_offset,
+            indicator_y=away_shoulder_inner_y,
+        )
         cap = BearingCap.create(
             length_x=self.cap_length_x,
             width_y=self.cap_width_y,
@@ -148,18 +158,19 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         block_top_z = self.block_height_z - self.block_center_z
         gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
 
-        self._add(joint, loc=Location(0, 0, -self.block_center_z))
-        angle_indicator_obj = angle_indicator.get_object().rotate(  # type: ignore[union-attr]
-            (0, 0, 0), (1, 0, 0), 90
-        )
-        away_shoulder_inner_y = (
-            -self.joint_shoulder_gap / 2 + self.joint_angle_indicator_thickness -20
+        self._add(body, loc=Location(0, 0, -self.block_center_z))
+        # Intentionally offset for inspection while the cutout is being
+        # refined. The QuillBody cutout uses the true assembled Y above.
+        indicator_display_y = (
+            -self.joint_shoulder_gap / 2
+            + self.joint_angle_indicator_thickness
+            - 20.0
         )
         self._add(
             angle_indicator,
             loc=Location(
                 0.0,
-                away_shoulder_inner_y,
+                indicator_display_y,
                 -self.block_center_z,
                 90,
                 0,
@@ -167,7 +178,6 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             ),
             name="angle_indicator",
         )
-        self._add(block, loc=Location(block_x, 0, -self.block_center_z))
         self._add(er11, loc=Location(Vector(shank_start_x, 0, 0), Vector(0, 1, 0), 90),
                   color="gray")
         self._add(cap, loc=Location(block_x + self.collet_side_bearing_x, 0, block_top_z),
@@ -371,6 +381,71 @@ class QuillMainBlock(QuillBlockBase):
 
     def _block_top_z(self) -> float:
         return self.split_height + self.height / 2
+
+
+class QuillBody(bpd.PrintedPart):
+    """Single printable body containing both the hinge joint and main block."""
+
+    def __init__(
+        self,
+        main_block: QuillMainBlock,
+        joint: QuillJointAli,
+        angle_indicator: QuillAngleIndicator,
+        block_x: float,
+        indicator_y: float,
+    ) -> None:
+        self.main_block = main_block
+        self.joint_dimensions = joint.dimensions()
+        self.angle_indicator = angle_indicator
+        self.block_x = block_x
+        self.indicator_y = indicator_y
+        super().__init__(name="Quill Body")
+
+        # The indicator is modeled flat for export. Rotate a clearance copy
+        # into its assembled orientation and subtract that exact profile from
+        # the joint before the joint and bearing block become one solid.
+        indicator_cutout = (
+            angle_indicator.make(cutout=True)
+            .rotate((0, 0, 0), (1, 0, 0), 90)
+            .translate((0, indicator_y, 0))
+        )
+        joint_obj = joint.get_object().cut(indicator_cutout)
+        block_obj = main_block.get_object()
+        if not isinstance(block_obj, cq.Workplane):
+            raise TypeError("QuillMainBlock must provide Workplane geometry")
+        obj = joint_obj.union(block_obj.translate((block_x, 0, 0)))
+
+        self._object = obj
+        self._assembly.add(obj, name="body", color=cq.Color("blue"))
+
+        # Bearings belong to the merged quill body. QuillMainBlock is now a
+        # geometry helper and is no longer added as a separate printed part.
+        bearing = bb.Bearing6001ZZ.get(name="6001ZZ Bearing")
+        bearing_positions = (
+            main_block.length - main_block.bearing_type.WIDTH,
+            0.0,
+        )
+        for bearing_x in bearing_positions:
+            self._add(
+                bearing,
+                loc=Location(
+                    Vector(block_x + bearing_x, 0, main_block.split_height),
+                    Vector(0, 1, 0),
+                    90,
+                ),
+                color="gray",
+                name=f"bearing_{bearing_x:.0f}",
+            )
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name,
+            self.main_block,
+            self.joint_dimensions,
+            self.angle_indicator,
+            self.block_x,
+            self.indicator_y,
+        )
 
 
 class BearingCap(bpd.PrintedPart):

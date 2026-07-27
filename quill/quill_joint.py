@@ -6,7 +6,7 @@ import bom_part_data as bpd
 from quill.quill_joint_abstract import QuillJointBase
 
 
-class QuillJointAli(bpd.PrintedPart, QuillJointBase):
+class QuillJointAli(QuillJointBase):
     """AliExpress-holder-compatible hinge for the replacement quill.
 
     The measured ``shoulder_gap`` is the distance between the two outer
@@ -34,7 +34,7 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         base_plate_x: float,
         base_plate_y: float,
     ) -> QuillJointAli:
-        return cls.get(
+        return cls(
             shoulder_dia=shoulder_dia,
             shoulder_gap=shoulder_gap,
             shoulder_thickness=shoulder_thickness,
@@ -85,8 +85,6 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         self.base_plate_thickness = base_plate_thickness
         self.base_plate_x = base_plate_x
         self.base_plate_y = base_plate_y
-        super().__init__(name="Quill Joint")
-
         obj = (
             self._make_base_plate()
             .union(self._make_support_block())
@@ -96,15 +94,15 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
             .union(self._make_user_nub())
             .union(self._make_away_nub())
         )
-        obj = obj.cut(self._make_indicator_mount_pocket())
         obj = obj.cut(self._make_indicator_screw_pilots())
         obj = obj.cut(self._make_magnet_pocket())
         self._object = obj
-        self._assembly.add(obj, name="body", color=cq.Color("blue"))
 
-    def _comparables(self) -> tuple[object, ...]:
+    def get_object(self) -> cq.Workplane:
+        return self._object
+
+    def dimensions(self) -> tuple[object, ...]:
         return (
-            self.name,
             self.shoulder_dia,
             self.shoulder_gap,
             self.shoulder_thickness,
@@ -198,27 +196,6 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         hinge_z = self._hinge_z()
         return ((-6.0, hinge_z - 6.0), (-6.0, hinge_z + 6.0))
 
-    def _make_indicator_mount_pocket(self) -> cq.Workplane:
-        """Cuboid seat with a cylindrical cutout matching the -Y nub."""
-        away_inner_y = -self.shoulder_gap / 2 + self.shoulder_thickness
-        pocket = (
-            cq.Workplane("XZ")
-            .box(10.4, self.angle_indicator_thickness + 0.2, 20.4)
-            .translate(
-                (
-                    -5.0,
-                    away_inner_y - self.angle_indicator_thickness / 2,
-                    self._hinge_z(),
-                )
-            )
-        )
-        nub_clearance = (
-            cq.Workplane("XZ")
-            .circle(self.away_nub_dia / 2 + 0.2)
-            .extrude(self.angle_indicator_thickness + 0.4)
-            .translate((0, away_inner_y + 0.2, self._hinge_z()))
-        )
-        return pocket.cut(nub_clearance)
 
     def _make_indicator_screw_pilots(self) -> cq.Workplane:
         """Blind 2.2 mm pilot holes for nominal 3 mm wood screws."""
@@ -291,11 +268,11 @@ class QuillAngleIndicator(bpd.PrintedPart):
         self._object = obj
         self._assembly.add(obj, name="body", color=cq.Color("purple"))
     
-    def make(self, cutout: bool = False):
+    def make(self, cutout: bool = False) -> cq.Workplane:
         mount_centers = self._mount_centers()
         # Thick flat-printable cuboid. Its X=0 edge is the stop surface and
         # lies directly above the -Y nub's X centreline.
-        gap = 0 if cutout else 0.2
+        gap = 0.0 if cutout else 0.2
         obj = (
             cq.Workplane("XY")
             .box(
@@ -312,6 +289,9 @@ class QuillAngleIndicator(bpd.PrintedPart):
             .translate((0, self.hinge_z, -1.0))
         )
         obj = obj.cut(nub_cutout)
+
+        if cutout:
+            return obj
 
         # Countersunk clearance holes enter from the exposed outer face. The
         # full 8 mm thickness leaves room for varying conical head profiles.
