@@ -54,7 +54,7 @@ class QuillHolderAssembly(quill_holder_abstract.QuillHolderAssemblyBase):
         if quill is not None:
             self._add(
                 quill,
-                loc=Location(pitch_x, 0, pitch_z),
+                loc=Location(pitch_x + 30, 0, pitch_z),
                 name="quill_assembly",
             )
 

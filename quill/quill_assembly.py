@@ -5,7 +5,7 @@ from cadquery import Location, Vector
 import bom_part_data as bpd
 import bought_bits as bb
 import quill.quill_abstract as quill_abstract
-from quill.quill_joint import QuillJointAli
+from quill.quill_joint import QuillAngleIndicator, QuillJointAli
 from cadquery.func import text, compound, offset
 
 
@@ -31,7 +31,11 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     joint_away_nub_length: float = 5.0
     joint_hinge_height: float = 20.0
     joint_angle_indicator_height: float = 40.0
-    joint_angle_indicator_thickness: float = 2.5
+    joint_angle_indicator_thickness: float = 8.0
+    joint_magnet_pocket_dia: float = 3.7
+    # 4.75 mm from the nub's top puts the midpoint of a 3.0 mm magnet stack
+    # on the nub's Z centreline while keeping the pocket close to the Y end.
+    joint_magnet_pocket_depth: float = 4.75
 
     # ── Base plate ──────────────────────────────────────────────
     base_plate_thickness: float = 5.0
@@ -90,9 +94,18 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             hinge_height=self.joint_hinge_height,
             angle_indicator_height=self.joint_angle_indicator_height,
             angle_indicator_thickness=self.joint_angle_indicator_thickness,
+            magnet_pocket_dia=self.joint_magnet_pocket_dia,
+            magnet_pocket_depth=self.joint_magnet_pocket_depth,
             base_plate_thickness=self.base_plate_thickness,
             base_plate_x=self.base_plate_x,
             base_plate_y=self.base_plate_y,
+        )
+        angle_indicator = QuillAngleIndicator.create(
+            shoulder_dia=self.joint_shoulder_dia,
+            away_nub_dia=self.joint_away_nub_dia,
+            hinge_z=self.base_plate_thickness + self.joint_hinge_height,
+            height=self.joint_angle_indicator_height,
+            thickness=self.joint_angle_indicator_thickness,
         )
         block = QuillMainBlock.create(
             length_x=self.block_length_x,
@@ -136,6 +149,24 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         gear_x = block_x - self.index_gear_teeth_width - self.index_gear_numbers_width - 2
 
         self._add(joint, loc=Location(0, 0, -self.block_center_z))
+        angle_indicator_obj = angle_indicator.get_object().rotate(  # type: ignore[union-attr]
+            (0, 0, 0), (1, 0, 0), 90
+        )
+        away_shoulder_inner_y = (
+            -self.joint_shoulder_gap / 2 + self.joint_angle_indicator_thickness -20
+        )
+        self._add(
+            angle_indicator,
+            loc=Location(
+                0.0,
+                away_shoulder_inner_y,
+                -self.block_center_z,
+                90,
+                0,
+                0,
+            ),
+            name="angle_indicator",
+        )
         self._add(block, loc=Location(block_x, 0, -self.block_center_z))
         self._add(er11, loc=Location(Vector(shank_start_x, 0, 0), Vector(0, 1, 0), 90),
                   color="gray")

@@ -28,6 +28,8 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         hinge_height: float,
         angle_indicator_height: float,
         angle_indicator_thickness: float,
+        magnet_pocket_dia: float,
+        magnet_pocket_depth: float,
         base_plate_thickness: float,
         base_plate_x: float,
         base_plate_y: float,
@@ -43,6 +45,8 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
             hinge_height=hinge_height,
             angle_indicator_height=angle_indicator_height,
             angle_indicator_thickness=angle_indicator_thickness,
+            magnet_pocket_dia=magnet_pocket_dia,
+            magnet_pocket_depth=magnet_pocket_depth,
             base_plate_thickness=base_plate_thickness,
             base_plate_x=base_plate_x,
             base_plate_y=base_plate_y,
@@ -60,6 +64,8 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         hinge_height: float,
         angle_indicator_height: float,
         angle_indicator_thickness: float,
+        magnet_pocket_dia: float,
+        magnet_pocket_depth: float,
         base_plate_thickness: float,
         base_plate_x: float,
         base_plate_y: float,
@@ -74,6 +80,8 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
         self.hinge_height = hinge_height
         self.angle_indicator_height = angle_indicator_height
         self.angle_indicator_thickness = angle_indicator_thickness
+        self.magnet_pocket_dia = magnet_pocket_dia
+        self.magnet_pocket_depth = magnet_pocket_depth
         self.base_plate_thickness = base_plate_thickness
         self.base_plate_x = base_plate_x
         self.base_plate_y = base_plate_y
@@ -87,8 +95,10 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
             .union(self._make_shoulder(-1))
             .union(self._make_user_nub())
             .union(self._make_away_nub())
-            .union(self._make_angle_indicator())
         )
+        obj = obj.cut(self._make_indicator_mount_pocket())
+        obj = obj.cut(self._make_indicator_screw_pilots())
+        obj = obj.cut(self._make_magnet_pocket())
         self._object = obj
         self._assembly.add(obj, name="body", color=cq.Color("blue"))
 
@@ -105,6 +115,8 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
             self.hinge_height,
             self.angle_indicator_height,
             self.angle_indicator_thickness,
+            self.magnet_pocket_dia,
+            self.magnet_pocket_depth,
             self.base_plate_thickness,
             self.base_plate_x,
             self.base_plate_y,
@@ -182,33 +194,145 @@ class QuillJointAli(bpd.PrintedPart, QuillJointBase):
             .translate((0, -self.shoulder_gap / 2, self._hinge_z()))
         )
 
-    def _make_angle_indicator(self) -> cq.Workplane:
-        """Tapered tab inside the joint, above the away-side support."""
-        # Start at the nub centreline so the tab overlaps the upper half of
-        # the nub instead of becoming a separate, merely face-touching solid.
-        base_z = self._hinge_z()
-        tip_z = self._hinge_z() + self.angle_indicator_height
-        mid_z = base_z + (tip_z - base_z) * 0.35
-        base_half_width = self.shoulder_dia / 2
-        mid_half_width = self.shoulder_dia / 4
-        tip_half_width = 1.0
-        away_inner_y = -self.shoulder_gap / 2 + self.shoulder_thickness
+    def _indicator_mount_centers(self) -> tuple[tuple[float, float], ...]:
+        hinge_z = self._hinge_z()
+        return ((-6.0, hinge_z - 6.0), (-6.0, hinge_z + 6.0))
 
-        profile = (
+    def _make_indicator_mount_pocket(self) -> cq.Workplane:
+        """Cuboid seat with a cylindrical cutout matching the -Y nub."""
+        away_inner_y = -self.shoulder_gap / 2 + self.shoulder_thickness
+        pocket = (
             cq.Workplane("XZ")
-            .polyline(
-                [
-                    (-base_half_width, base_z),
-                    (base_half_width, base_z),
-                    (mid_half_width, mid_z),
-                    (tip_half_width, tip_z),
-                    (-tip_half_width, tip_z),
-                    (-mid_half_width, mid_z),
-                ]
+            .box(10.4, self.angle_indicator_thickness + 0.2, 20.4)
+            .translate(
+                (
+                    -5.0,
+                    away_inner_y - self.angle_indicator_thickness / 2,
+                    self._hinge_z(),
+                )
             )
-            .close()
-            # Negative XZ extrusion points toward +Y, into the joint.
-            .extrude(-self.angle_indicator_thickness)
-            .translate((0, away_inner_y, 0))
         )
-        return profile
+        nub_clearance = (
+            cq.Workplane("XZ")
+            .circle(self.away_nub_dia / 2 + 0.2)
+            .extrude(self.angle_indicator_thickness + 0.4)
+            .translate((0, away_inner_y + 0.2, self._hinge_z()))
+        )
+        return pocket.cut(nub_clearance)
+
+    def _make_indicator_screw_pilots(self) -> cq.Workplane:
+        """Blind 2.2 mm pilot holes for nominal 3 mm wood screws."""
+        away_inner_y = -self.shoulder_gap / 2 + self.shoulder_thickness
+        pilots = cq.Workplane("XZ")
+        for x, z in self._indicator_mount_centers():
+            pilots = pilots.union(
+                cq.Workplane("XZ")
+                .center(x, z)
+                .circle(2.2 / 2)
+                .extrude(-8.0)
+                .translate((0, away_inner_y, 0))
+            )
+        return pilots
+
+    def _make_magnet_pocket(self) -> cq.Workplane:
+        """Radial magnet pocket opening upward (+Z) near the user nub end."""
+        pocket_y = (
+            self.shoulder_gap / 2
+            + self.user_nub_length
+            - self.magnet_pocket_dia / 2
+            - 0.4
+        )
+        nub_top_z = self._hinge_z() + self.user_nub_dia / 2
+        return (
+            cq.Workplane("XY")
+            .circle(self.magnet_pocket_dia / 2)
+            .extrude(-self.magnet_pocket_depth)
+            .translate((0, pocket_y, nub_top_z))
+        )
+
+
+class QuillAngleIndicator(bpd.PrintedPart):
+    """Replaceable angle-stop arm, printed flat on its broad XZ face."""
+
+    @classmethod
+    def create(
+        cls,
+        shoulder_dia: float,
+        away_nub_dia: float,
+        hinge_z: float,
+        height: float,
+        thickness: float,
+    ) -> QuillAngleIndicator:
+        return cls.get(
+            shoulder_dia=shoulder_dia,
+            away_nub_dia=away_nub_dia,
+            hinge_z=hinge_z,
+            height=height,
+            thickness=thickness,
+        )
+
+    def __init__(
+        self,
+        shoulder_dia: float,
+        away_nub_dia: float,
+        hinge_z: float,
+        height: float,
+        thickness: float,
+    ) -> None:
+        self.shoulder_dia = shoulder_dia
+        self.away_nub_dia = away_nub_dia
+        self.hinge_z = hinge_z
+        self.height = height
+        self.thickness = thickness
+        super().__init__(name="Quill Angle Indicator")
+
+        obj = self.make(cutout=False)
+
+        self._object = obj
+        self._assembly.add(obj, name="body", color=cq.Color("purple"))
+    
+    def make(self, cutout: bool = False):
+        mount_centers = self._mount_centers()
+        # Thick flat-printable cuboid. Its X=0 edge is the stop surface and
+        # lies directly above the -Y nub's X centreline.
+        gap = 0 if cutout else 0.2
+        obj = (
+            cq.Workplane("XY")
+            .box(
+                10.0,
+                self.height + 10.0 - gap,
+                self.thickness,
+                centered=(False, False, False),
+            )
+            .translate((-10.0, self.hinge_z - 10.0 + gap, 0))
+        )
+        nub_cutout = (
+            cq.Workplane("XY")
+            .cylinder(self.thickness + 2.0, self.away_nub_dia / 2 + gap, centered=(True, True, False))
+            .translate((0, self.hinge_z, -1.0))
+        )
+        obj = obj.cut(nub_cutout)
+
+        # Countersunk clearance holes enter from the exposed outer face. The
+        # full 8 mm thickness leaves room for varying conical head profiles.
+        obj = (
+            obj.faces(">Z")
+            .workplane()
+            .pushPoints(mount_centers)
+            .cskHole(3.4, 6.5, 82.0)
+        )
+        
+        return obj
+
+    def _mount_centers(self) -> tuple[tuple[float, float], ...]:
+        return ((-6.0, self.hinge_z - 6.0), (-6.0, self.hinge_z + 6.0))
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name,
+            self.shoulder_dia,
+            self.away_nub_dia,
+            self.hinge_z,
+            self.height,
+            self.thickness,
+        )
