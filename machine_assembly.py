@@ -15,9 +15,15 @@ from frame_mast_joint.frame_mast_joint import FrameMastJointSmoothRodRails
 class MachineAssembly(bpd.PartWithMetadata):
     """Class representing the entire machine assembly."""
 
+    exploded_view: bool = True
     lap: LapAssembly = LapAssembly()
-    quill: QuillAssemblyStandardMk1 = QuillAssemblyStandardMk1()
-    quill_holder: QuillHolderAssembly = QuillHolderAssembly(quill=quill)
+    quill: QuillAssemblyStandardMk1 = QuillAssemblyStandardMk1(
+        explode=exploded_view
+    )
+    quill_holder: QuillHolderAssembly = QuillHolderAssembly(
+        quill=quill,
+        explode=exploded_view,
+    )
     quill_joint: QuillHolderJointAli = QuillHolderJointAli()
     mast: MastAssembly = MastAssembly(quill=quill_holder, quill_joint=quill_joint)
     mast_joint: FrameMastJointSmoothRodRails = FrameMastJointSmoothRodRails()
