@@ -91,6 +91,15 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     removable_top_nut_clearance: float = 0.2
     removable_top_nut_depth_clearance: float = 0.2
     removable_top_nut_drop: float = 8.0
+    cheater_pivot_bolt_size: float = 4.0
+    cheater_pivot_bolt_length: float = 45.0
+    cheater_wheel_diameter: float = 24.0
+    cheater_wheel_width: float = 8.0
+    cheater_wheel_hex_clearance: float = 0.2
+    cheater_wheel_head_depth_clearance: float = 0.2
+    cheater_wheel_grip_notch_radius: float = 1.5
+    cheater_wheel_grip_notch_count: int = 12
+    cheater_positive_y_shelf_drop: float = 5.0
 
     def index_gear_width(self) -> float:
         return (
@@ -235,6 +244,16 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             + self.removable_top_nut_depth_clearance
         )
 
+    def cheater_pivot_bolt(self) -> bb.Bolt:
+        return bb.Bolt.get(
+            size=self.cheater_pivot_bolt_size,
+            length=self.cheater_pivot_bolt_length,
+            head="hex",
+        )
+
+    def cheater_pivot_nyloc(self) -> bb.NylocNut:
+        return bb.NylocNut.get(size=self.cheater_pivot_bolt_size)
+
     def __init__(
         self,
         er11: bb.StraightShankColletExtension | None = None,
@@ -330,6 +349,24 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             bearing_pocket_dia=self.cheater_bearing_pocket_dia(),
             bearing_width=self.cheater_bearing_type.WIDTH,
             axle_hole_dia=self.cheater_axle_hole_dia(),
+            positive_y_shelf_drop=self.cheater_positive_y_shelf_drop,
+        )
+        pivot_bolt = self.cheater_pivot_bolt()
+        pivot_nyloc = self.cheater_pivot_nyloc()
+        cheater_wheel = QuillCheaterAdjustmentWheel.create(
+            outside_diameter=self.cheater_wheel_diameter,
+            width=self.cheater_wheel_width,
+            hex_across_flats=(
+                pivot_bolt.head_diameter()
+                + self.cheater_wheel_hex_clearance * 2
+            ),
+            hex_depth=(
+                pivot_bolt.head_height()
+                + self.cheater_wheel_head_depth_clearance
+            ),
+            shaft_hole_diameter=self.cheater_axle_hole_dia(),
+            grip_notch_radius=self.cheater_wheel_grip_notch_radius,
+            grip_notch_count=self.cheater_wheel_grip_notch_count,
         )
         gear = IndexGearStandardMk1.create(
             od=self.index_gear_od,
@@ -426,7 +463,94 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             name="cheater_bearing_negative_y",
             color="gray",
         )
+        cheater_wall_outer_y = (
+            self.cheater_wall_inner_y() + self.cheater_wall_thickness_y()
+        )
+        pivot_location = (
+            block_x + self.cheater_pivot_x(),
+            0.0,
+            self.cheater_pivot_z() - self.block_center_z(),
+        )
+        pivot_bolt_obj = (
+            pivot_bolt.get_object()
+            .rotate((0, 0, 0), (1, 0, 0), -90)
+            .translate(
+                (
+                    pivot_location[0],
+                    cheater_wall_outer_y
+                    + self.cheater_wheel_width
+                    - pivot_bolt.head_height(),
+                    pivot_location[2],
+                )
+            )
+        )
+        cheater_wheel_printable_obj = cheater_wheel.get_object()
+        if not isinstance(cheater_wheel_printable_obj, cq.Workplane):
+            raise TypeError("Cheater adjustment wheel must provide Workplane geometry")
+        cheater_wheel_obj = (
+            cheater_wheel_printable_obj
+            .rotate((0, 0, 0), (1, 0, 0), -90)
+            .translate(
+                (
+                    pivot_location[0],
+                    cheater_wall_outer_y,
+                    pivot_location[2],
+                )
+            )
+        )
+        self._add(
+            pivot_bolt,
+            obj=pivot_bolt_obj,
+            name="cheater_pivot_bolt",
+            color="gray",
+        )
+        pivot_nyloc_metal_obj = (
+            pivot_nyloc.metal_object()
+            .rotate((0, 0, 0), (1, 0, 0), 90)
+            .translate(
+                (
+                    pivot_location[0],
+                    -cheater_wall_outer_y,
+                    pivot_location[2],
+                )
+            )
+        )
+        pivot_nyloc_insert_obj = (
+            pivot_nyloc.nylon_insert_object()
+            .rotate((0, 0, 0), (1, 0, 0), 90)
+            .translate(
+                (
+                    pivot_location[0],
+                    -cheater_wall_outer_y,
+                    pivot_location[2],
+                )
+            )
+        )
+        self._add(
+            pivot_nyloc,
+            obj=pivot_nyloc_metal_obj,
+            name="cheater_pivot_nyloc",
+            color="gray",
+        )
+        self._assembly.add(
+            pivot_nyloc_insert_obj,
+            name="cheater_pivot_nyloc_insert",
+            color=cq.Color("black"),
+        )
+        self._add(
+            cheater_wheel,
+            obj=cheater_wheel_obj,
+            name="cheater_adjustment_wheel",
+        )
         top_bolt = self.removable_top_bolt()
+        lowered_top_bolt = bb.Bolt.get(
+            size=self.removable_top_screw_size,
+            length=(
+                self.removable_top_screw_length
+                - self.cheater_positive_y_shelf_drop
+            ),
+            head=self.removable_top_screw_head,
+        )
         top_nut = self.removable_top_nut()
         hardware_positions = (
             tuple(
@@ -450,9 +574,15 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 for x, y in block.cheater_top_screw_positions()
             )
         )
-        bolt_top_z = self.block_height_z()
         for index, (x, y, nut_top_z, label) in enumerate(hardware_positions):
-            bolt_obj = top_bolt.get_object().translate(
+            is_lowered_shelf_screw = label == "cheater_top" and y > 0
+            displayed_bolt = lowered_top_bolt if is_lowered_shelf_screw else top_bolt
+            bolt_top_z = self.block_height_z() - (
+                self.cheater_positive_y_shelf_drop
+                if is_lowered_shelf_screw
+                else 0.0
+            )
+            bolt_obj = displayed_bolt.get_object().translate(
                 (block_x + x, y, bolt_top_z - self.block_center_z())
             )
             nut_obj = (
@@ -462,7 +592,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 .translate((block_x + x, y, nut_top_z - self.block_center_z()))
             )
             self._add(
-                top_bolt,
+                displayed_bolt,
                 obj=bolt_obj,
                 name=f"{label}_bolt_{index}",
                 color="gray",
@@ -929,6 +1059,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         bearing_pocket_dia: float,
         bearing_width: float,
         axle_hole_dia: float,
+        positive_y_shelf_drop: float,
     ) -> QuillCheaterBearingTop:
         return cls.get(
             quill_block=quill_block,
@@ -940,6 +1071,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             bearing_pocket_dia=bearing_pocket_dia,
             bearing_width=bearing_width,
             axle_hole_dia=axle_hole_dia,
+            positive_y_shelf_drop=positive_y_shelf_drop,
         )
 
     def __init__(
@@ -953,6 +1085,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         bearing_pocket_dia: float,
         bearing_width: float,
         axle_hole_dia: float,
+        positive_y_shelf_drop: float,
     ) -> None:
         self.quill_block_dimensions = quill_block.dimensions()
         self.pivot_x = pivot_x
@@ -963,9 +1096,12 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         self.bearing_pocket_dia = bearing_pocket_dia
         self.bearing_width = bearing_width
         self.axle_hole_dia = axle_hole_dia
+        self.positive_y_shelf_drop = positive_y_shelf_drop
         super().__init__(name="Quill Cheater Bearing Top")
 
-        assembled = quill_block.get_cheater_top_base_shape()
+        assembled = quill_block.get_cheater_top_base_shape().cut(
+            self._make_positive_y_shelf_cut(quill_block)
+        )
         wall = self._make_positive_y_wall(quill_block)
         assembled = assembled.union(wall).union(
             wall.mirror("XZ")
@@ -987,6 +1123,29 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         )
         self._object = printable
         self._assembly.add(printable, name="body", color=cq.Color("green"))
+
+    def _make_positive_y_shelf_cut(
+        self,
+        quill_block: QuillMainBlock,
+    ) -> cq.Workplane:
+        wall_outer_y = self.wall_inner_y + self.wall_thickness_y
+        outboard_width = quill_block.width / 2 - wall_outer_y
+        return (
+            cq.Workplane("XY")
+            .box(
+                quill_block.length,
+                outboard_width,
+                self.positive_y_shelf_drop,
+                centered=(False, False, False),
+            )
+            .translate(
+                (
+                    0,
+                    wall_outer_y,
+                    quill_block.height - self.positive_y_shelf_drop,
+                )
+            )
+        )
 
     def _make_positive_y_wall(
         self,
@@ -1088,6 +1247,97 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             self.bearing_pocket_dia,
             self.bearing_width,
             self.axle_hole_dia,
+            self.positive_y_shelf_drop,
+        )
+
+
+class QuillCheaterAdjustmentWheel(bpd.PrintedPart):
+    """Hand wheel that captures the M4 pivot bolt's hex head.
+
+    The wheel is exported flat with its axis along Z. In the assembly it is
+    rotated so that axis follows the pivot bolt along Y.
+    """
+
+    @classmethod
+    def create(
+        cls,
+        outside_diameter: float,
+        width: float,
+        hex_across_flats: float,
+        hex_depth: float,
+        shaft_hole_diameter: float,
+        grip_notch_radius: float,
+        grip_notch_count: int,
+    ) -> QuillCheaterAdjustmentWheel:
+        return cls.get(
+            outside_diameter=outside_diameter,
+            width=width,
+            hex_across_flats=hex_across_flats,
+            hex_depth=hex_depth,
+            shaft_hole_diameter=shaft_hole_diameter,
+            grip_notch_radius=grip_notch_radius,
+            grip_notch_count=grip_notch_count,
+        )
+
+    def __init__(
+        self,
+        outside_diameter: float,
+        width: float,
+        hex_across_flats: float,
+        hex_depth: float,
+        shaft_hole_diameter: float,
+        grip_notch_radius: float,
+        grip_notch_count: int,
+    ) -> None:
+        self.outside_diameter = outside_diameter
+        self.width = width
+        self.hex_across_flats = hex_across_flats
+        self.hex_depth = hex_depth
+        self.shaft_hole_diameter = shaft_hole_diameter
+        self.grip_notch_radius = grip_notch_radius
+        self.grip_notch_count = grip_notch_count
+        super().__init__(name="Quill Cheater Adjustment Wheel")
+
+        obj = cq.Workplane("XY").circle(outside_diameter / 2).extrude(width)
+        notch_radius_from_center = outside_diameter / 2
+        for index in range(grip_notch_count):
+            angle = math.radians(index * 360 / grip_notch_count)
+            notch = (
+                cq.Workplane("XY")
+                .center(
+                    math.cos(angle) * notch_radius_from_center,
+                    math.sin(angle) * notch_radius_from_center,
+                )
+                .circle(grip_notch_radius)
+                .extrude(width)
+            )
+            obj = obj.cut(notch)
+
+        hex_pocket = (
+            cq.Workplane("XY")
+            .workplane(offset=width - hex_depth)
+            .polygon(6, hex_across_flats, circumscribed=True)
+            .extrude(hex_depth)
+        )
+        shaft_hole = (
+            cq.Workplane("XY")
+            .circle(shaft_hole_diameter / 2)
+            .extrude(width)
+        )
+        obj = obj.cut(hex_pocket.union(shaft_hole))
+        self._object = obj
+        self._assembly.add(obj, name="body", color=cq.Color("orange"))
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name,
+            self.outside_diameter,
+            self.width,
+            self.hex_across_flats,
+            self.hex_depth,
+            self.shaft_hole_diameter,
+            self.grip_notch_radius,
+            self.grip_notch_count,
         )
 
 

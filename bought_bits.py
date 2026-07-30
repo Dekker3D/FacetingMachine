@@ -336,7 +336,7 @@ class Bolt(BoughtPartWithModel):
         if self.head == "hex":
             head_shape = (
                 cq.Workplane("XY")
-                .polygon(6, self._head_dia / 2, circumscribed=True)
+                .polygon(6, self._head_dia, circumscribed=True)
                 .extrude(self._head_h)
             )
         elif self.head == "countersunk":
@@ -404,6 +404,101 @@ class Nut(BoughtPartWithModel):
             .faces(">Z").workplane()
             .hole(self.diameter())
         )
+
+
+class NylocNut(BoughtPartWithModel):
+    """DIN 985-style metric nyloc nut, flat on XY with bore along Z.
+
+    The model includes the taller locking collar and a visible nylon insert.
+    Use ``NylocNut.get(size=4)``.
+    """
+
+    _HEIGHTS: dict[int, float] = {
+        3: 4.0,
+        4: 5.0,
+        5: 5.0,
+        6: 6.0,
+        8: 8.0,
+        10: 10.0,
+        12: 12.0,
+    }
+
+    def __init__(self, size: float) -> None:
+        self.size = size
+        _, _, self._width, _, _, _ = _FASTENER_DIMS.get(
+            int(size), (0, 0, size * 1.8, 0, 0, 0),
+        )
+        self._height = self._HEIGHTS.get(int(size), size * 1.25)
+        super().__init__(name=f"M{size:.0f} Nyloc Nut")
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name, self.size)
+
+    def diameter(self) -> float:
+        return self.size + 0.3
+
+    def width_across_flats(self) -> float:
+        return self._width
+
+    def width_across_corners(self) -> float:
+        return self._width / math.cos(math.radians(30))
+
+    def height(self) -> float:
+        return self._height
+
+    def metal_object(self) -> cq.Workplane:
+        regular_nut_height = _FASTENER_DIMS.get(
+            int(self.size),
+            (0, 0, 0, self.size * 0.8, 0, 0),
+        )[3]
+        dome_radius = self.width_across_flats() / 2
+        hex_body = (
+            cq.Workplane("XY")
+            .polygon(6, self.width_across_corners())
+            .extrude(regular_nut_height)
+        )
+        dome = (
+            cq.Workplane("XY")
+            .sphere(dome_radius)
+            .translate((0, 0, regular_nut_height))
+            .intersect(
+                cq.Workplane("XY")
+                .circle(dome_radius)
+                .extrude(self._height)
+            )
+            .intersect(
+                cq.Workplane("XY")
+                .box(
+                    self.width_across_corners(),
+                    self.width_across_corners(),
+                    self._height - regular_nut_height,
+                    centered=(True, True, False),
+                )
+                .translate((0, 0, regular_nut_height))
+            )
+        )
+        bore = cq.Workplane("XY").circle(self.diameter() / 2).extrude(
+            self._height
+        )
+        return (
+            hex_body
+            .union(dome)
+            .cut(bore)
+            .cut(self.nylon_insert_object())
+        )
+
+    def nylon_insert_object(self) -> cq.Workplane:
+        nylon_height = min(1.2, self._height * 0.25)
+        return (
+            cq.Workplane("XY")
+            .workplane(offset=self._height - nylon_height)
+            .circle(self.width_across_flats() * 0.36)
+            .circle(self.size * 0.42)
+            .extrude(nylon_height)
+        )
+
+    def _create_object(self) -> cq.Workplane:
+        return self.metal_object().union(self.nylon_insert_object())
 
 
 # ── Washer ───────────────────────────────────────────────────────────
