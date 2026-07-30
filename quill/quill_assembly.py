@@ -1188,7 +1188,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             wall.mirror("XZ")
         )
         assembled = assembled.cut(self._make_wheel_clearance_cut(quill_block))
-        assembled = assembled.cut(self._make_outer_shelf_bevel_cut(quill_block))
+        assembled = self._fillet_wheel_shelf_edges(assembled, quill_block)
         assembled = assembled.cut(self._make_bearing_pockets())
         assembled = assembled.cut(self._make_axle_hole())
         self._assembled_object = assembled
@@ -1239,20 +1239,91 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             .translate((0, wall_outer_y, 0))
         )
 
-    def _make_outer_shelf_bevel_cut(
+    def _fillet_wheel_shelf_edges(
         self,
+        assembled: cq.Workplane,
         quill_block: QuillMainBlock,
     ) -> cq.Workplane:
-        bevel = self.positive_y_shelf_edge_bevel
-        outer_y = quill_block.width / 2
-        top_z = self.positive_y_shelf_top_z
-        return (
-            cq.Workplane("YZ")
-            .moveTo(outer_y - bevel, top_z)
-            .lineTo(outer_y, top_z)
-            .lineTo(outer_y, top_z - bevel)
-            .close()
-            .extrude(quill_block.length)
+        """Fillet all five user-facing shelf/relief edges together."""
+        vertical_offset = self.pivot_z - self.positive_y_shelf_top_z
+        if vertical_offset >= self.wheel_clearance_radius:
+            # The cylindrical cut does not reach the shelf plane.
+            return assembled
+
+        x_extent = math.sqrt(
+            self.wheel_clearance_radius * self.wheel_clearance_radius
+            - vertical_offset * vertical_offset
+        )
+        wall_outer_y = self.wall_inner_y + self.wall_thickness_y
+        block_outer_y = quill_block.width / 2
+        tolerance = 0.01
+        relief_box = cq.selectors.BoxSelector(
+            (
+                self.pivot_x - x_extent - tolerance,
+                wall_outer_y - tolerance,
+                self.pivot_z - self.wheel_clearance_radius - tolerance,
+            ),
+            (
+                self.pivot_x + x_extent + tolerance,
+                block_outer_y + tolerance,
+                self.positive_y_shelf_top_z + tolerance,
+            ),
+        )
+        outer_shelf_box = cq.selectors.BoxSelector(
+            (
+                quill_block.holder_length_x - tolerance,
+                block_outer_y - tolerance,
+                self.positive_y_shelf_top_z - tolerance,
+            ),
+            (
+                quill_block.length - quill_block.holder_length_x + tolerance,
+                block_outer_y + tolerance,
+                self.positive_y_shelf_top_z + tolerance,
+            ),
+        )
+        combined_selector = cq.selectors.SumSelector(
+            relief_box,
+            outer_shelf_box,
+        )
+        boxed_edges = assembled.edges(combined_selector).vals()
+        if not all(isinstance(edge, cq.Edge) for edge in boxed_edges):
+            raise TypeError("Wheel-relief selector returned a non-edge shape")
+        relief_edges = []
+        for edge in boxed_edges:
+            if not isinstance(edge, cq.Edge):
+                continue
+            bounds = edge.BoundingBox()
+            is_x_side = (
+                edge.geomType() == "LINE"
+                and bounds.xlen < tolerance
+                and bounds.zlen < tolerance
+            )
+            is_user_side_arc = (
+                edge.geomType() in ("CIRCLE", "ELLIPSE")
+                and abs(bounds.ymin - block_outer_y) < tolerance
+                and abs(bounds.ymax - block_outer_y) < tolerance
+            )
+            is_outer_x_segment = (
+                edge.geomType() == "LINE"
+                and bounds.ylen < tolerance
+                and bounds.zlen < tolerance
+                and abs(bounds.ymin - block_outer_y) < tolerance
+                and abs(bounds.zmin - self.positive_y_shelf_top_z) < tolerance
+                and (
+                    bounds.xmax <= self.pivot_x - x_extent + tolerance
+                    or bounds.xmin >= self.pivot_x + x_extent - tolerance
+                )
+            )
+            if is_x_side or is_user_side_arc or is_outer_x_segment:
+                relief_edges.append(edge)
+        if len(relief_edges) != 5:
+            raise ValueError(
+                "Expected the relief arc, two Y-side edges, and two "
+                "outer X-aligned shelf edges, "
+                f"found {len(relief_edges)}"
+            )
+        return assembled.newObject(relief_edges).fillet(
+            self.positive_y_shelf_edge_bevel
         )
 
     def _wall_root_z(self, quill_block: QuillMainBlock) -> float:
