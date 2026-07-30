@@ -77,13 +77,15 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_bearing_inner_lip: float = 2.0
     cheater_bearing_radial_material: float = 5.0
     cheater_axle_clearance: float = 0.4
-    cheater_rocker_width_y: float = 15.0
+    cheater_rocker_width_y: float = 20.0
     cheater_rocker_side_clearance_y: float = 4.0
     cheater_pivot_above_block: float = 10.0
     cheater_pivot_from_tooth_face_x: float = 40.0
     cheater_top_screw_x_margin: float = 8.0
     cheater_screwdriver_shaft_diameter: float = 6.0
     cheater_screwdriver_radial_clearance: float = 0.5
+    block_end_vertical_edge_fillet: float = 2.0
+    block_top_edge_fillet: float = 2.0
     cheater_top_screw_clearance_dia: float = 3.4
     cheater_top_body_clearance_depth: float = 17.0
     removable_top_screw_size: float = 3.0
@@ -264,6 +266,11 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             - self.body_screw_hole_dia() / 2
             - self.screw_to_outer_wall
         )
+
+    def block_end_corner_chamfer(self) -> float:
+        """Start each end chamfer at the bearing-holder screw axis."""
+        shoulder_screw_y = self.bearing_holder_screw_spacing_y() / 2
+        return self.block_width_y() / 2 - shoulder_screw_y
 
     def cheater_wheel_width(self) -> float:
         return (
@@ -450,6 +457,9 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             cheater_top_screw_y=self.cheater_top_screw_y(),
             cheater_top_screw_clearance_dia=self.cheater_top_screw_clearance_dia,
             cheater_top_body_clearance_depth=self.cheater_top_body_clearance_depth,
+            end_corner_chamfer=self.block_end_corner_chamfer(),
+            end_vertical_edge_fillet=self.block_end_vertical_edge_fillet,
+            top_edge_fillet=self.block_top_edge_fillet,
             removable_top_nut_width=self.removable_top_nut_width(),
             removable_top_nut_depth=self.removable_top_nut_depth(),
             removable_top_nut_drop=self.removable_top_nut_drop,
@@ -825,6 +835,9 @@ class QuillMainBlock:
         cheater_top_screw_y: float,
         cheater_top_screw_clearance_dia: float,
         cheater_top_body_clearance_depth: float,
+        end_corner_chamfer: float,
+        end_vertical_edge_fillet: float,
+        top_edge_fillet: float,
         removable_top_nut_width: float,
         removable_top_nut_depth: float,
         removable_top_nut_drop: float,
@@ -851,6 +864,9 @@ class QuillMainBlock:
             cheater_top_screw_clearance_dia=cheater_top_screw_clearance_dia,
 
             cheater_top_body_clearance_depth=cheater_top_body_clearance_depth,
+            end_corner_chamfer=end_corner_chamfer,
+            end_vertical_edge_fillet=end_vertical_edge_fillet,
+            top_edge_fillet=top_edge_fillet,
             removable_top_nut_width=removable_top_nut_width,
             removable_top_nut_depth=removable_top_nut_depth,
             removable_top_nut_drop=removable_top_nut_drop,
@@ -878,6 +894,9 @@ class QuillMainBlock:
         cheater_top_screw_y: float,
         cheater_top_screw_clearance_dia: float,
         cheater_top_body_clearance_depth: float,
+        end_corner_chamfer: float,
+        end_vertical_edge_fillet: float,
+        top_edge_fillet: float,
         removable_top_nut_width: float,
         removable_top_nut_depth: float,
         removable_top_nut_drop: float,
@@ -903,6 +922,9 @@ class QuillMainBlock:
         self.cheater_top_screw_clearance_dia = cheater_top_screw_clearance_dia
 
         self.cheater_top_body_clearance_depth = cheater_top_body_clearance_depth
+        self.end_corner_chamfer = end_corner_chamfer
+        self.end_vertical_edge_fillet = end_vertical_edge_fillet
+        self.top_edge_fillet = top_edge_fillet
         self.removable_top_nut_width = removable_top_nut_width
         self.removable_top_nut_depth = removable_top_nut_depth
         self.removable_top_nut_drop = removable_top_nut_drop
@@ -933,6 +955,22 @@ class QuillMainBlock:
 
     def get_base_shape(self) -> cq.Workplane:
         """Complete block with the shared stepped bearing/shank cavity."""
+        block = (
+            cq.Workplane("XY")
+            .box(
+                self.length,
+                self.width,
+                self.height,
+                centered=(False, True, False),
+            )
+            .edges("|Z")
+            .chamfer(self.end_corner_chamfer)
+            .edges("|Z")
+            .fillet(self.end_vertical_edge_fillet)
+            .faces(">Z")
+            .edges()
+            .fillet(self.top_edge_fillet)
+        )
         index_pocket = (
             cq.Workplane("YZ")
             .cylinder(
@@ -955,11 +993,7 @@ class QuillMainBlock:
             .translate((0, 0, self.split_height))
         )
         block_cut = index_pocket.union(collet_pocket).union(shank_bore)
-        return (
-            cq.Workplane("XY")
-            .box(self.length, self.width, self.height, centered=(False, True, False))
-            .cut(block_cut)
-        )
+        return block.cut(block_cut)
 
     def bearing_holder_box(self, z_offset: float = 0.0) -> cq.Workplane:
         """Cube at the -X end; the +X end uses a translated copy."""
@@ -1148,6 +1182,9 @@ class QuillMainBlock:
             self.cheater_top_screw_y,
             self.cheater_top_screw_clearance_dia,
             self.cheater_top_body_clearance_depth,
+            self.end_corner_chamfer,
+            self.end_vertical_edge_fillet,
+            self.top_edge_fillet,
             self.removable_top_nut_width,
             self.removable_top_nut_depth,
             self.removable_top_nut_drop,
