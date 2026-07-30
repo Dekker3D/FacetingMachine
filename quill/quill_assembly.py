@@ -591,7 +591,9 @@ class QuillMainBlock:
         )
 
     def cheater_top_cut_box(self) -> cq.Workplane:
-        return self.cheater_top_box(-self.holder_split_gap / 2)
+        # Unlike the bearing holders, this top does not clamp a bearing.
+        # Its underside and the body's cut plane meet directly at split_height.
+        return self.cheater_top_box()
 
     def cheater_top_screw_positions(self) -> tuple[tuple[float, float], ...]:
         near_x = self.holder_length_x + self.cheater_top_screw_x_margin
@@ -607,7 +609,7 @@ class QuillMainBlock:
         )
 
     def cheater_top_pilot_holes(self) -> cq.Workplane:
-        pilot_top_z = self.split_height - self.holder_split_gap / 2
+        pilot_top_z = self.split_height
         result = cq.Workplane("XY")
         for x, y in self.cheater_top_screw_positions():
             result = result.union(
@@ -621,7 +623,7 @@ class QuillMainBlock:
 
     def get_cheater_top_base_shape(self) -> cq.Workplane:
         top = self.get_base_shape().intersect(
-            self.cheater_top_box(self.holder_split_gap / 2)
+            self.cheater_top_box()
         )
         clearance = cq.Workplane("XY")
         for x, y in self.cheater_top_screw_positions():
@@ -827,35 +829,61 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         top_start_x = quill_block.holder_length_x
         top_end_x = quill_block.length - quill_block.holder_length_x
         root_z = quill_block.height - 2.0
+        left_tangent = self._upper_tangent_point(
+            top_start_x,
+            root_z,
+        )
+        right_tangent = self._upper_tangent_point(
+            top_end_x,
+            root_z,
+        )
         # XZ's negative extrusion points toward +Y.
-        slope = (
+        wall = (
             cq.Workplane("XZ")
-            .polyline(
-                [
-                    (top_start_x, root_z),
-                    (top_end_x, root_z),
-                    (
-                        self.pivot_x + self.wall_outer_radius,
-                        self.pivot_z,
-                    ),
-                    (
-                        self.pivot_x - self.wall_outer_radius,
-                        self.pivot_z,
-                    ),
-                ]
+            .moveTo(top_start_x, root_z)
+            .lineTo(*left_tangent)
+            .threePointArc(
+                (self.pivot_x, self.pivot_z + self.wall_outer_radius),
+                right_tangent,
             )
+            .lineTo(top_end_x, root_z)
             .close()
             .extrude(-self.wall_thickness_y)
             .translate((0, self.wall_inner_y, 0))
         )
-        boss = (
-            cq.Workplane("XZ")
-            .center(self.pivot_x, self.pivot_z)
-            .circle(self.wall_outer_radius)
-            .extrude(-self.wall_thickness_y)
-            .translate((0, self.wall_inner_y, 0))
+        return wall
+
+    def _upper_tangent_point(
+        self,
+        root_x: float,
+        root_z: float,
+    ) -> tuple[float, float]:
+        """Upper external tangent from a wall root to the bearing boss."""
+        dx = root_x - self.pivot_x
+        dz = root_z - self.pivot_z
+        distance_squared = dx * dx + dz * dz
+        radius_squared = self.wall_outer_radius * self.wall_outer_radius
+        if distance_squared <= radius_squared:
+            raise ValueError("Wall root must lie outside the bearing boss")
+
+        base_x = self.pivot_x + radius_squared * dx / distance_squared
+        base_z = self.pivot_z + radius_squared * dz / distance_squared
+        factor = (
+            self.wall_outer_radius
+            * math.sqrt(distance_squared - radius_squared)
+            / distance_squared
         )
-        return slope.union(boss)
+        perpendicular_x = -dz
+        perpendicular_z = dx
+        first = (
+            base_x + factor * perpendicular_x,
+            base_z + factor * perpendicular_z,
+        )
+        second = (
+            base_x - factor * perpendicular_x,
+            base_z - factor * perpendicular_z,
+        )
+        return first if first[1] > second[1] else second
 
     def _make_bearing_pockets(self) -> cq.Workplane:
         outside_y = self.wall_inner_y + self.wall_thickness_y
