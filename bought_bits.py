@@ -542,3 +542,57 @@ class Washer(BoughtPartWithModel):
             .faces(">Z").workplane()
             .hole(self.diameter())
         )
+
+
+class CompressionSpring(BoughtPartWithModel):
+    """Visual model of a metric compression spring, axis along +Z."""
+
+    def __init__(
+        self,
+        wire_diameter: float,
+        outside_diameter: float,
+        free_length: float,
+        coil_count: int = 8,
+    ) -> None:
+        self.wire_diameter = wire_diameter
+        self.outside_diameter = outside_diameter
+        self.free_length = free_length
+        self.coil_count = coil_count
+        super().__init__(
+            name=(
+                f"Compression Spring {wire_diameter:.1f}mm wire × "
+                f"{outside_diameter:.0f}mm OD × {free_length:.0f}mm"
+            )
+        )
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name,
+            self.wire_diameter,
+            self.outside_diameter,
+            self.free_length,
+            self.coil_count,
+        )
+
+    def _create_object(self) -> cq.Workplane:
+        return self.object_at_length(self.free_length)
+
+    def object_at_length(self, length: float) -> cq.Workplane:
+        """Return display geometry compressed to the supplied length."""
+        centerline_radius = (
+            self.outside_diameter - self.wire_diameter
+        ) / 2
+        helix_height = length - self.wire_diameter
+        pitch = helix_height / self.coil_count
+        path = cq.Wire.makeHelix(
+            pitch,
+            helix_height,
+            centerline_radius,
+        )
+        return (
+            cq.Workplane("XZ")
+            .center(centerline_radius, 0)
+            .circle(self.wire_diameter / 2)
+            .sweep(path, isFrenet=True)
+            .translate((0, 0, self.wire_diameter / 2))
+        )

@@ -102,6 +102,18 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_wheel_grip_notch_count: int = 12
     cheater_positive_y_shelf_edge_bevel: float = 2.0
     cheater_wall_max_print_angle: float = 45.0
+    cheater_rocker_positive_x_length: float = 50.0
+    cheater_rocker_arm_thickness_z: float = 8.0
+    cheater_rocker_pivot_outer_diameter: float = 12.0
+    cheater_rocker_pivot_pilot_diameter: float = 3.4
+    cheater_spring_wire_diameter: float = 0.5
+    cheater_spring_outside_diameter: float = 8.0
+    cheater_spring_free_length: float = 15.0
+    cheater_spring_pocket_diameter_clearance: float = 0.5
+    cheater_spring_pocket_depth_top: float = 1.5
+    cheater_spring_pocket_depth_rocker: float = 1.5
+    cheater_spring_edge_clearance_x: float = 1.0
+    cheater_spring_target_from_pivot_x: float = 16.0
 
     def index_gear_width(self) -> float:
         return (
@@ -270,6 +282,41 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     def cheater_positive_y_shelf_drop(self) -> float:
         return self.block_height_z() - self.cheater_positive_y_shelf_top_z()
 
+    def cheater_spring(self) -> bb.CompressionSpring:
+        return bb.CompressionSpring.get(
+            wire_diameter=self.cheater_spring_wire_diameter,
+            outside_diameter=self.cheater_spring_outside_diameter,
+            free_length=self.cheater_spring_free_length,
+        )
+
+    def cheater_spring_pocket_diameter(self) -> float:
+        return (
+            self.cheater_spring_outside_diameter
+            + self.cheater_spring_pocket_diameter_clearance
+        )
+
+    def cheater_spring_center_x(self) -> float:
+        maximum_center_x = (
+            self.cheater_top_start_x()
+            + self.cheater_top_length_x()
+            - self.cheater_spring_pocket_diameter() / 2
+            - self.cheater_spring_edge_clearance_x
+        )
+        return min(
+            self.cheater_pivot_x() + self.cheater_spring_target_from_pivot_x,
+            maximum_center_x,
+        )
+
+    def cheater_spring_installed_length(self) -> float:
+        lower_seat_z = (
+            self.block_height_z() - self.cheater_spring_pocket_depth_top
+        )
+        upper_seat_z = (
+            self.cheater_pivot_z()
+            + self.cheater_spring_pocket_depth_rocker
+        )
+        return upper_seat_z - lower_seat_z
+
     def removable_top_bolt(self) -> bb.Bolt:
         return bb.Bolt.get(
             size=self.removable_top_screw_size,
@@ -418,7 +465,27 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 self.cheater_positive_y_shelf_edge_bevel
             ),
             max_print_angle=self.cheater_wall_max_print_angle,
+            spring_center_x=self.cheater_spring_center_x(),
+            spring_pocket_diameter=self.cheater_spring_pocket_diameter(),
+            spring_pocket_depth=self.cheater_spring_pocket_depth_top,
         )
+        cheater_rocker = QuillCheaterRocker.create(
+            negative_x=self.index_teeth_positive_x(),
+            positive_x=(
+                self.cheater_pivot_x()
+                + self.cheater_rocker_positive_x_length
+            ),
+            pivot_x=self.cheater_pivot_x(),
+            pivot_z=self.cheater_pivot_z(),
+            width_y=self.cheater_rocker_width_y,
+            arm_thickness_z=self.cheater_rocker_arm_thickness_z,
+            pivot_outer_diameter=self.cheater_rocker_pivot_outer_diameter,
+            pivot_pilot_diameter=self.cheater_rocker_pivot_pilot_diameter,
+            spring_center_x=self.cheater_spring_center_x(),
+            spring_pocket_diameter=self.cheater_spring_pocket_diameter(),
+            spring_pocket_depth=self.cheater_spring_pocket_depth_rocker,
+        )
+        cheater_spring = self.cheater_spring()
         pivot_bolt = self.cheater_pivot_bolt()
         pivot_nyloc = self.cheater_pivot_nyloc()
         cheater_wheel = QuillCheaterAdjustmentWheel.create(
@@ -529,6 +596,30 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             obj=negative_bearing_obj,
             loc=Location(block_x, 0, -self.block_center_z()),
             name="cheater_bearing_negative_y",
+            color="gray",
+        )
+        self._add(
+            cheater_rocker,
+            obj=cheater_rocker.get_assembled_object(),
+            loc=Location(block_x, 0, -self.block_center_z()),
+            name="cheater_rocker",
+        )
+        spring_lower_seat_z = (
+            self.block_height_z() - self.cheater_spring_pocket_depth_top
+        )
+        spring_obj = cheater_spring.object_at_length(
+            self.cheater_spring_installed_length()
+        ).translate(
+            (
+                block_x + self.cheater_spring_center_x(),
+                0,
+                spring_lower_seat_z - self.block_center_z(),
+            )
+        )
+        self._add(
+            cheater_spring,
+            obj=spring_obj,
+            name="cheater_rocker_spring",
             color="gray",
         )
         cheater_wall_outer_y = (
@@ -1131,6 +1222,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         wheel_clearance_radius: float,
         positive_y_shelf_edge_bevel: float,
         max_print_angle: float,
+        spring_center_x: float,
+        spring_pocket_diameter: float,
+        spring_pocket_depth: float,
     ) -> QuillCheaterBearingTop:
         return cls.get(
             quill_block=quill_block,
@@ -1146,6 +1240,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             wheel_clearance_radius=wheel_clearance_radius,
             positive_y_shelf_edge_bevel=positive_y_shelf_edge_bevel,
             max_print_angle=max_print_angle,
+            spring_center_x=spring_center_x,
+            spring_pocket_diameter=spring_pocket_diameter,
+            spring_pocket_depth=spring_pocket_depth,
         )
 
     def __init__(
@@ -1163,6 +1260,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         wheel_clearance_radius: float,
         positive_y_shelf_edge_bevel: float,
         max_print_angle: float,
+        spring_center_x: float,
+        spring_pocket_diameter: float,
+        spring_pocket_depth: float,
     ) -> None:
         self.quill_block_dimensions = quill_block.dimensions()
         self.pivot_x = pivot_x
@@ -1177,6 +1277,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         self.wheel_clearance_radius = wheel_clearance_radius
         self.positive_y_shelf_edge_bevel = positive_y_shelf_edge_bevel
         self.max_print_angle = max_print_angle
+        self.spring_center_x = spring_center_x
+        self.spring_pocket_diameter = spring_pocket_diameter
+        self.spring_pocket_depth = spring_pocket_depth
         super().__init__(name="Quill Cheater Bearing Top")
 
         assembled = quill_block.get_cheater_top_base_shape().cut(
@@ -1189,6 +1292,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         )
         assembled = assembled.cut(self._make_wheel_clearance_cut(quill_block))
         assembled = self._fillet_wheel_shelf_edges(assembled, quill_block)
+        assembled = assembled.cut(self._make_spring_pocket(quill_block))
         assembled = assembled.cut(self._make_bearing_pockets())
         assembled = assembled.cut(self._make_axle_hole())
         self._assembled_object = assembled
@@ -1237,6 +1341,18 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             .circle(self.wheel_clearance_radius)
             .extrude(-outboard_width)
             .translate((0, wall_outer_y, 0))
+        )
+
+    def _make_spring_pocket(
+        self,
+        quill_block: QuillMainBlock,
+    ) -> cq.Workplane:
+        return (
+            cq.Workplane("XY")
+            .center(self.spring_center_x, 0)
+            .circle(self.spring_pocket_diameter / 2)
+            .extrude(-self.spring_pocket_depth)
+            .translate((0, 0, quill_block.height))
         )
 
     def _fillet_wheel_shelf_edges(
@@ -1470,6 +1586,128 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             self.wheel_clearance_radius,
             self.positive_y_shelf_edge_bevel,
             self.max_print_angle,
+            self.spring_center_x,
+            self.spring_pocket_diameter,
+            self.spring_pocket_depth,
+        )
+
+
+class QuillCheaterRocker(bpd.PrintedPart):
+    """Raised cheater rocker, exported with assembled +Y on the print bed."""
+
+    @classmethod
+    def create(
+        cls,
+        negative_x: float,
+        positive_x: float,
+        pivot_x: float,
+        pivot_z: float,
+        width_y: float,
+        arm_thickness_z: float,
+        pivot_outer_diameter: float,
+        pivot_pilot_diameter: float,
+        spring_center_x: float,
+        spring_pocket_diameter: float,
+        spring_pocket_depth: float,
+    ) -> QuillCheaterRocker:
+        return cls.get(
+            negative_x=negative_x,
+            positive_x=positive_x,
+            pivot_x=pivot_x,
+            pivot_z=pivot_z,
+            width_y=width_y,
+            arm_thickness_z=arm_thickness_z,
+            pivot_outer_diameter=pivot_outer_diameter,
+            pivot_pilot_diameter=pivot_pilot_diameter,
+            spring_center_x=spring_center_x,
+            spring_pocket_diameter=spring_pocket_diameter,
+            spring_pocket_depth=spring_pocket_depth,
+        )
+
+    def __init__(
+        self,
+        negative_x: float,
+        positive_x: float,
+        pivot_x: float,
+        pivot_z: float,
+        width_y: float,
+        arm_thickness_z: float,
+        pivot_outer_diameter: float,
+        pivot_pilot_diameter: float,
+        spring_center_x: float,
+        spring_pocket_diameter: float,
+        spring_pocket_depth: float,
+    ) -> None:
+        self.negative_x = negative_x
+        self.positive_x = positive_x
+        self.pivot_x = pivot_x
+        self.pivot_z = pivot_z
+        self.width_y = width_y
+        self.arm_thickness_z = arm_thickness_z
+        self.pivot_outer_diameter = pivot_outer_diameter
+        self.pivot_pilot_diameter = pivot_pilot_diameter
+        self.spring_center_x = spring_center_x
+        self.spring_pocket_diameter = spring_pocket_diameter
+        self.spring_pocket_depth = spring_pocket_depth
+        super().__init__(name="Quill Cheater Rocker")
+
+        length_x = positive_x - negative_x
+        arm = (
+            cq.Workplane("XY")
+            .box(length_x, width_y, arm_thickness_z, centered=False)
+            .translate((negative_x, -width_y / 2, pivot_z))
+        )
+        pivot_barrel = (
+            cq.Workplane("XZ")
+            .center(pivot_x, pivot_z)
+            .circle(pivot_outer_diameter / 2)
+            .extrude(-width_y)
+            .translate((0, -width_y / 2, 0))
+        )
+        pivot_pilot = (
+            cq.Workplane("XZ")
+            .center(pivot_x, pivot_z)
+            .circle(pivot_pilot_diameter / 2)
+            .extrude(-width_y)
+            .translate((0, -width_y / 2, 0))
+        )
+        spring_pocket = (
+            cq.Workplane("XY")
+            .center(spring_center_x, 0)
+            .circle(spring_pocket_diameter / 2)
+            .extrude(spring_pocket_depth)
+            .translate((0, 0, pivot_z))
+        )
+        assembled = arm.union(pivot_barrel).cut(pivot_pilot).cut(spring_pocket)
+        self._assembled_object = assembled
+
+        printable = assembled.rotate((0, 0, 0), (1, 0, 0), -90)
+        printable_shape = printable.val()
+        if not isinstance(printable_shape, cq.Shape):
+            raise TypeError("Cheater rocker must provide solid geometry")
+        printable = printable.translate(
+            (0, 0, -printable_shape.BoundingBox().zmin)
+        )
+        self._object = printable
+        self._assembly.add(printable, name="body", color=cq.Color("green"))
+
+    def get_assembled_object(self) -> cq.Workplane:
+        return self._assembled_object
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name,
+            self.negative_x,
+            self.positive_x,
+            self.pivot_x,
+            self.pivot_z,
+            self.width_y,
+            self.arm_thickness_z,
+            self.pivot_outer_diameter,
+            self.pivot_pilot_diameter,
+            self.spring_center_x,
+            self.spring_pocket_diameter,
+            self.spring_pocket_depth,
         )
 
 
