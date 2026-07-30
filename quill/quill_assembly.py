@@ -30,9 +30,15 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     joint_user_nub_length: float = 8.0
     joint_away_nub_dia: float = 5.5
     joint_away_nub_length: float = 5.0
-    joint_hinge_height: float = 20.0
+    joint_hinge_height: float = 17.0
     joint_angle_indicator_height: float = 40.0
     joint_angle_indicator_thickness: float = 8.0
+    joint_angle_indicator_screw_size: float = 3.0
+    joint_angle_indicator_screw_length: float = 16.0
+    joint_angle_indicator_screw_head: str = "countersunk"
+    joint_body_negative_x: float = -16.0
+    joint_body_positive_x: float = 8.0
+    joint_body_top_z: float = 35.0
     joint_magnet_pocket_dia: float = 3.7
     # 4.75 mm from the nub's top puts the midpoint of a 3.0 mm magnet stack
     # on the nub's Z centreline while keeping the pocket close to the Y end.
@@ -42,9 +48,11 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     # docs/joint-resolution.md for the deferred ownership refactor.
 
     # ── Base plate ──────────────────────────────────────────────
-    base_plate_thickness: float = 5.0
-    base_plate_x: float = 110.0
-    base_plate_y: float = 70.0
+    base_plate_thickness: float = 8.0
+    base_plate_positive_x: float = 88.0
+    base_plate_shoulder_inset_y: float = 0.5
+    body_index_gear_radial_clearance: float = 2.0
+    body_reinforcement_block_overlap_x: float = 4.0
 
     # ── User-selected quill design settings ────────────────────
     bearing_radial_tolerance: float = 0.0
@@ -69,6 +77,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     index_gear_numbers_width: float = 8.0
     index_gear_spacer_width: float = 2.0
     index_gear_num_teeth: int = 96
+    index_gear_tooth_depth: float = 0.8
     index_side_shank_exposure: float = 10.0
 
     # ── Cheater bearing top ─────────────────────────────────────
@@ -109,6 +118,17 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_rocker_arm_thickness_z: float = 8.0
     cheater_rocker_pivot_outer_diameter: float = 12.0
     cheater_rocker_pivot_pilot_diameter: float = 3.4
+    cheater_rocker_gear_mount_drop_z: float = 5.0
+    cheater_rocker_gear_mount_positive_x: float = 10.0
+
+    cheater_gear_section_screw_size: float = 3.0
+    cheater_gear_section_screw_length: float = 12.0
+    cheater_gear_section_screw_head: str = "countersunk"
+    cheater_gear_section_screw_clearance_dia: float = 3.4
+    cheater_gear_section_screw_pilot_dia: float = 2.2
+    cheater_gear_section_screw_spacing_y: float = 10.0
+    cheater_gear_section_neutral_clearance: float = 0.5
+
     cheater_spring_wire_diameter: float = 0.5
     cheater_spring_outside_diameter: float = 8.0
     cheater_spring_free_length: float = 15.0
@@ -124,6 +144,41 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             + self.index_gear_numbers_width
             + self.index_gear_spacer_width
         )
+
+    def joint_angle_indicator_screw(self) -> bb.WoodScrew:
+        return bb.WoodScrew.get(
+            size=self.joint_angle_indicator_screw_size,
+            length=self.joint_angle_indicator_screw_length,
+            head=self.joint_angle_indicator_screw_head,
+        )
+
+    def base_plate_y(self) -> float:
+        return self.joint_shoulder_gap - self.base_plate_shoulder_inset_y * 2
+
+    def base_plate_x(self) -> float:
+        return self.base_plate_positive_x - self.joint_body_negative_x
+
+    def base_plate_center_x(self) -> float:
+        return (self.base_plate_positive_x + self.joint_body_negative_x) / 2
+
+    def joint_support_length_x(self) -> float:
+        return self.joint_body_positive_x - self.joint_body_negative_x
+
+    def body_reinforcement_start_x(self) -> float:
+        return self.joint_body_positive_x
+
+    def body_reinforcement_end_x(self) -> float:
+        return self.block_x_offset + self.body_reinforcement_block_overlap_x
+
+    def body_reinforcement_top_z(self) -> float:
+        shank_bottom_z = self.block_center_z() - self.er11.dia / 2
+        return shank_bottom_z - 1.0
+
+    def index_gear_tip_radius(self) -> float:
+        return self.index_gear_od / 2 + self.index_gear_tooth_depth
+
+    def body_index_gear_clearance_radius(self) -> float:
+        return self.index_gear_tip_radius() + self.body_index_gear_radial_clearance
 
     def block_length_x(self) -> float:
         return (
@@ -228,6 +283,49 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         # Relative to the block's index-side face. The spacer occupies the
         # final +X portion between the teeth and the bearing.
         return -self.index_gear_spacer_width
+
+    def cheater_gear_section_negative_x(self) -> float:
+        return self.index_teeth_positive_x() - self.index_gear_teeth_width
+
+    def cheater_gear_mount_bottom_z(self) -> float:
+        return self.cheater_pivot_z() - self.cheater_rocker_gear_mount_drop_z
+
+
+    def cheater_gear_section_tooth_tip_radius(self) -> float:
+        return (
+            self.index_gear_tip_radius()
+            + self.cheater_gear_section_neutral_clearance
+        )
+
+    def cheater_gear_section_screw(self) -> bb.WoodScrew:
+        return bb.WoodScrew.get(
+            size=self.cheater_gear_section_screw_size,
+            length=self.cheater_gear_section_screw_length,
+            head=self.cheater_gear_section_screw_head,
+        )
+
+    def cheater_gear_section_tooth_pitch(self) -> float:
+        return math.pi * self.index_gear_od / self.index_gear_num_teeth
+
+    def cheater_gear_section_tooth_count(self) -> int:
+        count = max(
+            3,
+            int(
+                self.cheater_rocker_width_y
+                / self.cheater_gear_section_tooth_pitch()
+            ),
+        )
+        return count - 1 if count % 2 == 0 else count
+
+    def cheater_gear_section_screw_z(self) -> float:
+        return (
+            self.cheater_gear_mount_bottom_z()
+            + self.cheater_pivot_z()
+            + self.cheater_rocker_arm_thickness_z
+        ) / 2
+
+    def cheater_gear_section_backing_top_z(self) -> float:
+        return self.cheater_pivot_z() + self.cheater_rocker_arm_thickness_z
 
     def cheater_pivot_x(self) -> float:
         return (
@@ -421,11 +519,15 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             hinge_height=self.joint_hinge_height,
             angle_indicator_height=self.joint_angle_indicator_height,
             angle_indicator_thickness=self.joint_angle_indicator_thickness,
+            body_negative_x=self.joint_body_negative_x,
+            body_positive_x=self.joint_body_positive_x,
+            body_top_z=self.joint_body_top_z,
             magnet_pocket_dia=self.joint_magnet_pocket_dia,
             magnet_pocket_depth=self.joint_magnet_pocket_depth,
             base_plate_thickness=self.base_plate_thickness,
-            base_plate_x=self.base_plate_x,
-            base_plate_y=self.base_plate_y,
+            base_plate_x=self.base_plate_x(),
+            base_plate_center_x=self.base_plate_center_x(),
+            base_plate_y=self.base_plate_y(),
         )
         angle_indicator = QuillAngleIndicator.create(
             shoulder_dia=self.joint_shoulder_dia,
@@ -434,6 +536,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             height=self.joint_angle_indicator_height,
             thickness=self.joint_angle_indicator_thickness,
         )
+        angle_indicator_screw = self.joint_angle_indicator_screw()
         block = QuillMainBlock.create(
             length_x=self.block_length_x(),
             width_y=self.block_width_y(),
@@ -475,6 +578,16 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             angle_indicator=angle_indicator,
             block_x=self.block_x_offset,
             indicator_y=away_shoulder_inner_y,
+            reinforcement_start_x=self.body_reinforcement_start_x(),
+            reinforcement_end_x=self.body_reinforcement_end_x(),
+            reinforcement_width_y=self.base_plate_y(),
+            reinforcement_bottom_z=self.base_plate_thickness,
+            reinforcement_top_z=self.body_reinforcement_top_z(),
+            index_gear_start_x=self.block_x_offset - self.index_gear_width(),
+            index_gear_width_x=self.index_gear_width(),
+            index_gear_axis_z=self.block_center_z(),
+            index_gear_clearance_radius=self.body_index_gear_clearance_radius(),
+            index_gear_axial_clearance=self.body_index_gear_radial_clearance,
         )
         bearing_holder = QuillBearingHolder.create(
             quill_block=block,
@@ -514,9 +627,39 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             arm_thickness_z=self.cheater_rocker_arm_thickness_z,
             pivot_outer_diameter=self.cheater_rocker_pivot_outer_diameter,
             pivot_pilot_diameter=self.cheater_rocker_pivot_pilot_diameter,
+            gear_mount_bottom_z=self.cheater_gear_mount_bottom_z(),
+            gear_mount_positive_x=self.cheater_rocker_gear_mount_positive_x,
+            gear_screw_z=self.cheater_gear_section_screw_z(),
+            gear_screw_spacing_y=self.cheater_gear_section_screw_spacing_y,
+            gear_screw_pilot_diameter=(
+                self.cheater_gear_section_screw_pilot_dia
+            ),
             spring_center_x=self.cheater_spring_center_x(),
             spring_pocket_diameter=self.cheater_spring_pocket_diameter(),
             spring_pocket_depth=self.cheater_spring_pocket_depth_rocker,
+        )
+        gear_section_screw = self.cheater_gear_section_screw()
+        cheater_gear_section = QuillCheaterGearSection.create(
+            negative_x=self.cheater_gear_section_negative_x(),
+            positive_x=self.index_teeth_positive_x(),
+            tooth_contact_z=(
+                self.block_center_z()
+                + self.cheater_gear_section_tooth_tip_radius()
+            ),
+            curve_radius=self.index_gear_tip_radius(),
+            tooth_depth=self.index_gear_tooth_depth,
+            backing_width_y=self.cheater_rocker_width_y,
+            backing_bottom_z=self.cheater_gear_mount_bottom_z(),
+            backing_top_z=self.cheater_gear_section_backing_top_z(),
+            angular_pitch=2 * math.pi / self.index_gear_num_teeth,
+            tooth_count=self.cheater_gear_section_tooth_count(),
+            screw_spacing_y=self.cheater_gear_section_screw_spacing_y,
+            screw_z=self.cheater_gear_section_screw_z(),
+            screw_clearance_diameter=(
+                self.cheater_gear_section_screw_clearance_dia
+            ),
+            screw_head_diameter=gear_section_screw.head_diameter(),
+            screw_head_height=gear_section_screw.head_height(),
         )
         cheater_spring = self.cheater_spring()
         pivot_bolt = self.cheater_pivot_bolt()
@@ -540,6 +683,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             od=self.index_gear_od,
             bore_dia=self.index_gear_bore_dia(),
             teeth_width=self.index_gear_teeth_width,
+            tooth_depth=self.index_gear_tooth_depth,
             numbers_width=self.index_gear_numbers_width,
             spacer_width=self.index_gear_spacer_width,
             num_teeth=self.index_gear_num_teeth,
@@ -569,8 +713,27 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 0,
             ),
             name="angle_indicator",
-            color="green",
+            color="blue",
         )
+        indicator_outer_y = (
+            indicator_display_y - self.joint_angle_indicator_thickness
+        )
+        indicator_hinge_z = self.base_plate_thickness + self.joint_hinge_height
+        for index, z in enumerate(
+            (indicator_hinge_z - 6.0, indicator_hinge_z + 6.0)
+        ):
+            screw_obj = (
+                angle_indicator_screw.get_object()
+                .rotate((0, 0, 0), (1, 0, 0), -90)
+                .translate((-6.0, indicator_outer_y, z))
+            )
+            self._add(
+                angle_indicator_screw,
+                obj=screw_obj,
+                loc=Location(0, 0, -self.block_center_z()),
+                name=f"angle_indicator_screw_{index}",
+                color="gray",
+            )
         self._add(er11, loc=Location(Vector(shank_start_x, 0, 0), Vector(0, 1, 0), 90),
                   color="gray")
         self._add(
@@ -643,6 +806,37 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             name="cheater_rocker",
             color="yellow",
         )
+        self._add(
+            cheater_gear_section,
+            obj=cheater_gear_section.get_assembled_object(),
+            loc=Location(block_x, 0, -self.block_center_z()),
+            name="cheater_gear_section",
+            color="red",
+        )
+        for index, y in enumerate(
+            (
+                -self.cheater_gear_section_screw_spacing_y / 2,
+                self.cheater_gear_section_screw_spacing_y / 2,
+            )
+        ):
+            screw_obj = (
+                gear_section_screw.get_object()
+                .rotate((0, 0, 0), (0, 1, 0), 90)
+                .translate(
+                    (
+                        self.cheater_gear_section_negative_x(),
+                        y,
+                        self.cheater_gear_section_screw_z(),
+                    )
+                )
+            )
+            self._add(
+                gear_section_screw,
+                obj=screw_obj,
+                loc=Location(block_x, 0, -self.block_center_z()),
+                name=f"cheater_gear_section_screw_{index}",
+                color="gray",
+            )
         spring_lower_seat_z = (
             self.block_height_z() - self.cheater_spring_pocket_depth_top
         )
@@ -964,9 +1158,9 @@ class QuillMainBlock:
             .hole(self.body_screw_hole_dia, self.height)
         )
 
-    def get_base_shape(self) -> cq.Workplane:
-        """Complete block with the shared stepped bearing/shank cavity."""
-        block = (
+    def get_outer_shape(self) -> cq.Workplane:
+        """Complete uncut block envelope used for pre-cut structural fusing."""
+        return (
             cq.Workplane("XY")
             .box(
                 self.length,
@@ -982,6 +1176,10 @@ class QuillMainBlock:
             .edges()
             .fillet(self.top_edge_fillet)
         )
+
+    def get_base_shape(self) -> cq.Workplane:
+        """Complete block with the shared stepped bearing/shank cavity."""
+        block = self.get_outer_shape()
         index_pocket = (
             cq.Workplane("YZ")
             .cylinder(
@@ -1172,6 +1370,10 @@ class QuillMainBlock:
     def get_object(self) -> cq.Workplane:
         return self._object
 
+    def get_cutouts(self) -> cq.Workplane:
+        """Block-local cuts to apply after the body structure is fused."""
+        return self.get_outer_shape().cut(self._object)
+
     def dimensions(self) -> tuple[object, ...]:
         return (
             self.length,
@@ -1213,27 +1415,81 @@ class QuillBody(bpd.PrintedPart):
         angle_indicator: QuillAngleIndicator,
         block_x: float,
         indicator_y: float,
+        reinforcement_start_x: float,
+        reinforcement_end_x: float,
+        reinforcement_width_y: float,
+        reinforcement_bottom_z: float,
+        reinforcement_top_z: float,
+        index_gear_start_x: float,
+        index_gear_width_x: float,
+        index_gear_axis_z: float,
+        index_gear_clearance_radius: float,
+        index_gear_axial_clearance: float,
     ) -> None:
         self.main_block = main_block
         self.joint_dimensions = joint.dimensions()
         self.angle_indicator = angle_indicator
         self.block_x = block_x
         self.indicator_y = indicator_y
+        self.reinforcement_dimensions = (
+            reinforcement_start_x,
+            reinforcement_end_x,
+            reinforcement_width_y,
+            reinforcement_bottom_z,
+            reinforcement_top_z,
+        )
+        self.index_gear_clearance_dimensions = (
+            index_gear_start_x,
+            index_gear_width_x,
+            index_gear_axis_z,
+            index_gear_clearance_radius,
+            index_gear_axial_clearance,
+        )
         super().__init__(name="Quill Body")
 
-        # The indicator is modeled flat for export. Rotate a clearance copy
-        # into its assembled orientation and subtract that exact profile from
-        # the joint before the joint and bearing block become one solid.
+        # Fuse the raw hinge, base, reinforcement, and block first. This lets
+        # every later bearing, fastener, indicator, and gear-clearance cut pass
+        # through the completed structural envelope cleanly.
+        reinforcement = (
+            cq.Workplane("XY")
+            .box(
+                reinforcement_end_x - reinforcement_start_x,
+                reinforcement_width_y,
+                reinforcement_top_z - reinforcement_bottom_z,
+                centered=(False, True, False),
+            )
+            .translate(
+                (
+                    reinforcement_start_x,
+                    0.0,
+                    reinforcement_bottom_z,
+                )
+            )
+        )
+        raw_block = main_block.get_outer_shape().translate((block_x, 0, 0))
+        obj = joint.get_raw_object().union(reinforcement).union(raw_block)
+
+        block_cutouts = main_block.get_cutouts().translate((block_x, 0, 0))
+        obj = obj.cut(joint.get_cutouts()).cut(block_cutouts)
+
         indicator_cutout = (
             angle_indicator.make(cutout=True)
             .rotate((0, 0, 0), (1, 0, 0), 90)
             .translate((0, indicator_y, 0))
         )
-        joint_obj = joint.get_object().cut(indicator_cutout)
-        block_obj = main_block.get_object()
-        if not isinstance(block_obj, cq.Workplane):
-            raise TypeError("QuillMainBlock must provide Workplane geometry")
-        obj = joint_obj.union(block_obj.translate((block_x, 0, 0)))
+        gear_clearance = (
+            cq.Workplane("YZ")
+            .circle(index_gear_clearance_radius)
+            .extrude(index_gear_width_x + index_gear_axial_clearance * 2)
+            .translate(
+                (
+                    index_gear_start_x - index_gear_axial_clearance,
+                    0.0,
+                    index_gear_axis_z,
+                )
+            )
+        )
+        obj = obj.cut(indicator_cutout).cut(gear_clearance)
 
         self._object = obj
         self._assembly.add(obj, name="body", color=cq.Color("red"))
@@ -1267,6 +1523,8 @@ class QuillBody(bpd.PrintedPart):
             self.angle_indicator,
             self.block_x,
             self.indicator_y,
+            self.reinforcement_dimensions,
+            self.index_gear_clearance_dimensions,
         )
 
 
@@ -1663,6 +1921,185 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         )
 
 
+class QuillCheaterGearSection(bpd.PrintedPart):
+    """Replaceable concave gear segment mounted to the rocker's -X face."""
+
+    @classmethod
+    def create(
+        cls,
+        negative_x: float,
+        positive_x: float,
+        tooth_contact_z: float,
+        curve_radius: float,
+        tooth_depth: float,
+        backing_width_y: float,
+        backing_bottom_z: float,
+        backing_top_z: float,
+        angular_pitch: float,
+        tooth_count: int,
+        screw_spacing_y: float,
+        screw_z: float,
+        screw_clearance_diameter: float,
+        screw_head_diameter: float,
+        screw_head_height: float,
+    ) -> QuillCheaterGearSection:
+        return cls.get(
+            negative_x=negative_x,
+            positive_x=positive_x,
+            tooth_contact_z=tooth_contact_z,
+            curve_radius=curve_radius,
+            tooth_depth=tooth_depth,
+            backing_width_y=backing_width_y,
+            backing_bottom_z=backing_bottom_z,
+            backing_top_z=backing_top_z,
+            angular_pitch=angular_pitch,
+            tooth_count=tooth_count,
+            screw_spacing_y=screw_spacing_y,
+            screw_z=screw_z,
+            screw_clearance_diameter=screw_clearance_diameter,
+            screw_head_diameter=screw_head_diameter,
+            screw_head_height=screw_head_height,
+        )
+
+    def __init__(
+        self,
+        negative_x: float,
+        positive_x: float,
+        tooth_contact_z: float,
+        curve_radius: float,
+        tooth_depth: float,
+        backing_width_y: float,
+        backing_bottom_z: float,
+        backing_top_z: float,
+        angular_pitch: float,
+        tooth_count: int,
+        screw_spacing_y: float,
+        screw_z: float,
+        screw_clearance_diameter: float,
+        screw_head_diameter: float,
+        screw_head_height: float,
+    ) -> None:
+        self.negative_x = negative_x
+        self.positive_x = positive_x
+        self.tooth_contact_z = tooth_contact_z
+        self.curve_radius = curve_radius
+        self.tooth_depth = tooth_depth
+        self.backing_width_y = backing_width_y
+        self.backing_bottom_z = backing_bottom_z
+        self.backing_top_z = backing_top_z
+        self.angular_pitch = angular_pitch
+        self.tooth_count = tooth_count
+        self.screw_spacing_y = screw_spacing_y
+        self.screw_z = screw_z
+        self.screw_clearance_diameter = screw_clearance_diameter
+        self.screw_head_diameter = screw_head_diameter
+        self.screw_head_height = screw_head_height
+        super().__init__(name="Quill Cheater Gear Section")
+
+        half_count = tooth_count // 2
+        root_radius = curve_radius - tooth_depth
+        curve_center_z = tooth_contact_z + curve_radius
+        half_angle = (half_count + 0.5) * angular_pitch
+        profile: list[tuple[float, float]] = []
+        for index in range(-half_count, half_count + 1):
+            valley_angle = (index - 0.5) * angular_pitch
+            tip_angle = index * angular_pitch
+            profile.append(
+                (
+                    math.sin(valley_angle) * root_radius,
+                    curve_center_z - math.cos(valley_angle) * root_radius,
+                )
+            )
+            profile.append(
+                (
+                    math.sin(tip_angle) * curve_radius,
+                    curve_center_z - math.cos(tip_angle) * curve_radius,
+                )
+            )
+        edge_y = math.sin(half_angle) * root_radius
+        profile.extend(
+            (
+                (
+                    edge_y,
+                    curve_center_z - math.cos(half_angle) * root_radius,
+                ),
+                (edge_y, backing_top_z),
+                (-edge_y, backing_top_z),
+            )
+        )
+
+        toothed_section = (
+            cq.Workplane("YZ")
+            .polyline(profile)
+            .close()
+            .extrude(positive_x - negative_x)
+            .translate((negative_x, 0.0, 0.0))
+        )
+        backing = (
+            cq.Workplane("XY")
+            .box(
+                positive_x - negative_x,
+                backing_width_y,
+                backing_top_z - backing_bottom_z,
+                centered=(False, True, False),
+            )
+            .translate((negative_x, 0.0, backing_bottom_z))
+        )
+        assembled = toothed_section.union(backing)
+        clearance = cq.Workplane("YZ")
+        for y in (-screw_spacing_y / 2, screw_spacing_y / 2):
+            shaft = (
+                cq.Workplane("YZ")
+                .center(y, screw_z)
+                .circle(screw_clearance_diameter / 2)
+                .extrude(positive_x - negative_x + 0.2)
+                .translate((negative_x - 0.1, 0.0, 0.0))
+            )
+            countersink = (
+                cq.Workplane("YZ")
+                .center(y, screw_z)
+                .circle(screw_head_diameter / 2)
+                .workplane(offset=screw_head_height)
+                .circle(screw_clearance_diameter / 2)
+                .loft()
+                .translate((negative_x, 0.0, 0.0))
+            )
+            clearance = clearance.union(shaft).union(countersink)
+        assembled = assembled.cut(clearance)
+        self._assembled_object = assembled
+
+        printable = assembled.rotate((0, 0, 0), (0, 1, 0), 90)
+        printable_shape = printable.val()
+        if not isinstance(printable_shape, cq.Shape):
+            raise TypeError("Cheater gear section must provide solid geometry")
+        printable = printable.translate((0.0, 0.0, -printable_shape.BoundingBox().zmin))
+        self._object = printable
+        self._assembly.add(printable, name="body", color=cq.Color("red"))
+
+    def get_assembled_object(self) -> cq.Workplane:
+        return self._assembled_object
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name,
+            self.negative_x,
+            self.positive_x,
+            self.tooth_contact_z,
+            self.curve_radius,
+            self.tooth_depth,
+            self.backing_width_y,
+            self.backing_bottom_z,
+            self.backing_top_z,
+            self.angular_pitch,
+            self.tooth_count,
+            self.screw_spacing_y,
+            self.screw_z,
+            self.screw_clearance_diameter,
+            self.screw_head_diameter,
+            self.screw_head_height,
+        )
+
+
 class QuillCheaterRocker(bpd.PrintedPart):
     """Raised cheater rocker, exported with assembled +Y on the print bed."""
 
@@ -1677,6 +2114,11 @@ class QuillCheaterRocker(bpd.PrintedPart):
         arm_thickness_z: float,
         pivot_outer_diameter: float,
         pivot_pilot_diameter: float,
+        gear_mount_bottom_z: float,
+        gear_mount_positive_x: float,
+        gear_screw_z: float,
+        gear_screw_spacing_y: float,
+        gear_screw_pilot_diameter: float,
         spring_center_x: float,
         spring_pocket_diameter: float,
         spring_pocket_depth: float,
@@ -1690,6 +2132,11 @@ class QuillCheaterRocker(bpd.PrintedPart):
             arm_thickness_z=arm_thickness_z,
             pivot_outer_diameter=pivot_outer_diameter,
             pivot_pilot_diameter=pivot_pilot_diameter,
+            gear_mount_bottom_z=gear_mount_bottom_z,
+            gear_mount_positive_x=gear_mount_positive_x,
+            gear_screw_z=gear_screw_z,
+            gear_screw_spacing_y=gear_screw_spacing_y,
+            gear_screw_pilot_diameter=gear_screw_pilot_diameter,
             spring_center_x=spring_center_x,
             spring_pocket_diameter=spring_pocket_diameter,
             spring_pocket_depth=spring_pocket_depth,
@@ -1705,6 +2152,11 @@ class QuillCheaterRocker(bpd.PrintedPart):
         arm_thickness_z: float,
         pivot_outer_diameter: float,
         pivot_pilot_diameter: float,
+        gear_mount_bottom_z: float,
+        gear_mount_positive_x: float,
+        gear_screw_z: float,
+        gear_screw_spacing_y: float,
+        gear_screw_pilot_diameter: float,
         spring_center_x: float,
         spring_pocket_diameter: float,
         spring_pocket_depth: float,
@@ -1717,6 +2169,11 @@ class QuillCheaterRocker(bpd.PrintedPart):
         self.arm_thickness_z = arm_thickness_z
         self.pivot_outer_diameter = pivot_outer_diameter
         self.pivot_pilot_diameter = pivot_pilot_diameter
+        self.gear_mount_bottom_z = gear_mount_bottom_z
+        self.gear_mount_positive_x = gear_mount_positive_x
+        self.gear_screw_z = gear_screw_z
+        self.gear_screw_spacing_y = gear_screw_spacing_y
+        self.gear_screw_pilot_diameter = gear_screw_pilot_diameter
         self.spring_center_x = spring_center_x
         self.spring_pocket_diameter = spring_pocket_diameter
         self.spring_pocket_depth = spring_pocket_depth
@@ -1727,6 +2184,16 @@ class QuillCheaterRocker(bpd.PrintedPart):
             cq.Workplane("XY")
             .box(length_x, width_y, arm_thickness_z, centered=False)
             .translate((negative_x, -width_y / 2, pivot_z))
+        )
+        gear_mount = (
+            cq.Workplane("XY")
+            .box(
+                gear_mount_positive_x - negative_x,
+                width_y,
+                pivot_z + arm_thickness_z - gear_mount_bottom_z,
+                centered=(False, True, False),
+            )
+            .translate((negative_x, 0.0, gear_mount_bottom_z))
         )
         pivot_barrel = (
             cq.Workplane("XZ")
@@ -1749,7 +2216,23 @@ class QuillCheaterRocker(bpd.PrintedPart):
             .extrude(spring_pocket_depth)
             .translate((0, 0, pivot_z))
         )
-        assembled = arm.union(pivot_barrel).cut(pivot_pilot).cut(spring_pocket)
+        gear_pilots = cq.Workplane("YZ")
+        gear_pilot_depth = gear_mount_positive_x - negative_x
+        for y in (-gear_screw_spacing_y / 2, gear_screw_spacing_y / 2):
+            gear_pilots = gear_pilots.union(
+                cq.Workplane("YZ")
+                .center(y, gear_screw_z)
+                .circle(gear_screw_pilot_diameter / 2)
+                .extrude(gear_pilot_depth)
+                .translate((negative_x, 0.0, 0.0))
+            )
+        assembled = (
+            arm.union(gear_mount)
+            .union(pivot_barrel)
+            .cut(pivot_pilot)
+            .cut(spring_pocket)
+            .cut(gear_pilots)
+        )
         self._assembled_object = assembled
 
         printable = assembled.rotate((0, 0, 0), (1, 0, 0), -90)
@@ -1776,6 +2259,11 @@ class QuillCheaterRocker(bpd.PrintedPart):
             self.arm_thickness_z,
             self.pivot_outer_diameter,
             self.pivot_pilot_diameter,
+            self.gear_mount_bottom_z,
+            self.gear_mount_positive_x,
+            self.gear_screw_z,
+            self.gear_screw_spacing_y,
+            self.gear_screw_pilot_diameter,
             self.spring_center_x,
             self.spring_pocket_diameter,
             self.spring_pocket_depth,
@@ -1928,6 +2416,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         od: float,
         bore_dia: float,
         teeth_width: float,
+        tooth_depth: float,
         numbers_width: float,
         spacer_width: float,
         num_teeth: int,
@@ -1936,6 +2425,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             od=od,
             bore_dia=bore_dia,
             teeth_width=teeth_width,
+            tooth_depth=tooth_depth,
             numbers_width=numbers_width,
             spacer_width=spacer_width,
             num_teeth=num_teeth,
@@ -1946,6 +2436,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         od: float,
         bore_dia: float,
         teeth_width: float,
+        tooth_depth: float,
         numbers_width: float,
         spacer_width: float,
         num_teeth: int,
@@ -1953,6 +2444,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         self.od = od
         self.bore_dia = bore_dia
         self.teeth_width = teeth_width
+        self.tooth_depth = tooth_depth
         self.numbers_width = numbers_width
         self.spacer_width = spacer_width
         self.num_teeth = num_teeth
@@ -1987,6 +2479,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             self.od,
             self.bore_dia,
             self.teeth_width,
+            self.tooth_depth,
             self.numbers_width,
             self.spacer_width,
             self.num_teeth,
@@ -1999,7 +2492,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         verts = []
         for x in range(self.num_teeth * 2):
             angle = math.radians(x * 360.0 / (self.num_teeth * 2))
-            dist = self.od / 2 + (x % 2) * 0.8
+            dist = self.od / 2 + (x % 2) * self.tooth_depth
             verts.append([math.sin(angle) * dist, math.cos(angle) * dist])
 
         teeth = cq.Workplane("XY").polyline(verts).close().extrude(self.teeth_width)

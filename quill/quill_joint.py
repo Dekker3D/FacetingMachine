@@ -28,10 +28,14 @@ class QuillJointAli(QuillJointBase):
         hinge_height: float,
         angle_indicator_height: float,
         angle_indicator_thickness: float,
+        body_negative_x: float,
+        body_positive_x: float,
+        body_top_z: float,
         magnet_pocket_dia: float,
         magnet_pocket_depth: float,
         base_plate_thickness: float,
         base_plate_x: float,
+        base_plate_center_x: float,
         base_plate_y: float,
     ) -> QuillJointAli:
         return cls(
@@ -45,10 +49,14 @@ class QuillJointAli(QuillJointBase):
             hinge_height=hinge_height,
             angle_indicator_height=angle_indicator_height,
             angle_indicator_thickness=angle_indicator_thickness,
+            body_negative_x=body_negative_x,
+            body_positive_x=body_positive_x,
+            body_top_z=body_top_z,
             magnet_pocket_dia=magnet_pocket_dia,
             magnet_pocket_depth=magnet_pocket_depth,
             base_plate_thickness=base_plate_thickness,
             base_plate_x=base_plate_x,
+            base_plate_center_x=base_plate_center_x,
             base_plate_y=base_plate_y,
         )
 
@@ -64,10 +72,14 @@ class QuillJointAli(QuillJointBase):
         hinge_height: float,
         angle_indicator_height: float,
         angle_indicator_thickness: float,
+        body_negative_x: float,
+        body_positive_x: float,
+        body_top_z: float,
         magnet_pocket_dia: float,
         magnet_pocket_depth: float,
         base_plate_thickness: float,
         base_plate_x: float,
+        base_plate_center_x: float,
         base_plate_y: float,
     ) -> None:
         self.shoulder_dia = shoulder_dia
@@ -80,12 +92,16 @@ class QuillJointAli(QuillJointBase):
         self.hinge_height = hinge_height
         self.angle_indicator_height = angle_indicator_height
         self.angle_indicator_thickness = angle_indicator_thickness
+        self.body_negative_x = body_negative_x
+        self.body_positive_x = body_positive_x
+        self.body_top_z = body_top_z
         self.magnet_pocket_dia = magnet_pocket_dia
         self.magnet_pocket_depth = magnet_pocket_depth
         self.base_plate_thickness = base_plate_thickness
         self.base_plate_x = base_plate_x
+        self.base_plate_center_x = base_plate_center_x
         self.base_plate_y = base_plate_y
-        obj = (
+        raw_obj = (
             self._make_base_plate()
             .union(self._make_support_block())
             .union(self._make_hinge_barrel())
@@ -94,12 +110,21 @@ class QuillJointAli(QuillJointBase):
             .union(self._make_user_nub())
             .union(self._make_away_nub())
         )
-        obj = obj.cut(self._make_indicator_screw_pilots())
+        self._raw_object = raw_obj
+        obj = raw_obj.cut(self._make_indicator_screw_pilots())
         obj = obj.cut(self._make_magnet_pocket())
         self._object = obj
 
     def get_object(self) -> cq.Workplane:
         return self._object
+
+    def get_raw_object(self) -> cq.Workplane:
+        """Uncut structure for fusing into the complete quill body."""
+        return self._raw_object
+
+    def get_cutouts(self) -> cq.Workplane:
+        """Joint-local cuts to apply after all structural unions."""
+        return self._raw_object.cut(self._object)
 
     def dimensions(self) -> tuple[object, ...]:
         return (
@@ -113,10 +138,14 @@ class QuillJointAli(QuillJointBase):
             self.hinge_height,
             self.angle_indicator_height,
             self.angle_indicator_thickness,
+            self.body_negative_x,
+            self.body_positive_x,
+            self.body_top_z,
             self.magnet_pocket_dia,
             self.magnet_pocket_depth,
             self.base_plate_thickness,
             self.base_plate_x,
+            self.base_plate_center_x,
             self.base_plate_y,
         )
 
@@ -127,7 +156,6 @@ class QuillJointAli(QuillJointBase):
         return side * (self.shoulder_gap - self.shoulder_thickness) / 2
 
     def _make_base_plate(self) -> cq.Workplane:
-        x_center = self.base_plate_x * 0.3
         return (
             cq.Workplane("XY")
             .box(
@@ -136,21 +164,22 @@ class QuillJointAli(QuillJointBase):
                 self.base_plate_thickness,
                 centered=(True, True, False),
             )
-            .translate((x_center, 0, 0))
+            .translate((self.base_plate_center_x, 0, 0))
         )
 
     def _make_support_block(self) -> cq.Workplane:
-        """Solid support spanning the full width beneath the hinge barrel."""
-        support_x = self.shoulder_dia + 4.0
+        """Large printable hinge body supporting the indicator screws."""
         return (
             cq.Workplane("XY")
             .box(
-                support_x,
+                self.body_positive_x - self.body_negative_x,
                 self.shoulder_gap,
-                self.hinge_height,
-                centered=(True, True, False),
+                self.body_top_z - self.base_plate_thickness,
+                centered=(False, True, False),
             )
-            .translate((0, 0, self.base_plate_thickness))
+            .translate(
+                (self.body_negative_x, 0, self.base_plate_thickness)
+            )
         )
 
     def _make_shoulder(self, side: int) -> cq.Workplane:
@@ -172,6 +201,7 @@ class QuillJointAli(QuillJointBase):
             .extrude(self.shoulder_gap)
             .translate((0, self.shoulder_gap / 2, self._hinge_z()))
         )
+
 
     def _make_user_nub(self) -> cq.Workplane:
         # XZ's positive normal points toward -Y, so a negative extrusion
@@ -266,7 +296,7 @@ class QuillAngleIndicator(bpd.PrintedPart):
         obj = self.make(cutout=False)
 
         self._object = obj
-        self._assembly.add(obj, name="body", color=cq.Color("purple"))
+        self._assembly.add(obj, name="body", color=cq.Color("blue"))
     
     def make(self, cutout: bool = False) -> cq.Workplane:
         mount_centers = self._mount_centers()

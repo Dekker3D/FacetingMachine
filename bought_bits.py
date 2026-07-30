@@ -359,6 +359,56 @@ class Bolt(BoughtPartWithModel):
         )
 
 
+class WoodScrew(Bolt):
+    """Simplified wood screw using the shared metric fastener envelope.
+
+    Threads are intentionally omitted from the display model; the nominal
+    diameter, length, and head geometry are retained for pilot and head
+    clearances. Use ``WoodScrew.get(size=3, length=12, head="countersunk")``.
+    """
+
+    def __init__(
+        self,
+        size: float,
+        length: float,
+        head: str = "countersunk",
+    ) -> None:
+        super().__init__(size=size, length=length, head=head)
+        self.name = f"{size:.0f}×{length:.0f}mm {head} Wood Screw"
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name, self.size, self.length, self.head)
+
+    def _create_object(self) -> cq.Workplane:
+        """Head at Z=0, with the shank extending correctly along +Z."""
+        if self.head == "countersunk":
+            head_shape = (
+                cq.Workplane("XY")
+                .circle(self._head_dia / 2)
+                .workplane(offset=self._head_h)
+                .circle(self.size / 2)
+                .loft()
+            )
+        elif self.head == "pan":
+            head_shape = cq.Workplane("XY").cylinder(
+                self._head_h,
+                self._head_dia / 2,
+                centered=(True, True, False),
+            )
+        else:
+            raise ValueError(f"Unsupported wood-screw head type: {self.head}")
+        shaft = (
+            cq.Workplane("XY")
+            .cylinder(
+                self.length,
+                self.size / 2,
+                centered=(True, True, False),
+            )
+            .translate((0.0, 0.0, self._head_h))
+        )
+        return head_shape.union(shaft)
+
+
 # ── Nut ──────────────────────────────────────────────────────────────
 
 
