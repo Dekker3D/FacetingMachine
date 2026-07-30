@@ -399,7 +399,7 @@ class Nut(BoughtPartWithModel):
     def _create_object(self) -> cq.Workplane:
         return (
             cq.Workplane("XY")
-            .polygon(6, self._width / 2, circumscribed=True)
+            .polygon(6, self.width_across_corners())
             .extrude(self._thick)
             .faces(">Z").workplane()
             .hole(self.diameter())

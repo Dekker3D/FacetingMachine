@@ -56,6 +56,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     block_x_offset: float = 45.0
 
     bearing_holder_length_x: float = 16.0
+    bearing_holder_screw_x_from_end: float = 8.0
     bearing_holder_split_gap: float = 2.0
     bearing_to_screw_clearance: float = 6.4
     screw_to_outer_wall: float = 4.4
@@ -78,13 +79,18 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_axle_clearance: float = 0.4
     cheater_rocker_width_y: float = 10.0
     cheater_rocker_side_clearance_y: float = 4.0
-    cheater_pivot_above_block: float = 15.0
+    cheater_pivot_above_block: float = 10.0
     cheater_pivot_from_tooth_face_x: float = 40.0
     cheater_top_screw_x_margin: float = 8.0
     cheater_top_screw_y: float = 22.0
     cheater_top_screw_clearance_dia: float = 3.4
-    cheater_top_screw_pilot_dia: float = 2.2
-    cheater_top_screw_pilot_depth: float = 8.0
+    cheater_top_body_clearance_depth: float = 16.0
+    removable_top_screw_size: float = 3.0
+    removable_top_screw_length: float = 35.0
+    removable_top_screw_head: str = "pan"
+    removable_top_nut_clearance: float = 0.2
+    removable_top_nut_depth_clearance: float = 0.2
+    removable_top_nut_drop: float = 8.0
 
     def index_gear_width(self) -> float:
         return (
@@ -207,6 +213,28 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     def cheater_axle_hole_dia(self) -> float:
         return self.cheater_bearing_type.ID + self.cheater_axle_clearance
 
+    def removable_top_bolt(self) -> bb.Bolt:
+        return bb.Bolt.get(
+            size=self.removable_top_screw_size,
+            length=self.removable_top_screw_length,
+            head=self.removable_top_screw_head,
+        )
+
+    def removable_top_nut(self) -> bb.Nut:
+        return bb.Nut.get(size=self.removable_top_screw_size)
+
+    def removable_top_nut_width(self) -> float:
+        return (
+            self.removable_top_nut().width_across_flats()
+            + self.removable_top_nut_clearance * 2
+        )
+
+    def removable_top_nut_depth(self) -> float:
+        return (
+            self.removable_top_nut().height()
+            + self.removable_top_nut_depth_clearance
+        )
+
     def __init__(
         self,
         er11: bb.StraightShankColletExtension | None = None,
@@ -260,14 +288,19 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             shank_bore_dia=self.shank_bore_dia(),
             holder_length_x=self.bearing_holder_length_x,
             holder_split_gap=self.bearing_holder_split_gap,
+            bearing_holder_screw_x_from_end=(
+                self.bearing_holder_screw_x_from_end
+            ),
             bearing_holder_screw_spacing_y=self.bearing_holder_screw_spacing_y(),
             body_screw_hole_dia=self.body_screw_hole_dia(),
             holder_screw_hole_dia=self.holder_screw_hole_dia(),
             cheater_top_screw_x_margin=self.cheater_top_screw_x_margin,
             cheater_top_screw_y=self.cheater_top_screw_y,
             cheater_top_screw_clearance_dia=self.cheater_top_screw_clearance_dia,
-            cheater_top_screw_pilot_dia=self.cheater_top_screw_pilot_dia,
-            cheater_top_screw_pilot_depth=self.cheater_top_screw_pilot_depth,
+            cheater_top_body_clearance_depth=self.cheater_top_body_clearance_depth,
+            removable_top_nut_width=self.removable_top_nut_width(),
+            removable_top_nut_depth=self.removable_top_nut_depth(),
+            removable_top_nut_drop=self.removable_top_nut_drop,
         )
         away_shoulder_inner_y = (
             # Repeated AI mistake: using shoulder_joint_thickness instead of
@@ -393,6 +426,53 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             name="cheater_bearing_negative_y",
             color="gray",
         )
+        top_bolt = self.removable_top_bolt()
+        top_nut = self.removable_top_nut()
+        hardware_positions = (
+            tuple(
+                (
+                    x,
+                    y,
+                    self.block_center_z()
+                    - self.bearing_holder_split_gap / 2
+                    - self.removable_top_nut_drop,
+                    "bearing_holder",
+                )
+                for x, y in block.bearing_holder_screw_positions()
+            )
+            + tuple(
+                (
+                    x,
+                    y,
+                    self.block_center_z() - self.removable_top_nut_drop,
+                    "cheater_top",
+                )
+                for x, y in block.cheater_top_screw_positions()
+            )
+        )
+        bolt_top_z = self.block_height_z()
+        for index, (x, y, nut_top_z, label) in enumerate(hardware_positions):
+            bolt_obj = top_bolt.get_object().translate(
+                (block_x + x, y, bolt_top_z - self.block_center_z())
+            )
+            nut_obj = (
+                top_nut.get_object()
+                .rotate((0, 0, 0), (1, 0, 0), 180)
+                .rotate((0, 0, 0), (0, 0, 1), 30)
+                .translate((block_x + x, y, nut_top_z - self.block_center_z()))
+            )
+            self._add(
+                top_bolt,
+                obj=bolt_obj,
+                name=f"{label}_bolt_{index}",
+                color="gray",
+            )
+            self._add(
+                top_nut,
+                obj=nut_obj,
+                name=f"{label}_nut_{index}",
+                color="gray",
+            )
         gear_obj = (
             gear.get_object()
             .rotate((0, 0, 0), (0, 0, 1), 180)  # type: ignore[union-attr]
@@ -425,14 +505,17 @@ class QuillMainBlock:
         shank_bore_dia: float,
         holder_length_x: float,
         holder_split_gap: float,
+        bearing_holder_screw_x_from_end: float,
         bearing_holder_screw_spacing_y: float,
         body_screw_hole_dia: float,
         holder_screw_hole_dia: float,
         cheater_top_screw_x_margin: float,
         cheater_top_screw_y: float,
         cheater_top_screw_clearance_dia: float,
-        cheater_top_screw_pilot_dia: float,
-        cheater_top_screw_pilot_depth: float,
+        cheater_top_body_clearance_depth: float,
+        removable_top_nut_width: float,
+        removable_top_nut_depth: float,
+        removable_top_nut_drop: float,
     ) -> QuillMainBlock:
         return cls(
             length_x=length_x,
@@ -447,14 +530,18 @@ class QuillMainBlock:
             shank_bore_dia=shank_bore_dia,
             holder_length_x=holder_length_x,
             holder_split_gap=holder_split_gap,
+            bearing_holder_screw_x_from_end=bearing_holder_screw_x_from_end,
             bearing_holder_screw_spacing_y=bearing_holder_screw_spacing_y,
             body_screw_hole_dia=body_screw_hole_dia,
             holder_screw_hole_dia=holder_screw_hole_dia,
             cheater_top_screw_x_margin=cheater_top_screw_x_margin,
             cheater_top_screw_y=cheater_top_screw_y,
             cheater_top_screw_clearance_dia=cheater_top_screw_clearance_dia,
-            cheater_top_screw_pilot_dia=cheater_top_screw_pilot_dia,
-            cheater_top_screw_pilot_depth=cheater_top_screw_pilot_depth,
+
+            cheater_top_body_clearance_depth=cheater_top_body_clearance_depth,
+            removable_top_nut_width=removable_top_nut_width,
+            removable_top_nut_depth=removable_top_nut_depth,
+            removable_top_nut_drop=removable_top_nut_drop,
         )
 
     def __init__(
@@ -471,14 +558,17 @@ class QuillMainBlock:
         shank_bore_dia: float,
         holder_length_x: float,
         holder_split_gap: float,
+        bearing_holder_screw_x_from_end: float,
         bearing_holder_screw_spacing_y: float,
         body_screw_hole_dia: float,
         holder_screw_hole_dia: float,
         cheater_top_screw_x_margin: float,
         cheater_top_screw_y: float,
         cheater_top_screw_clearance_dia: float,
-        cheater_top_screw_pilot_dia: float,
-        cheater_top_screw_pilot_depth: float,
+        cheater_top_body_clearance_depth: float,
+        removable_top_nut_width: float,
+        removable_top_nut_depth: float,
+        removable_top_nut_drop: float,
     ) -> None:
         self.length = length_x
         self.width = width_y
@@ -492,25 +582,30 @@ class QuillMainBlock:
         self.shank_bore_dia = shank_bore_dia
         self.holder_length_x = holder_length_x
         self.holder_split_gap = holder_split_gap
+        self.bearing_holder_screw_x_from_end = bearing_holder_screw_x_from_end
         self.bearing_holder_screw_spacing_y = bearing_holder_screw_spacing_y
         self.body_screw_hole_dia = body_screw_hole_dia
         self.holder_screw_hole_dia = holder_screw_hole_dia
         self.cheater_top_screw_x_margin = cheater_top_screw_x_margin
         self.cheater_top_screw_y = cheater_top_screw_y
         self.cheater_top_screw_clearance_dia = cheater_top_screw_clearance_dia
-        self.cheater_top_screw_pilot_dia = cheater_top_screw_pilot_dia
-        self.cheater_top_screw_pilot_depth = cheater_top_screw_pilot_depth
+
+        self.cheater_top_body_clearance_depth = cheater_top_body_clearance_depth
+        self.removable_top_nut_width = removable_top_nut_width
+        self.removable_top_nut_depth = removable_top_nut_depth
+        self.removable_top_nut_drop = removable_top_nut_drop
 
         obj = (
             self.get_base_shape()
             .cut(self.bearing_holder_cut_boxes())
             .cut(self.cheater_top_cut_box())
             .cut(self.cheater_top_pilot_holes())
+            .cut(self.removable_top_nut_pockets())
         )
         screw_y = self.bearing_holder_screw_spacing_y / 2
         screw_x_positions = (
-            self.collet_side_bearing_x + self.bearing_type.WIDTH / 2,
-            self.index_side_bearing_x + self.bearing_type.WIDTH / 2,
+            self.length - self.bearing_holder_screw_x_from_end,
+            self.bearing_holder_screw_x_from_end,
         )
         screw_positions = [
             (screw_x, side_y)
@@ -615,11 +710,79 @@ class QuillMainBlock:
             result = result.union(
                 cq.Workplane("XY")
                 .center(x, y)
-                .circle(self.cheater_top_screw_pilot_dia / 2)
-                .extrude(-self.cheater_top_screw_pilot_depth)
+                .circle(self.cheater_top_screw_clearance_dia / 2)
+                .extrude(-self.cheater_top_body_clearance_depth)
                 .translate((0, 0, pilot_top_z))
             )
         return result
+
+    def bearing_holder_screw_positions(self) -> tuple[tuple[float, float], ...]:
+        screw_y = self.bearing_holder_screw_spacing_y / 2
+        return tuple(
+            (x, y)
+            for x in (
+                self.bearing_holder_screw_x_from_end,
+                self.length - self.bearing_holder_screw_x_from_end,
+            )
+            for y in (-screw_y, screw_y)
+        )
+
+    def _hex_nut_pocket(
+        self,
+        x: float,
+        y: float,
+        interface_z: float,
+    ) -> cq.Workplane:
+        across_corners = self.removable_top_nut_width / math.cos(
+            math.radians(30)
+        )
+        nut_top_z = interface_z - self.removable_top_nut_drop
+        hex_pocket = (
+            cq.Workplane("XY")
+            .center(x, y)
+            .polygon(6, across_corners)
+            .extrude(-self.removable_top_nut_depth)
+            .rotate((x, y, 0), (x, y, 1), 30)
+            .translate((0, 0, nut_top_z))
+        )
+
+        # Open the trap laterally toward the nearest Y side. The nut remains
+        # captive in Z and against rotation while still being replaceable.
+        outside_y = math.copysign(self.width / 2, y)
+        channel_center_y = (y + outside_y) / 2
+        channel_length_y = abs(outside_y - y)
+        insertion_channel = (
+            cq.Workplane("XY")
+            .box(
+                self.removable_top_nut_width,
+                channel_length_y,
+                self.removable_top_nut_depth,
+                centered=(True, True, False),
+            )
+            .translate(
+                (
+                    x,
+                    channel_center_y,
+                    nut_top_z - self.removable_top_nut_depth,
+                )
+            )
+        )
+        return hex_pocket.union(insertion_channel)
+
+    def removable_top_nut_pockets(self) -> cq.Workplane:
+        pockets = cq.Workplane("XY")
+        bearing_holder_interface_z = (
+            self.split_height - self.holder_split_gap / 2
+        )
+        for x, y in self.bearing_holder_screw_positions():
+            pockets = pockets.union(
+                self._hex_nut_pocket(x, y, bearing_holder_interface_z)
+            )
+        for x, y in self.cheater_top_screw_positions():
+            pockets = pockets.union(
+                self._hex_nut_pocket(x, y, self.split_height)
+            )
+        return pockets
 
     def get_cheater_top_base_shape(self) -> cq.Workplane:
         top = self.get_base_shape().intersect(
@@ -641,7 +804,7 @@ class QuillMainBlock:
             self.bearing_holder_box(self.holder_split_gap / 2)
         )
         screw_y = self.bearing_holder_screw_spacing_y / 2
-        screw_x = self.bearing_type.WIDTH / 2
+        screw_x = self.bearing_holder_screw_x_from_end
         return (
             holder.faces(">Z")
             .workplane()
@@ -665,14 +828,17 @@ class QuillMainBlock:
             self.shank_bore_dia,
             self.holder_length_x,
             self.holder_split_gap,
+            self.bearing_holder_screw_x_from_end,
             self.bearing_holder_screw_spacing_y,
             self.body_screw_hole_dia,
             self.holder_screw_hole_dia,
             self.cheater_top_screw_x_margin,
             self.cheater_top_screw_y,
             self.cheater_top_screw_clearance_dia,
-            self.cheater_top_screw_pilot_dia,
-            self.cheater_top_screw_pilot_depth,
+            self.cheater_top_body_clearance_depth,
+            self.removable_top_nut_width,
+            self.removable_top_nut_depth,
+            self.removable_top_nut_drop,
             self.bearing_type,
         )
 
