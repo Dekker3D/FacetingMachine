@@ -97,7 +97,6 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     block_end_vertical_edge_fillet: float = 2.0
     block_top_edge_fillet: float = 2.0
     cheater_top_screw_clearance_dia: float = 3.4
-    cheater_top_body_clearance_depth: float = 17.0
     removable_top_screw_size: float = 3.0
     removable_top_screw_length: float = 35.0
     removable_top_screw_head: str = "pan"
@@ -583,7 +582,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             cheater_top_screw_x_margin=self.cheater_top_screw_x_margin,
             cheater_top_screw_y=self.cheater_top_screw_y(),
             cheater_top_screw_clearance_dia=self.cheater_top_screw_clearance_dia,
-            cheater_top_body_clearance_depth=self.cheater_top_body_clearance_depth,
+            cheater_top_body_clearance_depth=self.block_center_z(),
             end_corner_chamfer=self.block_end_corner_chamfer(),
             end_vertical_edge_fillet=self.block_end_vertical_edge_fillet,
             top_edge_fillet=self.block_top_edge_fillet,
@@ -762,11 +761,12 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                   color="gray")
         self._add(
             bearing_holder,
+            obj=bearing_holder.get_assembled_object(),
             loc=Location(block_x, 0, -self.block_center_z()),
             name="bearing_holder_index",
             color="green",
         )
-        far_holder_obj = bearing_holder.get_object()
+        far_holder_obj = bearing_holder.get_assembled_object()
         if not isinstance(far_holder_obj, cq.Workplane):
             raise TypeError("QuillBearingHolder must provide Workplane geometry")
         far_holder_obj = far_holder_obj.rotate((0, 0, 0), (0, 0, 1), 180)
@@ -2419,8 +2419,19 @@ class QuillBearingHolder(bpd.PrintedPart):
         super().__init__(name="Quill Bearing Holder")
 
         obj = quill_block.get_bearing_holder_shape()
-        self._object = obj
-        self._assembly.add(obj, name="body", color=cq.Color("green"))
+        self._assembled_object = obj
+        printable = obj.rotate((0, 0, 0), (1, 0, 0), 180)
+        printable_shape = printable.val()
+        if not isinstance(printable_shape, cq.Shape):
+            raise TypeError("Quill bearing holder must provide solid geometry")
+        printable = printable.translate(
+            (0.0, 0.0, -printable_shape.BoundingBox().zmin)
+        )
+        self._object = printable
+        self._assembly.add(printable, name="body", color=cq.Color("green"))
+
+    def get_assembled_object(self) -> cq.Workplane:
+        return self._assembled_object
 
     def _comparables(self) -> tuple[object, ...]:
         return (
@@ -2497,6 +2508,10 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             .translate((0, 0, self.teeth_width + self.numbers_width))
         )
         obj = obj.union(spacer_ring)
+        # Teeth are added as a solid polygon and therefore refill the bore.
+        # Cut the bore last, after every union, so the exported STL retains a
+        # continuous opening through the teeth, numbered body, and spacer.
+        obj = obj.faces(">Z").workplane().hole(self.bore_dia)
         self._object = obj
         self._assembly.add(obj, name="body", color=cq.Color("blue"))
 
