@@ -84,7 +84,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_top_screw_x_margin: float = 8.0
     cheater_top_screw_y: float = 22.0
     cheater_top_screw_clearance_dia: float = 3.4
-    cheater_top_body_clearance_depth: float = 16.0
+    cheater_top_body_clearance_depth: float = 17.0
     removable_top_screw_size: float = 3.0
     removable_top_screw_length: float = 35.0
     removable_top_screw_head: str = "pan"
@@ -92,14 +92,15 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     removable_top_nut_depth_clearance: float = 0.2
     removable_top_nut_drop: float = 8.0
     cheater_pivot_bolt_size: float = 4.0
-    cheater_pivot_bolt_length: float = 45.0
-    cheater_wheel_diameter: float = 24.0
-    cheater_wheel_width: float = 8.0
+    cheater_wheel_diameter: float = 30.0
+    cheater_wheel_radial_clearance: float = 2.0
+    cheater_wheel_outboard_extension: float = 5.0
+    cheater_pivot_bolt_thread_protrusion: float = 4.0
     cheater_wheel_hex_clearance: float = 0.2
     cheater_wheel_head_depth_clearance: float = 0.2
     cheater_wheel_grip_notch_radius: float = 1.5
     cheater_wheel_grip_notch_count: int = 12
-    cheater_positive_y_shelf_drop: float = 5.0
+    cheater_positive_y_shelf_edge_bevel: float = 2.0
     cheater_wall_max_print_angle: float = 45.0
 
     def index_gear_width(self) -> float:
@@ -223,6 +224,52 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     def cheater_axle_hole_dia(self) -> float:
         return self.cheater_bearing_type.ID + self.cheater_axle_clearance
 
+    def cheater_wheel_clearance_radius(self) -> float:
+        return self.cheater_wheel_diameter / 2 + self.cheater_wheel_radial_clearance
+
+    def cheater_wall_outer_y(self) -> float:
+        return self.cheater_wall_inner_y() + self.cheater_wall_thickness_y()
+
+    def cheater_wheel_width(self) -> float:
+        return (
+            self.block_width_y() / 2
+            - self.cheater_wall_outer_y()
+            + self.cheater_wheel_outboard_extension
+        )
+
+    def cheater_positive_y_shelf_top_z(self) -> float:
+        """Highest shelf that keeps both pan heads 2 mm from the wheel."""
+        bolt = self.removable_top_bolt()
+        keepout_radius = self.cheater_wheel_clearance_radius()
+        head_radius = bolt.head_diameter() / 2
+        screw_x_positions = (
+            self.cheater_top_start_x() + self.cheater_top_screw_x_margin,
+            self.cheater_top_start_x()
+            + self.cheater_top_length_x()
+            - self.cheater_top_screw_x_margin,
+        )
+        allowed_shelf_tops = []
+        for screw_x in screw_x_positions:
+            nearest_head_x = max(
+                0.0,
+                abs(screw_x - self.cheater_pivot_x()) - head_radius,
+            )
+            if nearest_head_x >= keepout_radius:
+                continue
+            clearance_floor_z = self.cheater_pivot_z() - math.sqrt(
+                keepout_radius * keepout_radius
+                - nearest_head_x * nearest_head_x
+            )
+            allowed_shelf_tops.append(
+                clearance_floor_z - bolt.head_height()
+            )
+        if not allowed_shelf_tops:
+            return self.block_height_z()
+        return min(self.block_height_z(), *allowed_shelf_tops)
+
+    def cheater_positive_y_shelf_drop(self) -> float:
+        return self.block_height_z() - self.cheater_positive_y_shelf_top_z()
+
     def removable_top_bolt(self) -> bb.Bolt:
         return bb.Bolt.get(
             size=self.removable_top_screw_size,
@@ -246,9 +293,24 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         )
 
     def cheater_pivot_bolt(self) -> bb.Bolt:
+        head_reference = bb.Bolt.get(
+            size=self.cheater_pivot_bolt_size,
+            length=1.0,
+            head="hex",
+        )
+        nyloc = self.cheater_pivot_nyloc()
+        minimum_shaft_length = (
+            self.cheater_wall_outer_y()
+            + self.cheater_wheel_width()
+            - head_reference.head_height()
+            + self.cheater_wall_outer_y()
+            + nyloc.height()
+            + self.cheater_pivot_bolt_thread_protrusion
+        )
+        shaft_length = math.ceil(minimum_shaft_length / 5.0) * 5.0
         return bb.Bolt.get(
             size=self.cheater_pivot_bolt_size,
-            length=self.cheater_pivot_bolt_length,
+            length=shaft_length,
             head="hex",
         )
 
@@ -350,14 +412,18 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             bearing_pocket_dia=self.cheater_bearing_pocket_dia(),
             bearing_width=self.cheater_bearing_type.WIDTH,
             axle_hole_dia=self.cheater_axle_hole_dia(),
-            positive_y_shelf_drop=self.cheater_positive_y_shelf_drop,
+            positive_y_shelf_top_z=self.cheater_positive_y_shelf_top_z(),
+            wheel_clearance_radius=self.cheater_wheel_clearance_radius(),
+            positive_y_shelf_edge_bevel=(
+                self.cheater_positive_y_shelf_edge_bevel
+            ),
             max_print_angle=self.cheater_wall_max_print_angle,
         )
         pivot_bolt = self.cheater_pivot_bolt()
         pivot_nyloc = self.cheater_pivot_nyloc()
         cheater_wheel = QuillCheaterAdjustmentWheel.create(
             outside_diameter=self.cheater_wheel_diameter,
-            width=self.cheater_wheel_width,
+            width=self.cheater_wheel_width(),
             hex_across_flats=(
                 pivot_bolt.head_diameter()
                 + self.cheater_wheel_hex_clearance * 2
@@ -480,7 +546,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 (
                     pivot_location[0],
                     cheater_wall_outer_y
-                    + self.cheater_wheel_width
+                    + self.cheater_wheel_width()
                     - pivot_bolt.head_height(),
                     pivot_location[2],
                 )
@@ -549,7 +615,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             size=self.removable_top_screw_size,
             length=(
                 self.removable_top_screw_length
-                - self.cheater_positive_y_shelf_drop
+                - math.floor(self.cheater_positive_y_shelf_drop())
             ),
             head=self.removable_top_screw_head,
         )
@@ -580,7 +646,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             is_lowered_shelf_screw = label == "cheater_top" and y > 0
             displayed_bolt = lowered_top_bolt if is_lowered_shelf_screw else top_bolt
             bolt_top_z = self.block_height_z() - (
-                self.cheater_positive_y_shelf_drop
+                self.cheater_positive_y_shelf_drop()
                 if is_lowered_shelf_screw
                 else 0.0
             )
@@ -1061,7 +1127,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         bearing_pocket_dia: float,
         bearing_width: float,
         axle_hole_dia: float,
-        positive_y_shelf_drop: float,
+        positive_y_shelf_top_z: float,
+        wheel_clearance_radius: float,
+        positive_y_shelf_edge_bevel: float,
         max_print_angle: float,
     ) -> QuillCheaterBearingTop:
         return cls.get(
@@ -1074,7 +1142,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             bearing_pocket_dia=bearing_pocket_dia,
             bearing_width=bearing_width,
             axle_hole_dia=axle_hole_dia,
-            positive_y_shelf_drop=positive_y_shelf_drop,
+            positive_y_shelf_top_z=positive_y_shelf_top_z,
+            wheel_clearance_radius=wheel_clearance_radius,
+            positive_y_shelf_edge_bevel=positive_y_shelf_edge_bevel,
             max_print_angle=max_print_angle,
         )
 
@@ -1089,7 +1159,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         bearing_pocket_dia: float,
         bearing_width: float,
         axle_hole_dia: float,
-        positive_y_shelf_drop: float,
+        positive_y_shelf_top_z: float,
+        wheel_clearance_radius: float,
+        positive_y_shelf_edge_bevel: float,
         max_print_angle: float,
     ) -> None:
         self.quill_block_dimensions = quill_block.dimensions()
@@ -1101,7 +1173,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         self.bearing_pocket_dia = bearing_pocket_dia
         self.bearing_width = bearing_width
         self.axle_hole_dia = axle_hole_dia
-        self.positive_y_shelf_drop = positive_y_shelf_drop
+        self.positive_y_shelf_top_z = positive_y_shelf_top_z
+        self.wheel_clearance_radius = wheel_clearance_radius
+        self.positive_y_shelf_edge_bevel = positive_y_shelf_edge_bevel
         self.max_print_angle = max_print_angle
         super().__init__(name="Quill Cheater Bearing Top")
 
@@ -1113,6 +1187,8 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         assembled = assembled.union(wall).union(
             wall.mirror("XZ")
         )
+        assembled = assembled.cut(self._make_wheel_clearance_cut(quill_block))
+        assembled = assembled.cut(self._make_outer_shelf_bevel_cut(quill_block))
         assembled = assembled.cut(self._make_bearing_pockets())
         assembled = assembled.cut(self._make_axle_hole())
         self._assembled_object = assembled
@@ -1137,21 +1213,46 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
     ) -> cq.Workplane:
         wall_outer_y = self.wall_inner_y + self.wall_thickness_y
         outboard_width = quill_block.width / 2 - wall_outer_y
+        shelf_drop = quill_block.height - self.positive_y_shelf_top_z
         return (
             cq.Workplane("XY")
             .box(
                 quill_block.length,
                 outboard_width,
-                self.positive_y_shelf_drop,
+                shelf_drop,
                 centered=(False, False, False),
             )
-            .translate(
-                (
-                    0,
-                    wall_outer_y,
-                    quill_block.height - self.positive_y_shelf_drop,
-                )
-            )
+            .translate((0, wall_outer_y, self.positive_y_shelf_top_z))
+        )
+
+    def _make_wheel_clearance_cut(
+        self,
+        quill_block: QuillMainBlock,
+    ) -> cq.Workplane:
+        wall_outer_y = self.wall_inner_y + self.wall_thickness_y
+        outboard_width = quill_block.width / 2 - wall_outer_y
+        return (
+            cq.Workplane("XZ")
+            .center(self.pivot_x, self.pivot_z)
+            .circle(self.wheel_clearance_radius)
+            .extrude(-outboard_width)
+            .translate((0, wall_outer_y, 0))
+        )
+
+    def _make_outer_shelf_bevel_cut(
+        self,
+        quill_block: QuillMainBlock,
+    ) -> cq.Workplane:
+        bevel = self.positive_y_shelf_edge_bevel
+        outer_y = quill_block.width / 2
+        top_z = self.positive_y_shelf_top_z
+        return (
+            cq.Workplane("YZ")
+            .moveTo(outer_y - bevel, top_z)
+            .lineTo(outer_y, top_z)
+            .lineTo(outer_y, top_z - bevel)
+            .close()
+            .extrude(quill_block.length)
         )
 
     def _wall_root_z(self, quill_block: QuillMainBlock) -> float:
@@ -1294,7 +1395,9 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             self.bearing_pocket_dia,
             self.bearing_width,
             self.axle_hole_dia,
-            self.positive_y_shelf_drop,
+            self.positive_y_shelf_top_z,
+            self.wheel_clearance_radius,
+            self.positive_y_shelf_edge_bevel,
             self.max_print_angle,
         )
 
