@@ -75,7 +75,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_bearing_type: type[bb.BearingGeneric] = bb.Bearing624ZZ
     cheater_bearing_radial_tolerance: float = 0.1
     cheater_bearing_inner_lip: float = 2.0
-    cheater_bearing_radial_material: float = 3.0
+    cheater_bearing_radial_material: float = 5.0
     cheater_axle_clearance: float = 0.4
     cheater_rocker_width_y: float = 10.0
     cheater_rocker_side_clearance_y: float = 4.0
@@ -100,6 +100,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_wheel_grip_notch_radius: float = 1.5
     cheater_wheel_grip_notch_count: int = 12
     cheater_positive_y_shelf_drop: float = 5.0
+    cheater_wall_max_print_angle: float = 45.0
 
     def index_gear_width(self) -> float:
         return (
@@ -350,6 +351,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             bearing_width=self.cheater_bearing_type.WIDTH,
             axle_hole_dia=self.cheater_axle_hole_dia(),
             positive_y_shelf_drop=self.cheater_positive_y_shelf_drop,
+            max_print_angle=self.cheater_wall_max_print_angle,
         )
         pivot_bolt = self.cheater_pivot_bolt()
         pivot_nyloc = self.cheater_pivot_nyloc()
@@ -1060,6 +1062,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         bearing_width: float,
         axle_hole_dia: float,
         positive_y_shelf_drop: float,
+        max_print_angle: float,
     ) -> QuillCheaterBearingTop:
         return cls.get(
             quill_block=quill_block,
@@ -1072,6 +1075,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             bearing_width=bearing_width,
             axle_hole_dia=axle_hole_dia,
             positive_y_shelf_drop=positive_y_shelf_drop,
+            max_print_angle=max_print_angle,
         )
 
     def __init__(
@@ -1086,6 +1090,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         bearing_width: float,
         axle_hole_dia: float,
         positive_y_shelf_drop: float,
+        max_print_angle: float,
     ) -> None:
         self.quill_block_dimensions = quill_block.dimensions()
         self.pivot_x = pivot_x
@@ -1097,11 +1102,13 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         self.bearing_width = bearing_width
         self.axle_hole_dia = axle_hole_dia
         self.positive_y_shelf_drop = positive_y_shelf_drop
+        self.max_print_angle = max_print_angle
         super().__init__(name="Quill Cheater Bearing Top")
 
         assembled = quill_block.get_cheater_top_base_shape().cut(
             self._make_positive_y_shelf_cut(quill_block)
         )
+        assembled = assembled.union(self._make_wall_rails(quill_block))
         wall = self._make_positive_y_wall(quill_block)
         assembled = assembled.union(wall).union(
             wall.mirror("XZ")
@@ -1147,13 +1154,53 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             )
         )
 
+    def _wall_root_z(self, quill_block: QuillMainBlock) -> float:
+        """Rail height required to keep both tangent slopes printable."""
+        angle = math.radians(self.max_print_angle)
+        tangent = math.tan(angle)
+        secant = 1.0 / math.cos(angle)
+        root_x_positions = (
+            quill_block.holder_length_x,
+            quill_block.length - quill_block.holder_length_x,
+        )
+        required_roots = tuple(
+            self.pivot_z
+            - tangent * abs(root_x - self.pivot_x)
+            + self.wall_outer_radius * secant
+            for root_x in root_x_positions
+        )
+        return max(quill_block.height, *required_roots)
+
+    def _make_wall_rails(
+        self,
+        quill_block: QuillMainBlock,
+    ) -> cq.Workplane:
+        start_x = quill_block.holder_length_x
+        end_x = quill_block.length - quill_block.holder_length_x
+        root_z = self._wall_root_z(quill_block)
+        rail_height = root_z - quill_block.height
+        if rail_height <= 0:
+            return cq.Workplane("XY")
+
+        positive_rail = (
+            cq.Workplane("XY")
+            .box(
+                end_x - start_x,
+                self.wall_thickness_y,
+                rail_height,
+                centered=(False, False, False),
+            )
+            .translate((start_x, self.wall_inner_y, quill_block.height))
+        )
+        return positive_rail.union(positive_rail.mirror("XZ"))
+
     def _make_positive_y_wall(
         self,
         quill_block: QuillMainBlock,
     ) -> cq.Workplane:
         top_start_x = quill_block.holder_length_x
         top_end_x = quill_block.length - quill_block.holder_length_x
-        root_z = quill_block.height - 2.0
+        root_z = self._wall_root_z(quill_block)
         left_tangent = self._upper_tangent_point(
             top_start_x,
             root_z,
@@ -1248,6 +1295,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             self.bearing_width,
             self.axle_hole_dia,
             self.positive_y_shelf_drop,
+            self.max_print_angle,
         )
 
 
