@@ -559,6 +559,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         )
         self._add(
             angle_indicator,
+            obj=angle_indicator.get_object(),
             loc=Location(
                 0.0,
                 indicator_display_y,
@@ -568,6 +569,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 0,
             ),
             name="angle_indicator",
+            color="green",
         )
         self._add(er11, loc=Location(Vector(shank_start_x, 0, 0), Vector(0, 1, 0), 90),
                   color="gray")
@@ -575,6 +577,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             bearing_holder,
             loc=Location(block_x, 0, -self.block_center_z()),
             name="bearing_holder_index",
+            color="green",
         )
         far_holder_obj = bearing_holder.get_object()
         if not isinstance(far_holder_obj, cq.Workplane):
@@ -585,12 +588,14 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             obj=far_holder_obj,
             loc=Location(block_x + self.block_length_x(), 0, -self.block_center_z()),
             name="bearing_holder_collet",
+            color="green",
         )
         self._add(
             cheater_top,
             obj=cheater_top.get_assembled_object(),
             loc=Location(block_x, 0, -self.block_center_z()),
             name="cheater_bearing_top",
+            color="blue",
         )
         cheater_bearing = self.cheater_bearing_type.get(
             name=self.cheater_bearing_type.name,
@@ -636,6 +641,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             obj=cheater_rocker.get_assembled_object(),
             loc=Location(block_x, 0, -self.block_center_z()),
             name="cheater_rocker",
+            color="yellow",
         )
         spring_lower_seat_z = (
             self.block_height_z() - self.cheater_spring_pocket_depth_top
@@ -733,6 +739,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             cheater_wheel,
             obj=cheater_wheel_obj,
             name="cheater_adjustment_wheel",
+            color="red",
         )
         top_bolt = self.removable_top_bolt()
         lowered_top_bolt = bb.Bolt.get(
@@ -800,8 +807,12 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             .rotate((0, 0, 0), (0, 0, 1), 180)  # type: ignore[union-attr]
             .rotate((0, 0, 0), (0, 1, 0), 90)    # type: ignore[union-attr]
         )
-        self._add(gear, obj=gear_obj,
-                  loc=Location(gear_x, 0, 0))
+        self._add(
+            gear,
+            obj=gear_obj,
+            loc=Location(gear_x, 0, 0),
+            color="blue",
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1225,7 +1236,7 @@ class QuillBody(bpd.PrintedPart):
         obj = joint_obj.union(block_obj.translate((block_x, 0, 0)))
 
         self._object = obj
-        self._assembly.add(obj, name="body", color=cq.Color("blue"))
+        self._assembly.add(obj, name="body", color=cq.Color("red"))
 
         # Bearings belong to the merged quill body. QuillMainBlock is now a
         # geometry helper and is no longer added as a separate printed part.
@@ -1369,7 +1380,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             .translate((0, 0, max_x))
         )
         self._object = printable
-        self._assembly.add(printable, name="body", color=cq.Color("green"))
+        self._assembly.add(printable, name="body", color=cq.Color("blue"))
 
     def _make_positive_y_shelf_cut(
         self,
@@ -1749,7 +1760,7 @@ class QuillCheaterRocker(bpd.PrintedPart):
             (0, 0, -printable_shape.BoundingBox().zmin)
         )
         self._object = printable
-        self._assembly.add(printable, name="body", color=cq.Color("green"))
+        self._assembly.add(printable, name="body", color=cq.Color("yellow"))
 
     def get_assembled_object(self) -> cq.Workplane:
         return self._assembled_object
@@ -1846,7 +1857,7 @@ class QuillCheaterAdjustmentWheel(bpd.PrintedPart):
         )
         obj = obj.cut(hex_pocket.union(shaft_hole))
         self._object = obj
-        self._assembly.add(obj, name="body", color=cq.Color("orange"))
+        self._assembly.add(obj, name="body", color=cq.Color("red"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (
@@ -1894,7 +1905,7 @@ class QuillBearingHolder(bpd.PrintedPart):
 
         obj = quill_block.get_bearing_holder_shape()
         self._object = obj
-        self._assembly.add(obj, name="body", color=cq.Color("red"))
+        self._assembly.add(obj, name="body", color=cq.Color("green"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (
@@ -1968,7 +1979,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         )
         obj = obj.union(spacer_ring)
         self._object = obj
-        self._assembly.add(obj, name="body", color=cq.Color("red"))
+        self._assembly.add(obj, name="body", color=cq.Color("blue"))
 
     def _comparables(self) -> tuple[object, ...]:
         return (
