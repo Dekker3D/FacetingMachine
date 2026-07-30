@@ -3,6 +3,7 @@ import os
 import cadquery as cq
 
 import bom_part_data as bpd
+import bought_bits as bb
 from lap.lap_assembly import LapAssembly
 from mast.mast_assembly import MastAssembly
 from frame.frame_assembly import FrameAssembly
@@ -17,7 +18,12 @@ class MachineAssembly(bpd.PartWithMetadata):
 
     exploded_view: bool = True
     lap: LapAssembly = LapAssembly()
+    quill_er11: bb.StraightShankColletExtension = (
+        bb.StraightShankColletExtension.get(dia=12.0, length=100.0)
+    )
     quill: QuillAssemblyStandardMk1 = QuillAssemblyStandardMk1(
+        er11=quill_er11,
+        bearing_type=bb.Bearing6001ZZ,
         explode=exploded_view
     )
     quill_holder: QuillHolderAssembly = QuillHolderAssembly(

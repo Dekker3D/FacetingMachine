@@ -6,6 +6,7 @@ import bom_part_data as bpd
 import bought_bits as bb
 import quill.quill_abstract as quill_abstract
 from quill.quill_joint import QuillAngleIndicator, QuillJointAli
+
 from cadquery.func import text, compound, offset
 
 
@@ -37,72 +38,120 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     # on the nub's Z centreline while keeping the pocket close to the Y end.
     joint_magnet_pocket_depth: float = 4.75
 
+    # Joint-related defaults remain here temporarily. See
+    # docs/joint-resolution.md for the deferred ownership refactor.
+
     # ── Base plate ──────────────────────────────────────────────
     base_plate_thickness: float = 5.0
     base_plate_x: float = 110.0
     base_plate_y: float = 70.0
 
-    # ── Main block ─────────────────────────────────────────────
-    block_width_y: float = 56.0
-    # Bearing centre is at Z=25; 39.2 leaves 0.1 mm radial clearance above
-    # a 28 mm bearing when the cap closes the top-loading pocket.
-    block_height_z: float = 39.2
+    # ── User-selected quill design settings ────────────────────
+    bearing_radial_tolerance: float = 0.0
+    bearing_axial_tolerance: float = 0.5
+    shank_bore_radial_tolerance: float = 1.0
+
+    bearing_axis_height_above_base_plate: float = 25.0
+    block_material_above_bearing: float = 5.0
     block_x_offset: float = 45.0
-    block_center_z: float = 25.0
 
-    # ── Bearing geometry ───────────────────────────────────────
-    bearing_pocket_dia: float = 28.2
-    bearing_pocket_depth: float = 8.5
-    shank_bore_dia: float = 12.2
-
-    # ── Bearing holders ─────────────────────────────────────────
     bearing_holder_length_x: float = 16.0
     bearing_holder_split_gap: float = 2.0
-    bearing_holder_screw_spacing_y: float = 44.0
+    bearing_to_screw_clearance: float = 6.4
+    screw_to_outer_wall: float = 4.4
+    bearing_holder_screw_nominal_dia: float = 3.0
+    body_screw_clearance: float = 0.2
+    holder_screw_clearance: float = 0.4
 
-    # ── Index gear ─────────────────────────────────────────────
     index_gear_od: float = 41.3
     index_gear_teeth_width: float = 5.0
     index_gear_numbers_width: float = 8.0
     index_gear_spacer_width: float = 2.0
-    index_gear_bore: float = 12.2
     index_gear_num_teeth: int = 96
-    index_gear_slot_angle: float = 30.0
-    index_gear_slot_depth: float = 3.0
-    index_gear_slot_width: float = 1.5
-
-    # ── ER11 collet extension ──────────────────────────────────
-    er11_shank_dia: float = 12.0
-    er11_shank_length: float = 100.0
     index_side_shank_exposure: float = 10.0
 
-    @classmethod
-    def index_gear_width(cls) -> float:
+    def index_gear_width(self) -> float:
         return (
-            cls.index_gear_teeth_width
-            + cls.index_gear_numbers_width
-            + cls.index_gear_spacer_width
+            self.index_gear_teeth_width
+            + self.index_gear_numbers_width
+            + self.index_gear_spacer_width
         )
 
-    @classmethod
-    def block_length_x(cls) -> float:
+    def block_length_x(self) -> float:
         return (
-            cls.er11_shank_length
-            - cls.index_gear_width()
-            - cls.index_side_shank_exposure
+            self.er11.length
+            - self.index_gear_width()
+            - self.index_side_shank_exposure
         )
 
-    @classmethod
-    def index_side_bearing_x(cls) -> float:
-        # Bearing models start at their local origin and extend toward +X.
+    def index_side_bearing_x(self) -> float:
         return 0.0
 
-    @classmethod
-    def collet_side_bearing_x(cls) -> float:
-        return cls.block_length_x() - bb.Bearing6001ZZ.WIDTH
+    def collet_side_bearing_x(self) -> float:
+        return self.block_length_x() - self.bearing_type.WIDTH
 
-    def __init__(self, explode: bool = False) -> None:
+    def bearing_pocket_dia(self) -> float:
+        return self.bearing_type.OD + self.bearing_radial_tolerance * 2
+
+    def bearing_pocket_depth(self) -> float:
+        return self.bearing_type.WIDTH + self.bearing_axial_tolerance
+
+    def shank_bore_dia(self) -> float:
+        return self.er11.dia + self.shank_bore_radial_tolerance * 2
+
+    def index_gear_bore_dia(self) -> float:
+        return self.er11.dia
+
+    def block_center_z(self) -> float:
+        return self.bearing_axis_height_above_base_plate
+
+    def block_height_z(self) -> float:
+        return (
+            self.block_center_z()
+            + self.bearing_pocket_dia() / 2
+            + self.block_material_above_bearing
+        )
+
+    def body_screw_hole_dia(self) -> float:
+        return (
+            self.bearing_holder_screw_nominal_dia
+            + self.body_screw_clearance
+        )
+
+    def holder_screw_hole_dia(self) -> float:
+        return (
+            self.bearing_holder_screw_nominal_dia
+            + self.holder_screw_clearance
+        )
+
+    def bearing_holder_screw_spacing_y(self) -> float:
+        screw_center_y = (
+            self.bearing_pocket_dia() / 2
+            + self.bearing_to_screw_clearance
+            + self.body_screw_hole_dia() / 2
+        )
+        return screw_center_y * 2
+
+    def block_width_y(self) -> float:
+        screw_center_y = self.bearing_holder_screw_spacing_y() / 2
+        return 2 * (
+            screw_center_y
+            + self.body_screw_hole_dia() / 2
+            + self.screw_to_outer_wall
+        )
+
+    def __init__(
+        self,
+        er11: bb.StraightShankColletExtension | None = None,
+        bearing_type: type[bb.BearingGeneric] = bb.Bearing6001ZZ,
+        explode: bool = False,
+    ) -> None:
         super().__init__(name="Quill Assembly")
+        self.er11 = er11 or bb.StraightShankColletExtension.get(
+            dia=12.0,
+            length=100.0,
+        )
+        self.bearing_type = bearing_type
         self.explode = explode
         self._current_group = self.name  # group sub-parts under this assembly
 
@@ -133,17 +182,20 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         )
         block = QuillMainBlock.create(
             length_x=self.block_length_x(),
-            width_y=self.block_width_y,
-            height_z=self.block_height_z,
-            split_height=self.block_center_z,
+            width_y=self.block_width_y(),
+            height_z=self.block_height_z(),
+            split_height=self.block_center_z(),
             collet_side_bearing_x=self.collet_side_bearing_x(),
             index_side_bearing_x=self.index_side_bearing_x(),
-            bearing_pocket_dia=self.bearing_pocket_dia,
-            bearing_pocket_depth=self.bearing_pocket_depth,
-            shank_bore_dia=self.shank_bore_dia,
+            bearing_type=self.bearing_type,
+            bearing_pocket_dia=self.bearing_pocket_dia(),
+            bearing_pocket_depth=self.bearing_pocket_depth(),
+            shank_bore_dia=self.shank_bore_dia(),
             holder_length_x=self.bearing_holder_length_x,
             holder_split_gap=self.bearing_holder_split_gap,
-            bearing_holder_screw_spacing_y=self.bearing_holder_screw_spacing_y,
+            bearing_holder_screw_spacing_y=self.bearing_holder_screw_spacing_y(),
+            body_screw_hole_dia=self.body_screw_hole_dia(),
+            holder_screw_hole_dia=self.holder_screw_hole_dia(),
         )
         away_shoulder_inner_y = (
             # Repeated AI mistake: using shoulder_joint_thickness instead of
@@ -161,31 +213,25 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             quill_block=block,
             holder_length_x=self.bearing_holder_length_x,
             holder_split_gap=self.bearing_holder_split_gap,
-            screw_spacing_y=self.bearing_holder_screw_spacing_y,
+            screw_spacing_y=self.bearing_holder_screw_spacing_y(),
         )
         gear = IndexGearStandardMk1.create(
             od=self.index_gear_od,
-            bore_dia=self.index_gear_bore,
+            bore_dia=self.index_gear_bore_dia(),
             teeth_width=self.index_gear_teeth_width,
             numbers_width=self.index_gear_numbers_width,
             spacer_width=self.index_gear_spacer_width,
             num_teeth=self.index_gear_num_teeth,
-            slot_angle=self.index_gear_slot_angle,
-            slot_depth=self.index_gear_slot_depth,
-            slot_width=self.index_gear_slot_width,
         )
-        er11 = bb.StraightShankColletExtension.get(
-            dia=self.er11_shank_dia,
-            length=self.er11_shank_length,
-        )
+        er11 = self.er11
 
         # ── Assemble ────────────────────────────────────────────
         # Reminder: we're subtracing self.block_center_z from the Z of all parts, to line up with the joint.
         block_x = self.block_x_offset
-        shank_start_x = block_x + self.block_length_x() - self.er11_shank_length
+        shank_start_x = block_x + self.block_length_x() - self.er11.length
         gear_x = block_x - self.index_gear_width()
 
-        self._add(body, loc=Location(0, 0, -self.block_center_z))
+        self._add(body, loc=Location(0, 0, -self.block_center_z()))
         # Exploded display placement does not affect the true cutout position.
         indicator_display_y = away_shoulder_inner_y - (
             20.0 if self.explode else 0.0
@@ -195,7 +241,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             loc=Location(
                 0.0,
                 indicator_display_y,
-                -self.block_center_z,
+                -self.block_center_z(),
                 90,
                 0,
                 0,
@@ -206,7 +252,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                   color="gray")
         self._add(
             bearing_holder,
-            loc=Location(block_x, 0, -self.block_center_z),
+            loc=Location(block_x, 0, -self.block_center_z()),
             name="bearing_holder_index",
         )
         far_holder_obj = bearing_holder.get_object()
@@ -216,7 +262,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         self._add(
             bearing_holder,
             obj=far_holder_obj,
-            loc=Location(block_x + self.block_length_x(), 0, -self.block_center_z),
+            loc=Location(block_x + self.block_length_x(), 0, -self.block_center_z()),
             name="bearing_holder_collet",
         )
         gear_obj = (
@@ -245,12 +291,15 @@ class QuillMainBlock:
         split_height: float,
         collet_side_bearing_x: float,
         index_side_bearing_x: float,
+        bearing_type: type[bb.BearingGeneric],
         bearing_pocket_dia: float,
         bearing_pocket_depth: float,
         shank_bore_dia: float,
         holder_length_x: float,
         holder_split_gap: float,
         bearing_holder_screw_spacing_y: float,
+        body_screw_hole_dia: float,
+        holder_screw_hole_dia: float,
     ) -> QuillMainBlock:
         return cls(
             length_x=length_x,
@@ -259,12 +308,15 @@ class QuillMainBlock:
             split_height=split_height,
             collet_side_bearing_x=collet_side_bearing_x,
             index_side_bearing_x=index_side_bearing_x,
+            bearing_type=bearing_type,
             bearing_pocket_dia=bearing_pocket_dia,
             bearing_pocket_depth=bearing_pocket_depth,
             shank_bore_dia=shank_bore_dia,
             holder_length_x=holder_length_x,
             holder_split_gap=holder_split_gap,
             bearing_holder_screw_spacing_y=bearing_holder_screw_spacing_y,
+            body_screw_hole_dia=body_screw_hole_dia,
+            holder_screw_hole_dia=holder_screw_hole_dia,
         )
 
     def __init__(
@@ -275,12 +327,15 @@ class QuillMainBlock:
         split_height: float,
         collet_side_bearing_x: float,
         index_side_bearing_x: float,
+        bearing_type: type[bb.BearingGeneric],
         bearing_pocket_dia: float,
         bearing_pocket_depth: float,
         shank_bore_dia: float,
         holder_length_x: float,
         holder_split_gap: float,
         bearing_holder_screw_spacing_y: float,
+        body_screw_hole_dia: float,
+        holder_screw_hole_dia: float,
     ) -> None:
         self.length = length_x
         self.width = width_y
@@ -288,17 +343,15 @@ class QuillMainBlock:
         self.split_height = split_height
         self.collet_side_bearing_x = collet_side_bearing_x
         self.index_side_bearing_x = index_side_bearing_x
+        self.bearing_type = bearing_type
         self.bearing_pocket_dia = bearing_pocket_dia
         self.bearing_pocket_depth = bearing_pocket_depth
         self.shank_bore_dia = shank_bore_dia
         self.holder_length_x = holder_length_x
         self.holder_split_gap = holder_split_gap
         self.bearing_holder_screw_spacing_y = bearing_holder_screw_spacing_y
-        self.bearing_type = bb.Bearing6001ZZ
-        self.collet_shank = bb.StraightShankColletExtension(
-            dia=shank_bore_dia,
-            length=length_x,
-        )
+        self.body_screw_hole_dia = body_screw_hole_dia
+        self.holder_screw_hole_dia = holder_screw_hole_dia
 
         obj = self.get_base_shape().cut(self.bearing_holder_cut_boxes())
         screw_y = self.bearing_holder_screw_spacing_y / 2
@@ -315,33 +368,33 @@ class QuillMainBlock:
             obj.faces(">Z")
             .workplane()
             .pushPoints(screw_positions)
-            .hole(3.2, self.height)
+            .hole(self.body_screw_hole_dia, self.height)
         )
 
     def get_base_shape(self) -> cq.Workplane:
         """Complete block with the shared stepped bearing/shank cavity."""
-        internal_length = self.length - self.bearing_type.WIDTH * 2
-        block_cut = (
+        index_pocket = (
             cq.Workplane("YZ")
             .cylinder(
-                self.bearing_type.WIDTH,
-                self.bearing_type.OD / 2,
-                centered=(True, True, False),
-            )
-            .faces(">X")
-            .cylinder(
-                internal_length,
-                self.collet_shank.dia / 2 + 1,
-                centered=(True, True, False),
-            )
-            .faces(">X")
-            .cylinder(
-                self.bearing_type.WIDTH,
-                self.bearing_type.OD / 2,
+                self.bearing_pocket_depth,
+                self.bearing_pocket_dia / 2,
                 centered=(True, True, False),
             )
             .translate((0, 0, self.split_height))
         )
+        collet_pocket = index_pocket.translate(
+            (self.length - self.bearing_pocket_depth, 0, 0)
+        )
+        shank_bore = (
+            cq.Workplane("YZ")
+            .cylinder(
+                self.length,
+                self.shank_bore_dia / 2,
+                centered=(True, True, False),
+            )
+            .translate((0, 0, self.split_height))
+        )
+        block_cut = index_pocket.union(collet_pocket).union(shank_bore)
         return (
             cq.Workplane("XY")
             .box(self.length, self.width, self.height, centered=(False, True, False))
@@ -379,7 +432,7 @@ class QuillMainBlock:
             holder.faces(">Z")
             .workplane()
             .pushPoints([(screw_x, -screw_y), (screw_x, screw_y)])
-            .hole(3.4, self.height)
+            .hole(self.holder_screw_hole_dia, self.height)
         )
 
     def get_object(self) -> cq.Workplane:
@@ -399,8 +452,9 @@ class QuillMainBlock:
             self.holder_length_x,
             self.holder_split_gap,
             self.bearing_holder_screw_spacing_y,
+            self.body_screw_hole_dia,
+            self.holder_screw_hole_dia,
             self.bearing_type,
-            self.collet_shank,
         )
 
 
@@ -441,7 +495,9 @@ class QuillBody(bpd.PrintedPart):
 
         # Bearings belong to the merged quill body. QuillMainBlock is now a
         # geometry helper and is no longer added as a separate printed part.
-        bearing = bb.Bearing6001ZZ.get(name="6001ZZ Bearing")
+        bearing = main_block.bearing_type.get(
+            name=main_block.bearing_type.name,
+        )
         bearing_positions = (
             main_block.collet_side_bearing_x,
             main_block.index_side_bearing_x,
@@ -528,9 +584,6 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         numbers_width: float,
         spacer_width: float,
         num_teeth: int,
-        slot_angle: float,
-        slot_depth: float,
-        slot_width: float,
     ) -> IndexGearStandardMk1:
         return cls.get(
             od=od,
@@ -539,9 +592,6 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             numbers_width=numbers_width,
             spacer_width=spacer_width,
             num_teeth=num_teeth,
-            slot_angle=slot_angle,
-            slot_depth=slot_depth,
-            slot_width=slot_width,
         )
 
     def __init__(
@@ -552,9 +602,6 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         numbers_width: float,
         spacer_width: float,
         num_teeth: int,
-        slot_angle: float,
-        slot_depth: float,
-        slot_width: float,
     ) -> None:
         self.od = od
         self.bore_dia = bore_dia
@@ -562,9 +609,6 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         self.numbers_width = numbers_width
         self.spacer_width = spacer_width
         self.num_teeth = num_teeth
-        self.slot_angle = slot_angle
-        self.slot_depth = slot_depth
-        self.slot_width = slot_width
         super().__init__(name="Index Gear")
         # Build geometry once
         obj = cq.Workplane("XY").cylinder(
@@ -599,9 +643,6 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             self.numbers_width,
             self.spacer_width,
             self.num_teeth,
-            self.slot_angle,
-            self.slot_depth,
-            self.slot_width,
         )
 
     def _get_nut_hole_angle(self):
