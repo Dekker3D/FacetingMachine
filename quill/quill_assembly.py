@@ -70,6 +70,22 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     index_gear_num_teeth: int = 96
     index_side_shank_exposure: float = 10.0
 
+    # ── Cheater bearing top ─────────────────────────────────────
+    cheater_bearing_type: type[bb.BearingGeneric] = bb.Bearing624ZZ
+    cheater_bearing_radial_tolerance: float = 0.1
+    cheater_bearing_inner_lip: float = 2.0
+    cheater_bearing_radial_material: float = 3.0
+    cheater_axle_clearance: float = 0.4
+    cheater_rocker_width_y: float = 10.0
+    cheater_rocker_side_clearance_y: float = 4.0
+    cheater_pivot_above_block: float = 15.0
+    cheater_pivot_from_tooth_face_x: float = 40.0
+    cheater_top_screw_x_margin: float = 8.0
+    cheater_top_screw_y: float = 22.0
+    cheater_top_screw_clearance_dia: float = 3.4
+    cheater_top_screw_pilot_dia: float = 2.2
+    cheater_top_screw_pilot_depth: float = 8.0
+
     def index_gear_width(self) -> float:
         return (
             self.index_gear_teeth_width
@@ -140,6 +156,57 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             + self.screw_to_outer_wall
         )
 
+    def cheater_top_start_x(self) -> float:
+        return self.bearing_holder_length_x
+
+    def cheater_top_length_x(self) -> float:
+        return self.block_length_x() - self.bearing_holder_length_x * 2
+
+    def cheater_bearing_pocket_dia(self) -> float:
+        return (
+            self.cheater_bearing_type.OD
+            + self.cheater_bearing_radial_tolerance * 2
+        )
+
+    def cheater_wall_thickness_y(self) -> float:
+        return self.cheater_bearing_type.WIDTH + self.cheater_bearing_inner_lip
+
+    def cheater_wall_inner_y(self) -> float:
+        return (
+            self.cheater_rocker_width_y / 2
+            + self.cheater_rocker_side_clearance_y
+        )
+
+    def cheater_structure_width_y(self) -> float:
+        return (
+            self.cheater_rocker_width_y
+            + self.cheater_rocker_side_clearance_y * 2
+            + self.cheater_wall_thickness_y() * 2
+        )
+
+    def index_teeth_positive_x(self) -> float:
+        # Relative to the block's index-side face. The spacer occupies the
+        # final +X portion between the teeth and the bearing.
+        return -self.index_gear_spacer_width
+
+    def cheater_pivot_x(self) -> float:
+        return (
+            self.index_teeth_positive_x()
+            + self.cheater_pivot_from_tooth_face_x
+        )
+
+    def cheater_pivot_z(self) -> float:
+        return self.block_height_z() + self.cheater_pivot_above_block
+
+    def cheater_wall_outer_radius(self) -> float:
+        return (
+            self.cheater_bearing_pocket_dia() / 2
+            + self.cheater_bearing_radial_material
+        )
+
+    def cheater_axle_hole_dia(self) -> float:
+        return self.cheater_bearing_type.ID + self.cheater_axle_clearance
+
     def __init__(
         self,
         er11: bb.StraightShankColletExtension | None = None,
@@ -196,6 +263,11 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             bearing_holder_screw_spacing_y=self.bearing_holder_screw_spacing_y(),
             body_screw_hole_dia=self.body_screw_hole_dia(),
             holder_screw_hole_dia=self.holder_screw_hole_dia(),
+            cheater_top_screw_x_margin=self.cheater_top_screw_x_margin,
+            cheater_top_screw_y=self.cheater_top_screw_y,
+            cheater_top_screw_clearance_dia=self.cheater_top_screw_clearance_dia,
+            cheater_top_screw_pilot_dia=self.cheater_top_screw_pilot_dia,
+            cheater_top_screw_pilot_depth=self.cheater_top_screw_pilot_depth,
         )
         away_shoulder_inner_y = (
             # Repeated AI mistake: using shoulder_joint_thickness instead of
@@ -214,6 +286,17 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             holder_length_x=self.bearing_holder_length_x,
             holder_split_gap=self.bearing_holder_split_gap,
             screw_spacing_y=self.bearing_holder_screw_spacing_y(),
+        )
+        cheater_top = QuillCheaterBearingTop.create(
+            quill_block=block,
+            pivot_x=self.cheater_pivot_x(),
+            pivot_z=self.cheater_pivot_z(),
+            wall_inner_y=self.cheater_wall_inner_y(),
+            wall_thickness_y=self.cheater_wall_thickness_y(),
+            wall_outer_radius=self.cheater_wall_outer_radius(),
+            bearing_pocket_dia=self.cheater_bearing_pocket_dia(),
+            bearing_width=self.cheater_bearing_type.WIDTH,
+            axle_hole_dia=self.cheater_axle_hole_dia(),
         )
         gear = IndexGearStandardMk1.create(
             od=self.index_gear_od,
@@ -265,6 +348,51 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             loc=Location(block_x + self.block_length_x(), 0, -self.block_center_z()),
             name="bearing_holder_collet",
         )
+        self._add(
+            cheater_top,
+            obj=cheater_top.get_assembled_object(),
+            loc=Location(block_x, 0, -self.block_center_z()),
+            name="cheater_bearing_top",
+        )
+        cheater_bearing = self.cheater_bearing_type.get(
+            name=self.cheater_bearing_type.name,
+        )
+        positive_bearing_obj = (
+            cheater_bearing.get_object()
+            .rotate((0, 0, 0), (1, 0, 0), -90)
+            .translate(
+                (
+                    self.cheater_pivot_x(),
+                    self.cheater_wall_inner_y() + self.cheater_bearing_inner_lip,
+                    self.cheater_pivot_z(),
+                )
+            )
+        )
+        negative_bearing_obj = (
+            cheater_bearing.get_object()
+            .rotate((0, 0, 0), (1, 0, 0), 90)
+            .translate(
+                (
+                    self.cheater_pivot_x(),
+                    -self.cheater_wall_inner_y() - self.cheater_bearing_inner_lip,
+                    self.cheater_pivot_z(),
+                )
+            )
+        )
+        self._add(
+            cheater_bearing,
+            obj=positive_bearing_obj,
+            loc=Location(block_x, 0, -self.block_center_z()),
+            name="cheater_bearing_positive_y",
+            color="gray",
+        )
+        self._add(
+            cheater_bearing,
+            obj=negative_bearing_obj,
+            loc=Location(block_x, 0, -self.block_center_z()),
+            name="cheater_bearing_negative_y",
+            color="gray",
+        )
         gear_obj = (
             gear.get_object()
             .rotate((0, 0, 0), (0, 0, 1), 180)  # type: ignore[union-attr]
@@ -300,6 +428,11 @@ class QuillMainBlock:
         bearing_holder_screw_spacing_y: float,
         body_screw_hole_dia: float,
         holder_screw_hole_dia: float,
+        cheater_top_screw_x_margin: float,
+        cheater_top_screw_y: float,
+        cheater_top_screw_clearance_dia: float,
+        cheater_top_screw_pilot_dia: float,
+        cheater_top_screw_pilot_depth: float,
     ) -> QuillMainBlock:
         return cls(
             length_x=length_x,
@@ -317,6 +450,11 @@ class QuillMainBlock:
             bearing_holder_screw_spacing_y=bearing_holder_screw_spacing_y,
             body_screw_hole_dia=body_screw_hole_dia,
             holder_screw_hole_dia=holder_screw_hole_dia,
+            cheater_top_screw_x_margin=cheater_top_screw_x_margin,
+            cheater_top_screw_y=cheater_top_screw_y,
+            cheater_top_screw_clearance_dia=cheater_top_screw_clearance_dia,
+            cheater_top_screw_pilot_dia=cheater_top_screw_pilot_dia,
+            cheater_top_screw_pilot_depth=cheater_top_screw_pilot_depth,
         )
 
     def __init__(
@@ -336,6 +474,11 @@ class QuillMainBlock:
         bearing_holder_screw_spacing_y: float,
         body_screw_hole_dia: float,
         holder_screw_hole_dia: float,
+        cheater_top_screw_x_margin: float,
+        cheater_top_screw_y: float,
+        cheater_top_screw_clearance_dia: float,
+        cheater_top_screw_pilot_dia: float,
+        cheater_top_screw_pilot_depth: float,
     ) -> None:
         self.length = length_x
         self.width = width_y
@@ -352,8 +495,18 @@ class QuillMainBlock:
         self.bearing_holder_screw_spacing_y = bearing_holder_screw_spacing_y
         self.body_screw_hole_dia = body_screw_hole_dia
         self.holder_screw_hole_dia = holder_screw_hole_dia
+        self.cheater_top_screw_x_margin = cheater_top_screw_x_margin
+        self.cheater_top_screw_y = cheater_top_screw_y
+        self.cheater_top_screw_clearance_dia = cheater_top_screw_clearance_dia
+        self.cheater_top_screw_pilot_dia = cheater_top_screw_pilot_dia
+        self.cheater_top_screw_pilot_depth = cheater_top_screw_pilot_depth
 
-        obj = self.get_base_shape().cut(self.bearing_holder_cut_boxes())
+        obj = (
+            self.get_base_shape()
+            .cut(self.bearing_holder_cut_boxes())
+            .cut(self.cheater_top_cut_box())
+            .cut(self.cheater_top_pilot_holes())
+        )
         screw_y = self.bearing_holder_screw_spacing_y / 2
         screw_x_positions = (
             self.collet_side_bearing_x + self.bearing_type.WIDTH / 2,
@@ -421,6 +574,65 @@ class QuillMainBlock:
         far_box = near_box.translate((self.length - self.holder_length_x, 0, 0))
         return near_box.union(far_box)
 
+    def cheater_top_box(self, z_offset: float = 0.0) -> cq.Workplane:
+        """Central removable top between the two end bearing holders."""
+        box_bottom_z = self.split_height + z_offset
+        box_height = self.height - box_bottom_z
+        top_length = self.length - self.holder_length_x * 2
+        return (
+            cq.Workplane("XY")
+            .box(
+                top_length,
+                self.width,
+                box_height,
+                centered=(False, True, False),
+            )
+            .translate((self.holder_length_x, 0, box_bottom_z))
+        )
+
+    def cheater_top_cut_box(self) -> cq.Workplane:
+        return self.cheater_top_box(-self.holder_split_gap / 2)
+
+    def cheater_top_screw_positions(self) -> tuple[tuple[float, float], ...]:
+        near_x = self.holder_length_x + self.cheater_top_screw_x_margin
+        far_x = (
+            self.length
+            - self.holder_length_x
+            - self.cheater_top_screw_x_margin
+        )
+        return tuple(
+            (x, y)
+            for x in (near_x, far_x)
+            for y in (-self.cheater_top_screw_y, self.cheater_top_screw_y)
+        )
+
+    def cheater_top_pilot_holes(self) -> cq.Workplane:
+        pilot_top_z = self.split_height - self.holder_split_gap / 2
+        result = cq.Workplane("XY")
+        for x, y in self.cheater_top_screw_positions():
+            result = result.union(
+                cq.Workplane("XY")
+                .center(x, y)
+                .circle(self.cheater_top_screw_pilot_dia / 2)
+                .extrude(-self.cheater_top_screw_pilot_depth)
+                .translate((0, 0, pilot_top_z))
+            )
+        return result
+
+    def get_cheater_top_base_shape(self) -> cq.Workplane:
+        top = self.get_base_shape().intersect(
+            self.cheater_top_box(self.holder_split_gap / 2)
+        )
+        clearance = cq.Workplane("XY")
+        for x, y in self.cheater_top_screw_positions():
+            clearance = clearance.union(
+                cq.Workplane("XY")
+                .center(x, y)
+                .circle(self.cheater_top_screw_clearance_dia / 2)
+                .extrude(self.height)
+            )
+        return top.cut(clearance)
+
     def get_bearing_holder_shape(self) -> cq.Workplane:
         """Holder derived from the block above the centered split gap."""
         holder = self.get_base_shape().intersect(
@@ -454,6 +666,11 @@ class QuillMainBlock:
             self.bearing_holder_screw_spacing_y,
             self.body_screw_hole_dia,
             self.holder_screw_hole_dia,
+            self.cheater_top_screw_x_margin,
+            self.cheater_top_screw_y,
+            self.cheater_top_screw_clearance_dia,
+            self.cheater_top_screw_pilot_dia,
+            self.cheater_top_screw_pilot_depth,
             self.bearing_type,
         )
 
@@ -522,6 +739,161 @@ class QuillBody(bpd.PrintedPart):
             self.angle_indicator,
             self.block_x,
             self.indicator_y,
+        )
+
+
+class QuillCheaterBearingTop(bpd.PrintedPart):
+    """Removable block top with sloped walls for the cheater pivot bearings.
+
+    The exported object is rotated so its assembled +X face is on the print
+    bed. ``get_assembled_object()`` returns the orientation used by the quill.
+    """
+
+    @classmethod
+    def create(
+        cls,
+        quill_block: QuillMainBlock,
+        pivot_x: float,
+        pivot_z: float,
+        wall_inner_y: float,
+        wall_thickness_y: float,
+        wall_outer_radius: float,
+        bearing_pocket_dia: float,
+        bearing_width: float,
+        axle_hole_dia: float,
+    ) -> QuillCheaterBearingTop:
+        return cls.get(
+            quill_block=quill_block,
+            pivot_x=pivot_x,
+            pivot_z=pivot_z,
+            wall_inner_y=wall_inner_y,
+            wall_thickness_y=wall_thickness_y,
+            wall_outer_radius=wall_outer_radius,
+            bearing_pocket_dia=bearing_pocket_dia,
+            bearing_width=bearing_width,
+            axle_hole_dia=axle_hole_dia,
+        )
+
+    def __init__(
+        self,
+        quill_block: QuillMainBlock,
+        pivot_x: float,
+        pivot_z: float,
+        wall_inner_y: float,
+        wall_thickness_y: float,
+        wall_outer_radius: float,
+        bearing_pocket_dia: float,
+        bearing_width: float,
+        axle_hole_dia: float,
+    ) -> None:
+        self.quill_block_dimensions = quill_block.dimensions()
+        self.pivot_x = pivot_x
+        self.pivot_z = pivot_z
+        self.wall_inner_y = wall_inner_y
+        self.wall_thickness_y = wall_thickness_y
+        self.wall_outer_radius = wall_outer_radius
+        self.bearing_pocket_dia = bearing_pocket_dia
+        self.bearing_width = bearing_width
+        self.axle_hole_dia = axle_hole_dia
+        super().__init__(name="Quill Cheater Bearing Top")
+
+        assembled = quill_block.get_cheater_top_base_shape()
+        wall = self._make_positive_y_wall(quill_block)
+        assembled = assembled.union(wall).union(
+            wall.mirror("XZ")
+        )
+        assembled = assembled.cut(self._make_bearing_pockets())
+        assembled = assembled.cut(self._make_axle_hole())
+        self._assembled_object = assembled
+
+        # +X is the print-bed face: after this rotation the maximum assembled
+        # X plane is at print Z=0 and the rest of the part rises in +Z.
+        assembled_shape = assembled.val()
+        if not isinstance(assembled_shape, cq.Shape):
+            raise TypeError("Cheater bearing top must provide solid geometry")
+        max_x = assembled_shape.BoundingBox().xmax
+        printable = (
+            assembled
+            .rotate((0, 0, 0), (0, 1, 0), 90)
+            .translate((0, 0, max_x))
+        )
+        self._object = printable
+        self._assembly.add(printable, name="body", color=cq.Color("green"))
+
+    def _make_positive_y_wall(
+        self,
+        quill_block: QuillMainBlock,
+    ) -> cq.Workplane:
+        top_start_x = quill_block.holder_length_x
+        top_end_x = quill_block.length - quill_block.holder_length_x
+        root_z = quill_block.height - 2.0
+        # XZ's negative extrusion points toward +Y.
+        slope = (
+            cq.Workplane("XZ")
+            .polyline(
+                [
+                    (top_start_x, root_z),
+                    (top_end_x, root_z),
+                    (
+                        self.pivot_x + self.wall_outer_radius,
+                        self.pivot_z,
+                    ),
+                    (
+                        self.pivot_x - self.wall_outer_radius,
+                        self.pivot_z,
+                    ),
+                ]
+            )
+            .close()
+            .extrude(-self.wall_thickness_y)
+            .translate((0, self.wall_inner_y, 0))
+        )
+        boss = (
+            cq.Workplane("XZ")
+            .center(self.pivot_x, self.pivot_z)
+            .circle(self.wall_outer_radius)
+            .extrude(-self.wall_thickness_y)
+            .translate((0, self.wall_inner_y, 0))
+        )
+        return slope.union(boss)
+
+    def _make_bearing_pockets(self) -> cq.Workplane:
+        outside_y = self.wall_inner_y + self.wall_thickness_y
+        positive = (
+            cq.Workplane("XZ")
+            .center(self.pivot_x, self.pivot_z)
+            .circle(self.bearing_pocket_dia / 2)
+            .extrude(self.bearing_width)
+            .translate((0, outside_y, 0))
+        )
+        negative = positive.mirror("XZ")
+        return positive.union(negative)
+
+    def _make_axle_hole(self) -> cq.Workplane:
+        outside_y = self.wall_inner_y + self.wall_thickness_y
+        return (
+            cq.Workplane("XZ")
+            .center(self.pivot_x, self.pivot_z)
+            .circle(self.axle_hole_dia / 2)
+            .extrude(outside_y * 2)
+            .translate((0, outside_y, 0))
+        )
+
+    def get_assembled_object(self) -> cq.Workplane:
+        return self._assembled_object
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (
+            self.name,
+            self.quill_block_dimensions,
+            self.pivot_x,
+            self.pivot_z,
+            self.wall_inner_y,
+            self.wall_thickness_y,
+            self.wall_outer_radius,
+            self.bearing_pocket_dia,
+            self.bearing_width,
+            self.axle_hole_dia,
         )
 
 
