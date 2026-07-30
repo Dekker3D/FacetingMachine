@@ -77,12 +77,13 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_bearing_inner_lip: float = 2.0
     cheater_bearing_radial_material: float = 5.0
     cheater_axle_clearance: float = 0.4
-    cheater_rocker_width_y: float = 10.0
+    cheater_rocker_width_y: float = 15.0
     cheater_rocker_side_clearance_y: float = 4.0
     cheater_pivot_above_block: float = 10.0
     cheater_pivot_from_tooth_face_x: float = 40.0
     cheater_top_screw_x_margin: float = 8.0
-    cheater_top_screw_y: float = 22.0
+    cheater_screwdriver_shaft_diameter: float = 6.0
+    cheater_screwdriver_radial_clearance: float = 0.5
     cheater_top_screw_clearance_dia: float = 3.4
     cheater_top_body_clearance_depth: float = 17.0
     removable_top_screw_size: float = 3.0
@@ -178,12 +179,20 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         return screw_center_y * 2
 
     def block_width_y(self) -> float:
-        screw_center_y = self.bearing_holder_screw_spacing_y() / 2
-        return 2 * (
-            screw_center_y
-            + self.body_screw_hole_dia() / 2
+        screw_center_to_edge = (
+            self.body_screw_hole_dia() / 2
             + self.screw_to_outer_wall
         )
+        bearing_holder_half_width = (
+            self.bearing_holder_screw_spacing_y() / 2
+            + screw_center_to_edge
+        )
+        cheater_top_half_width = (
+            self.cheater_wall_outer_y()
+            + self.cheater_screwdriver_keepout_radius()
+            + screw_center_to_edge
+        )
+        return 2 * max(bearing_holder_half_width, cheater_top_half_width)
 
     def cheater_top_start_x(self) -> float:
         return self.bearing_holder_length_x
@@ -241,6 +250,20 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
 
     def cheater_wall_outer_y(self) -> float:
         return self.cheater_wall_inner_y() + self.cheater_wall_thickness_y()
+
+    def cheater_screwdriver_keepout_radius(self) -> float:
+        return (
+            self.cheater_screwdriver_shaft_diameter / 2
+            + self.cheater_screwdriver_radial_clearance
+        )
+
+    def cheater_top_screw_y(self) -> float:
+        """Keep the established screw-to-edge material around the middle top."""
+        return (
+            self.block_width_y() / 2
+            - self.body_screw_hole_dia() / 2
+            - self.screw_to_outer_wall
+        )
 
     def cheater_wheel_width(self) -> float:
         return (
@@ -424,7 +447,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             body_screw_hole_dia=self.body_screw_hole_dia(),
             holder_screw_hole_dia=self.holder_screw_hole_dia(),
             cheater_top_screw_x_margin=self.cheater_top_screw_x_margin,
-            cheater_top_screw_y=self.cheater_top_screw_y,
+            cheater_top_screw_y=self.cheater_top_screw_y(),
             cheater_top_screw_clearance_dia=self.cheater_top_screw_clearance_dia,
             cheater_top_body_clearance_depth=self.cheater_top_body_clearance_depth,
             removable_top_nut_width=self.removable_top_nut_width(),
