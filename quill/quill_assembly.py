@@ -32,11 +32,12 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     joint_away_nub_length: float = 5.0
     joint_hinge_height: float = 17.0
     joint_angle_indicator_height: float = 40.0
-    joint_angle_indicator_thickness: float = 8.0
+    joint_angle_indicator_width_x: float = 10.0
+    joint_angle_indicator_thickness: float = 10.0
+    joint_angle_indicator_corner_margin: float = 2.0
     joint_angle_indicator_screw_size: float = 3.0
     joint_angle_indicator_screw_length: float = 16.0
     joint_angle_indicator_screw_head: str = "countersunk"
-    joint_body_negative_x: float = -16.0
     joint_body_positive_x: float = 8.0
     joint_body_top_z: float = 35.0
     joint_magnet_pocket_dia: float = 3.7
@@ -118,7 +119,6 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_rocker_arm_thickness_z: float = 8.0
     cheater_rocker_pivot_outer_diameter: float = 12.0
     cheater_rocker_pivot_pilot_diameter: float = 3.4
-    cheater_rocker_gear_mount_drop_z: float = 5.0
     cheater_rocker_gear_mount_positive_x: float = 10.0
 
     cheater_gear_section_screw_size: float = 3.0
@@ -155,14 +155,25 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     def base_plate_y(self) -> float:
         return self.joint_shoulder_gap - self.base_plate_shoulder_inset_y * 2
 
+    def joint_body_negative_x(self) -> float:
+        return -self.joint_angle_indicator_width_x
+
+    def joint_angle_indicator_corner_radius(self) -> float:
+        return (
+            self.joint_angle_indicator_width_x
+            - self.joint_angle_indicator_corner_margin
+        )
+
     def base_plate_x(self) -> float:
-        return self.base_plate_positive_x - self.joint_body_negative_x
+        return self.base_plate_positive_x - self.joint_body_negative_x()
 
     def base_plate_center_x(self) -> float:
-        return (self.base_plate_positive_x + self.joint_body_negative_x) / 2
+        return (
+            self.base_plate_positive_x + self.joint_body_negative_x()
+        ) / 2
 
     def joint_support_length_x(self) -> float:
-        return self.joint_body_positive_x - self.joint_body_negative_x
+        return self.joint_body_positive_x - self.joint_body_negative_x()
 
     def body_reinforcement_start_x(self) -> float:
         return self.joint_body_positive_x
@@ -288,7 +299,18 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         return self.index_teeth_positive_x() - self.index_gear_teeth_width
 
     def cheater_gear_mount_bottom_z(self) -> float:
-        return self.cheater_pivot_z() - self.cheater_rocker_gear_mount_drop_z
+        tooth_count = self.cheater_gear_section_tooth_count()
+        half_angle = (
+            tooth_count // 2 + 0.5
+        ) * 2 * math.pi / self.index_gear_num_teeth
+        curve_radius = self.index_gear_tip_radius()
+        curve_center_z = (
+            self.block_center_z()
+            + self.cheater_gear_section_tooth_tip_radius()
+            + curve_radius
+        )
+        root_radius = curve_radius - self.index_gear_tooth_depth
+        return curve_center_z - math.cos(half_angle) * root_radius
 
 
     def cheater_gear_section_tooth_tip_radius(self) -> float:
@@ -519,7 +541,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             hinge_height=self.joint_hinge_height,
             angle_indicator_height=self.joint_angle_indicator_height,
             angle_indicator_thickness=self.joint_angle_indicator_thickness,
-            body_negative_x=self.joint_body_negative_x,
+            body_negative_x=self.joint_body_negative_x(),
             body_positive_x=self.joint_body_positive_x,
             body_top_z=self.joint_body_top_z,
             magnet_pocket_dia=self.joint_magnet_pocket_dia,
@@ -534,7 +556,9 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             away_nub_dia=self.joint_away_nub_dia,
             hinge_z=self.base_plate_thickness + self.joint_hinge_height,
             height=self.joint_angle_indicator_height,
+            width_x=self.joint_angle_indicator_width_x,
             thickness=self.joint_angle_indicator_thickness,
+            corner_radius=self.joint_angle_indicator_corner_radius(),
         )
         angle_indicator_screw = self.joint_angle_indicator_screw()
         block = QuillMainBlock.create(
@@ -1480,7 +1504,10 @@ class QuillBody(bpd.PrintedPart):
         gear_clearance = (
             cq.Workplane("YZ")
             .circle(index_gear_clearance_radius)
-            .extrude(index_gear_width_x + index_gear_axial_clearance * 2)
+            # Clearance is needed outside the index gear, not behind the
+            # block face. End the cylinder exactly where the block begins so
+            # the bearing-holder shoulder retains the same rear profile.
+            .extrude(index_gear_width_x + index_gear_axial_clearance)
             .translate(
                 (
                     index_gear_start_x - index_gear_axial_clearance,

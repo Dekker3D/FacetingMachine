@@ -268,14 +268,18 @@ class QuillAngleIndicator(bpd.PrintedPart):
         away_nub_dia: float,
         hinge_z: float,
         height: float,
+        width_x: float,
         thickness: float,
+        corner_radius: float,
     ) -> QuillAngleIndicator:
         return cls.get(
             shoulder_dia=shoulder_dia,
             away_nub_dia=away_nub_dia,
             hinge_z=hinge_z,
             height=height,
+            width_x=width_x,
             thickness=thickness,
+            corner_radius=corner_radius,
         )
 
     def __init__(
@@ -284,13 +288,17 @@ class QuillAngleIndicator(bpd.PrintedPart):
         away_nub_dia: float,
         hinge_z: float,
         height: float,
+        width_x: float,
         thickness: float,
+        corner_radius: float,
     ) -> None:
         self.shoulder_dia = shoulder_dia
         self.away_nub_dia = away_nub_dia
         self.hinge_z = hinge_z
         self.height = height
+        self.width_x = width_x
         self.thickness = thickness
+        self.corner_radius = corner_radius
         super().__init__(name="Quill Angle Indicator")
 
         obj = self.make(cutout=False)
@@ -306,12 +314,12 @@ class QuillAngleIndicator(bpd.PrintedPart):
         obj = (
             cq.Workplane("XY")
             .box(
-                10.0,
+                self.width_x,
                 self.height + 10.0 - gap,
                 self.thickness,
                 centered=(False, False, False),
             )
-            .translate((-10.0, self.hinge_z - 10.0 + gap, 0))
+            .translate((-self.width_x, self.hinge_z - 10.0 + gap, 0))
         )
         nub_cutout = (
             cq.Workplane("XY")
@@ -319,6 +327,20 @@ class QuillAngleIndicator(bpd.PrintedPart):
             .translate((0, self.hinge_z, -1.0))
         )
         obj = obj.cut(nub_cutout)
+
+        # In print coordinates this is the +Y/-X vertical edge. After the
+        # assembly's X-axis rotation it becomes the requested +Z/-X edge.
+        top_y = self.hinge_z + self.height
+        rounded_edge = obj.edges("|Z").filter(
+            lambda edge: (
+                isinstance(edge, cq.Edge)
+                and abs(edge.Center().x + self.width_x) < 1e-6
+                and abs(edge.Center().y - top_y) < 1e-6
+            )
+        )
+        if rounded_edge.size() != 1:
+            raise ValueError("Expected one angle-indicator outer top edge")
+        obj = rounded_edge.fillet(self.corner_radius)
 
         if cutout:
             return obj
@@ -344,5 +366,7 @@ class QuillAngleIndicator(bpd.PrintedPart):
             self.away_nub_dia,
             self.hinge_z,
             self.height,
+            self.width_x,
             self.thickness,
+            self.corner_radius,
         )
