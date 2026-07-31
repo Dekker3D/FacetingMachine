@@ -54,6 +54,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     base_plate_positive_x: float = 88.0
     base_plate_shoulder_inset_y: float = 0.5
     body_index_gear_radial_clearance: float = 2.0
+    body_index_gear_axial_clearance: float = 10.0
     body_reinforcement_block_overlap_x: float = 4.0
 
     # ── User-selected quill design settings ────────────────────
@@ -82,8 +83,17 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     index_gear_spacer_width: float = 2.0
     index_gear_spacer_od: float = 18.0
     index_gear_num_teeth: int = 96
+    index_gear_tick_interval_teeth: int = 3
+    index_gear_number_interval_teeth: int = 12
     index_gear_tooth_depth: float = 0.8
     index_side_shank_exposure: float = 10.0
+    index_gear_clamp_screw_size: float = 3.0
+    index_gear_clamp_screw_length: float = 8.0
+    index_gear_clamp_screw_clearance: float = 0.2
+    index_gear_clamp_nut_clearance: float = 0.3
+    index_gear_clamp_nut_depth_clearance: float = 0.6
+    index_gear_clamp_nut_inset: float = 10.0
+    index_gear_clamp_nut_bore_wall_min: float = 2.0
 
     # ── Cheater bearing top ─────────────────────────────────────
     cheater_bearing_type: type[bb.BearingGeneric] = bb.Bearing624ZZ
@@ -152,6 +162,170 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
 
     def index_gear_modeled_spacer_width(self) -> float:
         return self.index_gear_spacer_width + self.bearing_retaining_lip_depth
+
+    def index_gear_clamp_screw(self) -> bb.SetScrew:
+        return bb.SetScrew.get(
+            size=self.index_gear_clamp_screw_size,
+            length=self.index_gear_clamp_screw_length,
+        )
+
+    def index_gear_clamp_nut(self) -> bb.Nut:
+        return bb.Nut.get(size=self.index_gear_clamp_screw_size)
+
+    def index_gear_clamp_screw_hole_dia(self) -> float:
+        return (
+            self.index_gear_clamp_screw().diameter()
+            + self.index_gear_clamp_screw_clearance
+        )
+
+    def index_gear_clamp_nut_pocket_width(self) -> float:
+        return (
+            self.index_gear_clamp_nut().width_across_flats()
+            + self.index_gear_clamp_nut_clearance
+        )
+
+    def index_gear_clamp_nut_pocket_corner_dia(self) -> float:
+        return self.index_gear_clamp_nut_pocket_width() / math.cos(
+            math.radians(30)
+        )
+
+    def index_gear_clamp_nut_pocket_depth(self) -> float:
+        return (
+            self.index_gear_clamp_nut().height()
+            + self.index_gear_clamp_nut_depth_clearance
+        )
+
+    def index_gear_clamp_angle(self) -> float:
+        tooth_pitch = 360.0 / self.index_gear_num_teeth
+        return tooth_pitch * self.index_gear_number_interval_teeth / 2
+
+    def index_gear_clamp_nut_inner_radius(self) -> float:
+        return self.index_gear_od / 2 - self.index_gear_clamp_nut_inset
+
+    def index_gear_clamp_nut_bore_wall(self) -> float:
+        return (
+            self.index_gear_clamp_nut_inner_radius()
+            - self.index_gear_bore_dia() / 2
+        )
+
+    def index_gear_clamp_screw_outer_radius(self) -> float:
+        return (
+            self.index_gear_bore_dia() / 2
+            + self.index_gear_clamp_screw().shaft_length()
+        )
+
+    def index_gear_clamp_hardware_local_objects(
+        self,
+    ) -> tuple[cq.Workplane, cq.Workplane]:
+        """Return clamp set screw/nut in the gear's local print coordinates."""
+        numbers_mid_z = self.index_gear_numbers_width / 2
+        screw_object = (
+            self.index_gear_clamp_screw()
+            .get_object()
+            .rotate((0, 0, 0), (0, 1, 0), -90)
+            .translate(
+                (
+                    self.index_gear_clamp_screw_outer_radius(),
+                    0,
+                    numbers_mid_z,
+                )
+            )
+            .rotate((0, 0, 0), (0, 0, 1), -self.index_gear_clamp_angle())
+        )
+        nut_object = (
+            self.index_gear_clamp_nut()
+            .get_object()
+            .rotate((0, 0, 0), (0, 1, 0), 90)
+            .translate(
+                (
+                    self.index_gear_clamp_nut_inner_radius(),
+                    0,
+                    numbers_mid_z,
+                )
+            )
+            .rotate((0, 0, 0), (0, 0, 1), -self.index_gear_clamp_angle())
+        )
+        return screw_object, nut_object
+
+    def _validate_index_gear_configuration(self) -> None:
+        if not isinstance(self.index_gear_num_teeth, int) or self.index_gear_num_teeth <= 0:
+            raise ValueError("index_gear_num_teeth must be a positive integer")
+        intervals = {
+            "index_gear_tick_interval_teeth": self.index_gear_tick_interval_teeth,
+            "index_gear_number_interval_teeth": (
+                self.index_gear_number_interval_teeth
+            ),
+        }
+        for label, value in intervals.items():
+            if not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{label} must be a positive integer")
+            if self.index_gear_num_teeth % value != 0:
+                raise ValueError(
+                    f"index_gear_num_teeth must be divisible by {label}"
+                )
+        if (
+            self.index_gear_number_interval_teeth
+            % self.index_gear_tick_interval_teeth
+            != 0
+        ):
+            raise ValueError(
+                "index_gear_number_interval_teeth must be divisible by "
+                "index_gear_tick_interval_teeth"
+            )
+
+        screw = self.index_gear_clamp_screw()
+        nut_pocket_width = self.index_gear_clamp_nut_pocket_width()
+        nut_pocket_depth = self.index_gear_clamp_nut_pocket_depth()
+        finite_positive = {
+            "index_gear_clamp_screw_clearance": (
+                self.index_gear_clamp_screw_clearance
+            ),
+            "index_gear_clamp_nut_clearance": self.index_gear_clamp_nut_clearance,
+            "index_gear_clamp_nut_depth_clearance": (
+                self.index_gear_clamp_nut_depth_clearance
+            ),
+            "index_gear_clamp_nut_inset": self.index_gear_clamp_nut_inset,
+            "index_gear_clamp_nut_bore_wall_min": (
+                self.index_gear_clamp_nut_bore_wall_min
+            ),
+            "body_index_gear_axial_clearance": self.body_index_gear_axial_clearance,
+        }
+        for label, value in finite_positive.items():
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{label} must be finite and greater than 0 mm")
+        nut_pocket_corner_dia = nut_pocket_width / math.cos(math.radians(30))
+        if nut_pocket_corner_dia >= self.index_gear_numbers_width:
+            raise ValueError(
+                "Index-gear clamp nut-pocket corners must fit within the numbered "
+                f"gear section ({nut_pocket_corner_dia:g} mm corner diameter, "
+                f"{self.index_gear_numbers_width:g} mm section)"
+            )
+        nut_inner_radius = self.index_gear_clamp_nut_inner_radius()
+        nut_bore_wall = self.index_gear_clamp_nut_bore_wall()
+        if nut_bore_wall < self.index_gear_clamp_nut_bore_wall_min:
+            raise ValueError(
+                "Index-gear clamp nut pocket leaves too little material around "
+                f"the shank bore ({nut_bore_wall:g} mm available, "
+                f"{self.index_gear_clamp_nut_bore_wall_min:g} mm required)"
+            )
+        if nut_inner_radius + nut_pocket_depth >= self.index_gear_od / 2:
+            raise ValueError(
+                "Index-gear clamp nut pocket must leave material at the gear rim"
+            )
+        nut_outer_radius = nut_inner_radius + self.index_gear_clamp_nut().height()
+        screw_outer_radius = self.index_gear_clamp_screw_outer_radius()
+        if screw_outer_radius < nut_outer_radius:
+            raise ValueError(
+                "Index-gear clamp set screw cannot reach the ER11 shank while "
+                "spanning the full captive nut; "
+                f"M{screw.size:g}×{screw.shaft_length():g} mm is "
+                f"{nut_outer_radius - screw_outer_radius:g} mm too short"
+            )
+        if screw_outer_radius >= self.index_gear_od / 2:
+            raise ValueError(
+                "Index-gear clamp set screw would protrude beyond the gear rim "
+                "when tightened against the ER11 shank"
+            )
 
     def joint_angle_indicator_screw(self) -> bb.WoodScrew:
         return bb.WoodScrew.get(
@@ -692,6 +866,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         self.explode = explode
         self._current_group = self.name  # group sub-parts under this assembly
         self._validate_bearing_configuration()
+        self._validate_index_gear_configuration()
         self._validate_spring_configuration()
 
         # Sub-parts (cached via create() → get())
@@ -780,7 +955,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             index_gear_width_x=self.index_gear_width(),
             index_gear_axis_z=self.block_center_z(),
             index_gear_clearance_radius=self.body_index_gear_clearance_radius(),
-            index_gear_axial_clearance=self.body_index_gear_radial_clearance,
+            index_gear_axial_clearance=self.body_index_gear_axial_clearance,
         )
         bearing_holder = QuillBearingHolder.create(
             quill_block=block,
@@ -881,6 +1056,15 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             spacer_width=self.index_gear_modeled_spacer_width(),
             spacer_od=self.index_gear_spacer_od,
             num_teeth=self.index_gear_num_teeth,
+            tick_interval_teeth=self.index_gear_tick_interval_teeth,
+            number_interval_teeth=self.index_gear_number_interval_teeth,
+            clamp_screw_hole_dia=self.index_gear_clamp_screw_hole_dia(),
+            clamp_nut_width_across_flats=(
+                self.index_gear_clamp_nut_pocket_width()
+            ),
+            clamp_nut_depth=self.index_gear_clamp_nut_pocket_depth(),
+            clamp_nut_inner_radius=self.index_gear_clamp_nut_inner_radius(),
+            clamp_angle=self.index_gear_clamp_angle(),
         )
         er11 = self.er11
 
@@ -1192,16 +1376,39 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 name=f"{label}_nut_{index}",
                 color="gray",
             )
-        gear_obj = (
-            gear.get_object()
-            .rotate((0, 0, 0), (0, 0, 1), 180)  # type: ignore[union-attr]
-            .rotate((0, 0, 0), (0, 1, 0), 90)    # type: ignore[union-attr]
-        )
+        def gear_local_to_assembly(obj: cq.Workplane) -> cq.Workplane:
+            return obj.rotate(
+                (0, 0, 0), (0, 0, 1), 180
+            ).rotate(
+                (0, 0, 0), (0, 1, 0), 90
+            )
+
+        gear_object = gear.get_object()
+        if not isinstance(gear_object, cq.Workplane):
+            raise TypeError("Index gear must provide Workplane geometry")
+        gear_obj = gear_local_to_assembly(gear_object)
         self._add(
             gear,
             obj=gear_obj,
             loc=Location(gear_x, 0, 0),
             color="blue",
+        )
+        clamp_screw_local, clamp_nut_local = (
+            self.index_gear_clamp_hardware_local_objects()
+        )
+        self._add(
+            self.index_gear_clamp_screw(),
+            obj=gear_local_to_assembly(clamp_screw_local),
+            loc=Location(gear_x, 0, 0),
+            name="index_gear_clamp_set_screw",
+            color="gray",
+        )
+        self._add(
+            self.index_gear_clamp_nut(),
+            obj=gear_local_to_assembly(clamp_nut_local),
+            loc=Location(gear_x, 0, 0),
+            name="index_gear_clamp_nut",
+            color="gray",
         )
 
 
@@ -2633,6 +2840,13 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         spacer_width: float,
         spacer_od: float,
         num_teeth: int,
+        tick_interval_teeth: int,
+        number_interval_teeth: int,
+        clamp_screw_hole_dia: float,
+        clamp_nut_width_across_flats: float,
+        clamp_nut_depth: float,
+        clamp_nut_inner_radius: float,
+        clamp_angle: float,
     ) -> IndexGearStandardMk1:
         return cls.get(
             od=od,
@@ -2643,6 +2857,13 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             spacer_width=spacer_width,
             spacer_od=spacer_od,
             num_teeth=num_teeth,
+            tick_interval_teeth=tick_interval_teeth,
+            number_interval_teeth=number_interval_teeth,
+            clamp_screw_hole_dia=clamp_screw_hole_dia,
+            clamp_nut_width_across_flats=clamp_nut_width_across_flats,
+            clamp_nut_depth=clamp_nut_depth,
+            clamp_nut_inner_radius=clamp_nut_inner_radius,
+            clamp_angle=clamp_angle,
         )
 
     def __init__(
@@ -2655,6 +2876,13 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         spacer_width: float,
         spacer_od: float,
         num_teeth: int,
+        tick_interval_teeth: int,
+        number_interval_teeth: int,
+        clamp_screw_hole_dia: float,
+        clamp_nut_width_across_flats: float,
+        clamp_nut_depth: float,
+        clamp_nut_inner_radius: float,
+        clamp_angle: float,
     ) -> None:
         self.od = od
         self.bore_dia = bore_dia
@@ -2664,6 +2892,13 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         self.spacer_width = spacer_width
         self.spacer_od = spacer_od
         self.num_teeth = num_teeth
+        self.tick_interval_teeth = tick_interval_teeth
+        self.number_interval_teeth = number_interval_teeth
+        self.clamp_screw_hole_dia = clamp_screw_hole_dia
+        self.clamp_nut_width_across_flats = clamp_nut_width_across_flats
+        self.clamp_nut_depth = clamp_nut_depth
+        self.clamp_nut_inner_radius = clamp_nut_inner_radius
+        self.clamp_angle = clamp_angle
         super().__init__(name="Index Gear")
         # Build geometry once
         obj = cq.Workplane("XY").cylinder(
@@ -2704,10 +2939,14 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             self.spacer_width,
             self.spacer_od,
             self.num_teeth,
+            self.tick_interval_teeth,
+            self.number_interval_teeth,
+            self.clamp_screw_hole_dia,
+            self.clamp_nut_width_across_flats,
+            self.clamp_nut_depth,
+            self.clamp_nut_inner_radius,
+            self.clamp_angle,
         )
-
-    def _get_nut_hole_angle(self):
-        return 360 / 16.0  # between the numbers, and there's 8 numbers.
 
     def _add_teeth(self, gear: cq.Workplane) -> cq.Workplane:
         verts = []
@@ -2720,42 +2959,43 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         return gear.union(teeth.translate((0, 0, self.numbers_width)))
 
     def _add_nut_pocket(self, gear: cq.Workplane) -> cq.Workplane:
-        """Hex pocket for captive M3 nut + radial hole to bore."""
-        radius = self.od / 2
+        """Captive-nut pocket, face-loading channel, and radial screw path."""
         numbers_mid_z = self.numbers_width / 2
-        nut_flat = 5.8  # M3 nut across flats + clearance
-        nut_depth = 3.0
-        nut_distance = radius - 10
 
-        # Hex pocket cut into the outer surface
         pocket = (
             cq.Workplane("YZ")
-            .polygon(6, nut_flat, circumscribed=True)
-            .extrude(nut_depth)
-            .rotate((0, 0, 0), (1, 0, 0), 0)
-            .translate((nut_distance, 0, numbers_mid_z))
+            .polygon(
+                6,
+                self.clamp_nut_width_across_flats,
+                circumscribed=True,
+            )
+            .extrude(self.clamp_nut_depth)
+            .translate((self.clamp_nut_inner_radius, 0, numbers_mid_z))
         )
 
-        pocket_shaft = (
+        loading_channel = (
             cq.Workplane("YZ")
-            .box(nut_flat, numbers_mid_z * 2, nut_depth, centered=(True, True, False))
-            .translate((nut_distance, 0, 0))
+            .box(
+                self.clamp_nut_width_across_flats,
+                numbers_mid_z * 2,
+                self.clamp_nut_depth,
+                centered=(True, True, False),
+            )
+            .translate((self.clamp_nut_inner_radius, 0, 0))
         )
-        pocket = pocket.union(pocket_shaft)
 
-        # Radial hole from pocket bottom to central bore
-        radial = (
+        radial_screw_path = (
             cq.Workplane("YZ")
-            .circle(3.2 / 2)
+            .circle(self.clamp_screw_hole_dia / 2)
             .extrude(self.od)
             .translate((0, 0, numbers_mid_z))
         )
-        pocket = pocket.union(radial).rotate(
-            (0, 0, 0), (0, 0, 1), -self._get_nut_hole_angle()
+        cutout = pocket.union(loading_channel).union(radial_screw_path).rotate(
+            (0, 0, 0),
+            (0, 0, 1),
+            -self.clamp_angle,
         )
-        gear = gear.cut(pocket)
-
-        return gear
+        return gear.cut(cutout)
 
     def _add_tick_marks(self, gear: cq.Workplane) -> cq.Workplane:
         """Engraved tick marks on the bottom face."""
@@ -2763,11 +3003,10 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         radius = self.od / 2
         mark_depth = 0.4
 
-        for i in range(0, self.num_teeth, 3):
+        for i in range(0, self.num_teeth, self.tick_interval_teeth):
             angle = angle_per_tooth * i
-            is_major = i % 12 == 0
-            is_mid = i % 3 == 0
-            line_len = 4.0 if is_major else 2.5 if is_mid else 1.5
+            is_major = i % self.number_interval_teeth == 0
+            line_len = 4.0 if is_major else 2.5
 
             mark = (
                 cq.Workplane("XY")

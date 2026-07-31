@@ -35,9 +35,9 @@ This note is an agent-facing handoff for continuing the quill robustness pass in
 
 CadQuery's regular-polygon constructor accepts a vertex-to-vertex diameter, so constructing a hex with a requested 5.9 mm across-flats size requires passing `5.9 / cos(30°)` to `polygon()`. That conversion does **not** make the slot across-corners wide. The corner radius is also used only to ensure the loading channel reaches far enough in local `+Y` to open the pocket.
 
-## Current geometry checkpoint: inset main bearings
+## Inset main bearings — `b74c447`
 
-The next commit on this branch restores the requested bearing retention:
+This checkpoint restores the requested bearing retention:
 
 - Both 6001ZZ bearings are inset 1.0 mm into the main block.
 - Each end has a 1.0 mm-deep lip overlapping the bearing's outer race by 1.0 mm radially.
@@ -81,19 +81,36 @@ Open `machine_assembly.py` in CQ-Editor and inspect both block ends, especially:
 
 Do not regenerate or commit release exports until this visual checkpoint is accepted.
 
+## Current checkpoint: index-gear clamp hardware
+
+- Adds a headless `M3×8mm Set Screw` bought-part model and the existing M3 nut to the assembly display and BOM.
+- Derives the 3.2 mm radial access path, 5.8 mm across-flats nut pocket, and 3.0 mm pocket depth from the selected screw/nut plus explicit clearances.
+- Keeps the captive-nut pocket at its accepted radius. The default pocket begins 4.65 mm outside the 12 mm shank bore; validation requires at least 2.0 mm printable material.
+- Positions the tightened set screw from radius 14 mm to the 6 mm shank radius. It spans the complete 2.4 mm nut with 0.95 mm remaining outside the nut, stays inside the gear rim, and does not overlap the printed gear or shank envelope.
+- Adds the clamp hardware to the BOM. The default machine now has 38 BOM lines; the existing M3-nut line increases from eight to nine nuts.
+- Derives the clamp angle and engraved major-mark positions from explicit tooth intervals rather than fixed `360 / 16` and `12` constants. Incompatible tooth/mark intervals fail before CadQuery construction.
+- Separates radial body clearance (2 mm) from axial installation clearance. The latter now extends 10 mm toward **−X only**, while still ending exactly at the block face so the bearing housing and retaining lip remain unchanged.
+- Retains the explicit 0.5 mm bearing axial tolerance and 0.0 mm radial tolerance.
+
+Default contract values:
+
+```text
+set screw:                    M3 × 8 mm
+nut:                          M3
+shank/bore radius:            6.00 mm
+nut pocket inner radius:     10.65 mm
+bore-to-pocket material:      4.65 mm (2.00 mm minimum)
+nut outer radius:            13.05 mm
+set-screw outer radius:      14.00 mm
+set-screw tip radius:         6.00 mm
+extra installation clearance: 10.00 mm toward -X
+```
+
 ## Planned next work
 
 Continue as separate, reviewable checkpoints in this order. Do not combine all of these into one refactor.
 
-### 1. Index-gear clamp hardware
-
-- Replace the hardcoded M3 nut/shaft dimensions with selected `Bolt`/`Nut` objects and explicit clearances.
-- Add the actual clamp screw and nut to the assembly display and BOM.
-- Derive the captive-pocket angular position from tooth pitch/number layout instead of a fixed `360 / 16` assumption.
-- Validate pocket, channel, bore, and outer-wall material before CadQuery operations.
-- Reuse a printed-fastener utility only if the radial gear geometry genuinely matches its coordinate contract; do not force the vertical `SideLoadedCaptiveNutHole` abstraction onto it.
-
-### 2. Assembly preflight validation
+### 1. Assembly preflight validation
 
 Add early, actionable validation for stable physical contracts:
 
@@ -106,7 +123,7 @@ Add early, actionable validation for stable physical contracts:
 
 Keep formula ownership on `QuillAssemblyStandardMk1`; printed parts remain dimension receivers.
 
-### 3. Angle-indicator mount specification
+### 2. Angle-indicator mount specification
 
 Create one small immutable specification shared by the joint and indicator containing:
 
@@ -118,7 +135,7 @@ Create one small immutable specification shared by the joint and indicator conta
 
 This is an interface-consistency cleanup, not the deferred broad joint redesign.
 
-### 4. Printed-part file split
+### 3. Printed-part file split
 
 After the preceding tests are stable, move quill printed-part/helper classes from `quill_assembly.py` to a dedicated module such as `quill/quill_parts.py`.
 
@@ -127,7 +144,7 @@ After the preceding tests are stable, move quill printed-part/helper classes fro
 - Do not move assembly dimension formulas into part classes.
 - Commit the move separately from behavior changes to keep review straightforward.
 
-### 5. Cache API documentation/TODO
+### 4. Cache API documentation/TODO
 
 Document rather than refactor immediately:
 
@@ -136,7 +153,7 @@ Document rather than refactor immediately:
 - Object identity can reduce reuse for helper-containing keys.
 - Cache/lifecycle behavior should be addressed project-wide, not in a quill-only patch.
 
-### 6. Explicit build lifecycle design (design pass only)
+### 5. Explicit build lifecycle design (design pass only)
 
 The user wants class variables to remain convenient configuration that can be changed after object initialization but before geometry construction. Explore an explicit recursive `build()` lifecycle separately:
 

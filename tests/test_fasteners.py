@@ -2,10 +2,25 @@ from __future__ import annotations
 
 import unittest
 
+import cadquery as cq
 import bought_bits as bb
 
 
 class MetricFastenerDimensionTests(unittest.TestCase):
+    def test_m3_set_screw_is_headless(self) -> None:
+        screw = bb.SetScrew.get(size=3.0, length=8.0)
+
+        self.assertEqual(screw.name, "M3×8mm Set Screw")
+        self.assertEqual(screw.diameter(), 3.0)
+        self.assertEqual(screw.shaft_length(), 8.0)
+        screw_shape = screw.get_object().val()
+        self.assertIsInstance(screw_shape, cq.Shape)
+        assert isinstance(screw_shape, cq.Shape)
+        bounds = screw_shape.BoundingBox()
+        self.assertAlmostEqual(bounds.xlen, 3.0)
+        self.assertAlmostEqual(bounds.ylen, 3.0)
+        self.assertAlmostEqual(bounds.zlen, 8.0)
+
     def test_m2_5_hex_fasteners_use_exact_standard_dimensions(self) -> None:
         bolt = bb.Bolt(size=2.5, length=10.0)
         nut = bb.Nut(size=2.5)

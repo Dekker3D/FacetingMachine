@@ -383,6 +383,39 @@ class Bolt(BoughtPartWithModel):
         )
 
 
+class SetScrew(BoughtPartWithModel):
+    """Headless metric set/grub screw, modeled as its threaded envelope."""
+
+    def __init__(self, size: float, length: float) -> None:
+        _standard_fastener_dims(size)
+        if not math.isfinite(length) or length <= 0:
+            raise ValueError("Set-screw length must be finite and greater than 0 mm")
+        self.size = size
+        self.length = length
+        super().__init__(
+            name=(
+                f"M{_metric_size_label(size)}×{_metric_size_label(length)}mm "
+                "Set Screw"
+            )
+        )
+
+    def _comparables(self) -> tuple[object, ...]:
+        return (self.name, self.size, self.length)
+
+    def diameter(self) -> float:
+        return self.size
+
+    def shaft_length(self) -> float:
+        return self.length
+
+    def _create_object(self) -> cq.Workplane:
+        return cq.Workplane("XY").cylinder(
+            self.length,
+            self.size / 2,
+            centered=(True, True, False),
+        )
+
+
 class WoodScrew(Bolt):
     """Simplified wood screw using the shared metric fastener envelope.
 
