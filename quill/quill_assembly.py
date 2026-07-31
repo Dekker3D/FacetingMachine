@@ -7,7 +7,7 @@ import bought_bits as bb
 import quill.quill_abstract as quill_abstract
 from quill.quill_joint import QuillAngleIndicator, QuillJointAli
 
-from cadquery.func import text, compound, offset
+from cadquery.func import text, offset
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -131,6 +131,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_spring_wire_diameter: float = 0.5
     cheater_spring_outside_diameter: float = 8.0
     cheater_spring_free_length: float = 15.0
+    cheater_spring_coil_count: int = 8
     cheater_spring_pocket_diameter_clearance: float = 0.5
     cheater_spring_pocket_depth_top: float = 1.5
     cheater_spring_pocket_depth_rocker: float = 1.5
@@ -436,6 +437,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             wire_diameter=self.cheater_spring_wire_diameter,
             outside_diameter=self.cheater_spring_outside_diameter,
             free_length=self.cheater_spring_free_length,
+            coil_count=self.cheater_spring_coil_count,
         )
 
     def cheater_spring_pocket_diameter(self) -> float:
@@ -465,6 +467,118 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             + self.cheater_spring_pocket_depth_rocker
         )
         return upper_seat_z - lower_seat_z
+
+    def _validate_spring_configuration(self) -> None:
+        """Reject spring choices that cannot work in the current mechanism."""
+        wire_diameter = self.cheater_spring_wire_diameter
+        outside_diameter = self.cheater_spring_outside_diameter
+        installed_length = self.cheater_spring_installed_length()
+        pocket_diameter = self.cheater_spring_pocket_diameter()
+        spring_center_x = self.cheater_spring_center_x()
+        dimensions = {
+            "wire diameter": wire_diameter,
+            "outside diameter": outside_diameter,
+            "free length": self.cheater_spring_free_length,
+            "installed length": installed_length,
+            "pocket diameter": pocket_diameter,
+            "pocket center X": spring_center_x,
+            "pocket diameter clearance": (
+                self.cheater_spring_pocket_diameter_clearance
+            ),
+            "X-edge clearance": self.cheater_spring_edge_clearance_x,
+        }
+        for label, value in dimensions.items():
+            if not math.isfinite(value):
+                raise ValueError(f"Cheater spring {label} must be finite")
+        if (
+            type(self.cheater_spring_coil_count) is not int
+            or self.cheater_spring_coil_count < 1
+        ):
+            raise ValueError("Cheater spring coil count must be a positive integer")
+        if wire_diameter <= 0:
+            raise ValueError("Cheater spring wire diameter must be greater than 0 mm")
+        if outside_diameter <= wire_diameter:
+            raise ValueError(
+                "Cheater spring outside diameter must be greater than its wire "
+                f"diameter ({outside_diameter:g} mm OD, {wire_diameter:g} mm wire)"
+            )
+        if self.cheater_spring_pocket_diameter_clearance < 0:
+            raise ValueError(
+                "Cheater spring pocket diameter clearance cannot be negative"
+            )
+        if self.cheater_spring_edge_clearance_x < 0:
+            raise ValueError("Cheater spring X-edge clearance cannot be negative")
+        if not 0 < self.cheater_spring_pocket_depth_top < (
+            self.block_height_z() - self.block_center_z()
+        ):
+            raise ValueError(
+                "Cheater top spring-pocket depth must be positive and shallower "
+                "than the removable top"
+            )
+        if not 0 < self.cheater_spring_pocket_depth_rocker < (
+            self.cheater_rocker_arm_thickness_z
+        ):
+            raise ValueError(
+                "Cheater rocker spring-pocket depth must be positive and shallower "
+                "than the rocker arm"
+            )
+        modeled_solid_length = (
+            self.cheater_spring_coil_count + 1
+        ) * wire_diameter
+        if installed_length < modeled_solid_length:
+            raise ValueError(
+                "Cheater spring installed length is shorter than the modeled solid "
+                f"height ({installed_length:g} mm installed, "
+                f"{modeled_solid_length:g} mm solid for "
+                f"{self.cheater_spring_coil_count} coils)"
+            )
+        if self.cheater_spring_free_length <= installed_length:
+            raise ValueError(
+                "Cheater spring free length must exceed the installed seat gap to "
+                f"provide preload ({self.cheater_spring_free_length:g} mm free, "
+                f"{installed_length:g} mm installed)"
+            )
+        if pocket_diameter >= self.cheater_rocker_width_y:
+            raise ValueError(
+                "Cheater spring pocket must be narrower than the rocker so the "
+                f"spring remains laterally captured ({pocket_diameter:g} mm pocket, "
+                f"{self.cheater_rocker_width_y:g} mm rocker); use a narrower spring "
+                "or increase cheater_rocker_width_y"
+            )
+
+        top_start_x = self.cheater_top_start_x()
+        top_end_x = top_start_x + self.cheater_top_length_x()
+        pocket_radius = pocket_diameter / 2
+        required_edge_clearance = self.cheater_spring_edge_clearance_x
+        pocket_left_x = spring_center_x - pocket_radius
+        pocket_right_x = spring_center_x + pocket_radius
+        if (
+            pocket_left_x < top_start_x + required_edge_clearance
+            or pocket_right_x > top_end_x - required_edge_clearance
+        ):
+            raise ValueError(
+                "Cheater spring pocket does not fit within the removable top with "
+                f"the requested {required_edge_clearance:g} mm X-edge clearance"
+            )
+
+        rocker_start_x = self.index_teeth_positive_x()
+        rocker_end_x = (
+            self.cheater_pivot_x() + self.cheater_rocker_positive_x_length
+        )
+        if (
+            pocket_left_x < rocker_start_x + required_edge_clearance
+            or pocket_right_x > rocker_end_x - required_edge_clearance
+        ):
+            raise ValueError(
+                "Cheater spring pocket does not fit within the rocker arm with "
+                f"the requested {required_edge_clearance:g} mm X-edge clearance; "
+                "increase cheater_rocker_positive_x_length or use a narrower spring"
+            )
+        if spring_center_x <= self.cheater_pivot_x():
+            raise ValueError(
+                "Cheater spring center must be on the +X side of the rocker pivot "
+                "so it presses the gear section toward the index gear"
+            )
 
     def removable_top_bolt(self) -> bb.Bolt:
         return bb.Bolt.get(
@@ -527,6 +641,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         self.bearing_type = bearing_type
         self.explode = explode
         self._current_group = self.name  # group sub-parts under this assembly
+        self._validate_spring_configuration()
 
         # Sub-parts (cached via create() → get())
         joint = QuillJointAli.create(
@@ -714,7 +829,8 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         er11 = self.er11
 
         # ── Assemble ────────────────────────────────────────────
-        # Reminder: we're subtracing self.block_center_z from the Z of all parts, to line up with the joint.
+        # Subtract block_center_z from each part's Z placement to align it with
+        # the joint hinge axis.
         block_x = self.block_x_offset
         shank_start_x = block_x + self.block_length_x() - self.er11.length
         gear_x = block_x - self.index_gear_width()
@@ -2599,13 +2715,9 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             gear = gear.cut(mark)
 
             if is_major:
-                print(f"Making numbah {i}!")
-                # num = compound(text("15", 5))
                 num_mark = (
                     cq.Workplane("XY")
                     .add(offset(text(f"{((i - 1) % self.num_teeth) + 1}", 5), 2))
-                    # .extrude(2)
-                    # compound(offset(text("15", 3), 3, cap=True, both=True))
                     .rotate((0, 0, 0), (0, 1, 0), 90)
                     .translate((radius - mark_depth, 0, self.numbers_width * 2 / 3))
                     .rotate((0, 0, 0), (0, 0, 1), -angle)

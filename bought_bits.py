@@ -604,6 +604,29 @@ class CompressionSpring(BoughtPartWithModel):
         free_length: float,
         coil_count: int = 8,
     ) -> None:
+        dimensions = {
+            "wire diameter": wire_diameter,
+            "outside diameter": outside_diameter,
+            "free length": free_length,
+        }
+        for label, value in dimensions.items():
+            if not math.isfinite(value):
+                raise ValueError(f"Spring {label} must be finite")
+        if type(coil_count) is not int or coil_count < 1:
+            raise ValueError("Spring coil count must be a positive integer")
+        if wire_diameter <= 0:
+            raise ValueError("Spring wire diameter must be greater than 0 mm")
+        if outside_diameter <= wire_diameter:
+            raise ValueError(
+                "Spring outside diameter must be greater than its wire diameter"
+            )
+        modeled_solid_length = (coil_count + 1) * wire_diameter
+        if free_length < modeled_solid_length:
+            raise ValueError(
+                "Spring free length cannot be shorter than its modeled solid "
+                f"height ({free_length:g} mm free, "
+                f"{modeled_solid_length:g} mm solid)"
+            )
         self.wire_diameter = wire_diameter
         self.outside_diameter = outside_diameter
         self.free_length = free_length
@@ -629,6 +652,21 @@ class CompressionSpring(BoughtPartWithModel):
 
     def object_at_length(self, length: float) -> cq.Workplane:
         """Return display geometry compressed to the supplied length."""
+        if not math.isfinite(length):
+            raise ValueError("Displayed spring length must be finite")
+        if length > self.free_length:
+            raise ValueError(
+                "Displayed compression-spring length cannot exceed its free "
+                f"length ({length:g} mm displayed, "
+                f"{self.free_length:g} mm free)"
+            )
+        modeled_solid_length = (self.coil_count + 1) * self.wire_diameter
+        if length < modeled_solid_length:
+            raise ValueError(
+                "Displayed spring length cannot be shorter than its modeled solid "
+                f"height ({length:g} mm length, "
+                f"{modeled_solid_length:g} mm solid)"
+            )
         centerline_radius = (
             self.outside_diameter - self.wire_diameter
         ) / 2
