@@ -259,7 +259,9 @@ class SmoothRod(bom.PartWithMetadata):
 #   (head_dia_across_flats, head_height,
 #    nut_width_across_flats, nut_thickness,
 #    washer_od, washer_thickness)
-_FASTENER_DIMS: dict[int, tuple[float, float, float, float, float, float]] = {
+_FASTENER_DIMS: dict[float, tuple[float, float, float, float, float, float]] = {
+    2.0: (4.0, 2.0, 4.0, 1.6, 5.0, 0.3),
+    2.5: (5.0, 2.5, 5.0, 2.0, 6.0, 0.5),
     3:  (5.5, 3.0, 5.5, 2.4, 7.0, 0.5),
     4:  (7.0, 4.0, 7.0, 3.2, 9.0, 0.8),
     5:  (8.0, 5.0, 8.0, 4.0, 10.0, 1.0),
@@ -268,6 +270,25 @@ _FASTENER_DIMS: dict[int, tuple[float, float, float, float, float, float]] = {
     10: (17.0, 10.0, 17.0, 8.0, 20.0, 2.0),
     12: (19.0, 12.0, 19.0, 10.0, 24.0, 2.5),
 }
+
+
+def _metric_size_label(size: float) -> str:
+    return f"{size:g}"
+
+
+def _standard_fastener_dims(
+    size: float,
+) -> tuple[float, float, float, float, float, float]:
+    try:
+        return _FASTENER_DIMS[size]
+    except KeyError as error:
+        supported = ", ".join(
+            f"M{_metric_size_label(item)}" for item in _FASTENER_DIMS
+        )
+        raise ValueError(
+            f"Unsupported ISO metric fastener size M{_metric_size_label(size)}; "
+            f"supported sizes: {supported}"
+        ) from error
 
 
 # ── Bolt / screw ─────────────────────────────────────────────────────
@@ -289,9 +310,7 @@ class Bolt(BoughtPartWithModel):
         self.size = size
         self.length = length
         self.head = head
-        hd, hh, *_ = _FASTENER_DIMS.get(
-            int(size), (size * 1.8, size, 0, 0, 0, 0),
-        )
+        hd, hh, *_ = _standard_fastener_dims(size)
         if head == "hex":
             self._head_dia = hd
             self._head_h = hh
@@ -303,7 +322,12 @@ class Bolt(BoughtPartWithModel):
             self._head_h = size * 0.7
         else:
             raise ValueError(f"Unknown head type: {head}")
-        super().__init__(name=f"M{size:.0f}×{length:.0f}mm {head} Bolt")
+        super().__init__(
+            name=(
+                f"M{_metric_size_label(size)}×{_metric_size_label(length)}mm "
+                f"{head} Bolt"
+            )
+        )
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.size, self.length, self.head)
@@ -418,10 +442,8 @@ class Nut(BoughtPartWithModel):
 
     def __init__(self, size: float) -> None:
         self.size = size
-        _, _, self._width, self._thick, _, _ = _FASTENER_DIMS.get(
-            int(size), (0, 0, size * 1.8, size * 0.8, 0, 0),
-        )
-        super().__init__(name=f"M{size:.0f} Nut")
+        _, _, self._width, self._thick, _, _ = _standard_fastener_dims(size)
+        super().__init__(name=f"M{_metric_size_label(size)} Nut")
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.size)
@@ -463,7 +485,9 @@ class NylocNut(BoughtPartWithModel):
     Use ``NylocNut.get(size=4)``.
     """
 
-    _HEIGHTS: dict[int, float] = {
+    _HEIGHTS: dict[float, float] = {
+        2.0: 3.2,
+        2.5: 4.0,
         3: 4.0,
         4: 5.0,
         5: 5.0,
@@ -475,11 +499,9 @@ class NylocNut(BoughtPartWithModel):
 
     def __init__(self, size: float) -> None:
         self.size = size
-        _, _, self._width, _, _, _ = _FASTENER_DIMS.get(
-            int(size), (0, 0, size * 1.8, 0, 0, 0),
-        )
-        self._height = self._HEIGHTS.get(int(size), size * 1.25)
-        super().__init__(name=f"M{size:.0f} Nyloc Nut")
+        _, _, self._width, _, _, _ = _standard_fastener_dims(size)
+        self._height = self._HEIGHTS[size]
+        super().__init__(name=f"M{_metric_size_label(size)} Nyloc Nut")
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.size)
@@ -497,10 +519,7 @@ class NylocNut(BoughtPartWithModel):
         return self._height
 
     def metal_object(self) -> cq.Workplane:
-        regular_nut_height = _FASTENER_DIMS.get(
-            int(self.size),
-            (0, 0, 0, self.size * 0.8, 0, 0),
-        )[3]
+        regular_nut_height = _standard_fastener_dims(self.size)[3]
         dome_radius = self.width_across_flats() / 2
         hex_body = (
             cq.Workplane("XY")
@@ -560,10 +579,8 @@ class Washer(BoughtPartWithModel):
 
     def __init__(self, size: float) -> None:
         self.size = size
-        _, _, _, _, self._od, self._thick = _FASTENER_DIMS.get(
-            int(size), (0, 0, 0, 0, size * 2.2, size * 0.15),
-        )
-        super().__init__(name=f"M{size:.0f} Washer")
+        _, _, _, _, self._od, self._thick = _standard_fastener_dims(size)
+        super().__init__(name=f"M{_metric_size_label(size)} Washer")
 
     def _comparables(self) -> tuple[object, ...]:
         return (self.name, self.size)
