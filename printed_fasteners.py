@@ -57,12 +57,15 @@ class SideLoadedCaptiveNutHole:
             .circle(self.shaft_diameter / 2)
             .extrude(-self.shaft_depth)
         )
-        nut_width_across_corners = self.nut_width_across_flats / math.cos(
-            math.radians(30)
+        # CadQuery's polygon diameter is vertex-to-vertex. Converting the
+        # requested across-flats width here produces a pocket whose measured
+        # local-X width remains exactly nut_width_across_flats.
+        polygon_diameter_for_across_flats = (
+            self.nut_width_across_flats / math.cos(math.radians(30))
         )
         nut_trap = (
             cq.Workplane("XY")
-            .polygon(6, nut_width_across_corners)
+            .polygon(6, polygon_diameter_for_across_flats)
             .extrude(-self.nut_depth)
             .rotate((0, 0, 0), (0, 0, 1), 30)
             .translate((0, 0, -self.nut_drop_from_interface))

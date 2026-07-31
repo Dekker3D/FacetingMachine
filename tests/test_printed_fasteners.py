@@ -26,6 +26,10 @@ class SideLoadedCaptiveNutHoleTests(unittest.TestCase):
         bounds = shape.BoundingBox()
         self.assertAlmostEqual(bounds.zmax, 0.0, places=6)
         self.assertAlmostEqual(bounds.zmin, -25.0, places=6)
+        # The insertion slot and the rotated hex are exactly the configured
+        # across-flats width in local X. Across-corners is used only to feed
+        # CadQuery's polygon constructor and to validate forward reach.
+        self.assertAlmostEqual(bounds.xlen, 5.9, places=6)
         self.assertGreaterEqual(bounds.ymax, 12.0)
 
     def test_caller_can_rotate_channel_to_opposite_direction(self) -> None:
