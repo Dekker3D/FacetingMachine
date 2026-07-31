@@ -4,6 +4,7 @@ import cadquery as cq
 from cadquery import Location, Vector
 import bom_part_data as bpd
 import bought_bits as bb
+from printed_fasteners import SideLoadedCaptiveNutHole
 import quill.quill_abstract as quill_abstract
 from quill.quill_joint import QuillAngleIndicator, QuillJointAli
 
@@ -1274,28 +1275,11 @@ class QuillMainBlock:
         self.removable_top_nut_depth = removable_top_nut_depth
         self.removable_top_nut_drop = removable_top_nut_drop
 
-        obj = (
+        self._object = (
             self.get_base_shape()
             .cut(self.bearing_holder_cut_boxes())
             .cut(self.cheater_top_cut_box())
-            .cut(self.cheater_top_pilot_holes())
-            .cut(self.removable_top_nut_pockets())
-        )
-        screw_y = self.bearing_holder_screw_spacing_y / 2
-        screw_x_positions = (
-            self.length - self.bearing_holder_screw_x_from_end,
-            self.bearing_holder_screw_x_from_end,
-        )
-        screw_positions = [
-            (screw_x, side_y)
-            for screw_x in screw_x_positions
-            for side_y in (-screw_y, screw_y)
-        ]
-        self._object = (
-            obj.faces(">Z")
-            .workplane()
-            .pushPoints(screw_positions)
-            .hole(self.body_screw_hole_dia, self.height)
+            .cut(self.removable_top_fastener_cutouts())
         )
 
     def get_outer_shape(self) -> cq.Workplane:
@@ -1398,19 +1382,6 @@ class QuillMainBlock:
             for y in (-self.cheater_top_screw_y, self.cheater_top_screw_y)
         )
 
-    def cheater_top_pilot_holes(self) -> cq.Workplane:
-        pilot_top_z = self.split_height
-        result = cq.Workplane("XY")
-        for x, y in self.cheater_top_screw_positions():
-            result = result.union(
-                cq.Workplane("XY")
-                .center(x, y)
-                .circle(self.cheater_top_screw_clearance_dia / 2)
-                .extrude(-self.cheater_top_body_clearance_depth)
-                .translate((0, 0, pilot_top_z))
-            )
-        return result
-
     def bearing_holder_screw_positions(self) -> tuple[tuple[float, float], ...]:
         screw_y = self.bearing_holder_screw_spacing_y / 2
         return tuple(
@@ -1422,62 +1393,54 @@ class QuillMainBlock:
             for y in (-screw_y, screw_y)
         )
 
-    def _hex_nut_pocket(
+    def _captive_nut_fastener_cutout(
         self,
         x: float,
         y: float,
         interface_z: float,
+        shaft_diameter: float,
+        shaft_depth: float,
     ) -> cq.Workplane:
-        across_corners = self.removable_top_nut_width / math.cos(
-            math.radians(30)
-        )
-        nut_top_z = interface_z - self.removable_top_nut_drop
-        hex_pocket = (
-            cq.Workplane("XY")
-            .center(x, y)
-            .polygon(6, across_corners)
-            .extrude(-self.removable_top_nut_depth)
-            .rotate((x, y, 0), (x, y, 1), 30)
-            .translate((0, 0, nut_top_z))
-        )
-
-        # Open the trap laterally toward the nearest Y side. The nut remains
-        # captive in Z and against rotation while still being replaceable.
         outside_y = math.copysign(self.width / 2, y)
-        channel_center_y = (y + outside_y) / 2
-        channel_length_y = abs(outside_y - y)
-        insertion_channel = (
-            cq.Workplane("XY")
-            .box(
-                self.removable_top_nut_width,
-                channel_length_y,
-                self.removable_top_nut_depth,
-                centered=(True, True, False),
-            )
-            .translate(
-                (
-                    x,
-                    channel_center_y,
-                    nut_top_z - self.removable_top_nut_depth,
-                )
-            )
-        )
-        return hex_pocket.union(insertion_channel)
+        local_cutout = SideLoadedCaptiveNutHole(
+            shaft_diameter=shaft_diameter,
+            shaft_depth=shaft_depth,
+            nut_width_across_flats=self.removable_top_nut_width,
+            nut_depth=self.removable_top_nut_depth,
+            nut_drop_from_interface=self.removable_top_nut_drop,
+            channel_length=abs(outside_y - y),
+        ).make_cutout()
+        if y < 0:
+            local_cutout = local_cutout.rotate((0, 0, 0), (0, 0, 1), 180)
+        return local_cutout.translate((x, y, interface_z))
 
-    def removable_top_nut_pockets(self) -> cq.Workplane:
-        pockets = cq.Workplane("XY")
+    def removable_top_fastener_cutouts(self) -> cq.Workplane:
+        """Body-side bolt paths, captive-nut traps, and loading channels."""
+        cutouts = cq.Workplane("XY")
         bearing_holder_interface_z = (
             self.split_height - self.holder_split_gap / 2
         )
         for x, y in self.bearing_holder_screw_positions():
-            pockets = pockets.union(
-                self._hex_nut_pocket(x, y, bearing_holder_interface_z)
+            cutouts = cutouts.union(
+                self._captive_nut_fastener_cutout(
+                    x,
+                    y,
+                    bearing_holder_interface_z,
+                    self.body_screw_hole_dia,
+                    bearing_holder_interface_z,
+                )
             )
         for x, y in self.cheater_top_screw_positions():
-            pockets = pockets.union(
-                self._hex_nut_pocket(x, y, self.split_height)
+            cutouts = cutouts.union(
+                self._captive_nut_fastener_cutout(
+                    x,
+                    y,
+                    self.split_height,
+                    self.cheater_top_screw_clearance_dia,
+                    self.cheater_top_body_clearance_depth,
+                )
             )
-        return pockets
+        return cutouts
 
     def get_cheater_top_base_shape(self) -> cq.Workplane:
         top = self.get_base_shape().intersect(
