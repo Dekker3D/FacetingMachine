@@ -117,6 +117,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     removable_top_nut_clearance: float = 0.2
     removable_top_nut_depth_clearance: float = 0.2
     removable_top_nut_drop: float = 8.0
+    removable_top_nut_bridge_thickness: float = 0.5
     cheater_pivot_bolt_size: float = 4.0
     cheater_wheel_diameter: float = 30.0
     cheater_wheel_radial_clearance: float = 2.0
@@ -960,6 +961,9 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             removable_top_nut_width=self.removable_top_nut_width(),
             removable_top_nut_depth=self.removable_top_nut_depth(),
             removable_top_nut_drop=self.removable_top_nut_drop,
+            removable_top_nut_bridge_thickness=(
+                self.removable_top_nut_bridge_thickness
+            ),
         )
         away_shoulder_inner_y = (
             # Repeated AI mistake: using shoulder_joint_thickness instead of
@@ -1477,6 +1481,7 @@ class QuillMainBlock:
         removable_top_nut_width: float,
         removable_top_nut_depth: float,
         removable_top_nut_drop: float,
+        removable_top_nut_bridge_thickness: float,
     ) -> QuillMainBlock:
         return cls(
             length_x=length_x,
@@ -1510,6 +1515,9 @@ class QuillMainBlock:
             removable_top_nut_width=removable_top_nut_width,
             removable_top_nut_depth=removable_top_nut_depth,
             removable_top_nut_drop=removable_top_nut_drop,
+            removable_top_nut_bridge_thickness=(
+                removable_top_nut_bridge_thickness
+            ),
         )
 
     def __init__(
@@ -1542,6 +1550,7 @@ class QuillMainBlock:
         removable_top_nut_width: float,
         removable_top_nut_depth: float,
         removable_top_nut_drop: float,
+        removable_top_nut_bridge_thickness: float,
     ) -> None:
         self.length = length_x
         self.width = width_y
@@ -1574,6 +1583,9 @@ class QuillMainBlock:
         self.removable_top_nut_width = removable_top_nut_width
         self.removable_top_nut_depth = removable_top_nut_depth
         self.removable_top_nut_drop = removable_top_nut_drop
+        self.removable_top_nut_bridge_thickness = (
+            removable_top_nut_bridge_thickness
+        )
 
         self._object = (
             self.get_base_shape()
@@ -1735,6 +1747,8 @@ class QuillMainBlock:
             nut_depth=self.removable_top_nut_depth,
             nut_drop_from_interface=self.removable_top_nut_drop,
             channel_length=abs(outside_y - y),
+            bridge_thickness=self.removable_top_nut_bridge_thickness,
+            bridge_side="above_nut",
         ).make_cutout()
         if y < 0:
             local_cutout = local_cutout.rotate((0, 0, 0), (0, 0, 1), 180)
@@ -1832,6 +1846,7 @@ class QuillMainBlock:
             self.removable_top_nut_width,
             self.removable_top_nut_depth,
             self.removable_top_nut_drop,
+            self.removable_top_nut_bridge_thickness,
             self.bearing_type,
         )
 

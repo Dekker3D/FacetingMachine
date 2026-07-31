@@ -122,7 +122,13 @@ These are visual-identification features, not manufacturing-detail models. They 
 
 The two 2.2 mm wood-screw pilots in the printable quill body are now 8.0 mm deep from the actual indicator/body interface. They previously started from the 3 mm shoulder's inner face instead of the 10 mm indicator interface, so only about 1 mm of each nominal 8 mm cut reached the finished body after the indicator cavity was removed.
 
-For the default M3×16 countersunk wood screws, the corrected stack gives approximately 7.5 mm of threaded shaft inside the body and 0.5 mm clearance before the blind pilot bottom. A regression test checks both complete pilot paths and confirms solid material remains immediately beyond 8 mm.
+For the default M3×16 countersunk wood screws, a conventionally specified real screw gives approximately 6 mm of body engagement through the 10 mm indicator and 2 mm clearance before the blind pilot bottom. The current simplified `WoodScrew` display model treats its length as shaft-only and therefore displays 7.5 mm body penetration; reconciling that broader bought-part length convention is deferred. A regression test checks both complete pilot paths and confirms solid material remains immediately beyond 8 mm.
+
+### Captive-nut bridge membranes
+
+`SideLoadedCaptiveNutHole` can optionally leave a sacrificial membrane immediately above or below its nut cavity. The side names refer to the helper's local Z/print orientation; callers may still rotate the complete cutout. Validation ensures the requested membrane leaves usable shaft on both sides of the nut.
+
+The quill body's eight vertically oriented removable-top fasteners use a 0.5 mm `above_nut` membrane. This gives the side-loaded cavity a continuous bridgeable roof during printing; the screw breaks through the thin membrane during first assembly. The nut pocket and loading channel remain fully open.
 
 ## Planned next work
 
