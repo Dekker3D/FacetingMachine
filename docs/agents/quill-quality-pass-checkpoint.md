@@ -85,8 +85,8 @@ Do not regenerate or commit release exports until this visual checkpoint is acce
 
 - Adds a headless `M3×8mm Set Screw` bought-part model and the existing M3 nut to the assembly display and BOM.
 - Derives the 3.2 mm radial access path, 5.8 mm across-flats nut pocket, and 3.0 mm pocket depth from the selected screw/nut plus explicit clearances.
-- Keeps the captive-nut pocket at its accepted radius. The default pocket begins 4.65 mm outside the 12 mm shank bore; validation requires at least 2.0 mm printable material.
-- Positions the tightened set screw from radius 14 mm to the 6 mm shank radius. It spans the complete 2.4 mm nut with 0.95 mm remaining outside the nut, stays inside the gear rim, and does not overlap the printed gear or shank envelope.
+- Derives the captive-nut radius from the selected screw length, actual nut thickness, and an explicit 3.0 mm inward-adjustment target. The default pocket begins 2.6 mm outside the 12 mm shank bore; validation requires at least 2.0 mm printable material.
+- Positions the tightened set screw from radius 14 mm to the 6 mm shank radius. It spans the complete 2.4 mm nut with 3.0 mm available outside the nut for tightening against a filed flat, stays inside the gear rim, and does not overlap the printed gear or shank envelope.
 - Adds the clamp hardware to the BOM. The default machine now has 38 BOM lines; the existing M3-nut line increases from eight to nine nuts.
 - Derives the clamp angle and engraved major-mark positions from explicit tooth intervals rather than fixed `360 / 16` and `12` constants. Incompatible tooth/mark intervals fail before CadQuery construction.
 - Separates radial body clearance (2 mm) from axial installation clearance. The latter now extends 10 mm toward **−X only**, while still ending exactly at the block face so the bearing housing and retaining lip remain unchanged.
@@ -98,13 +98,25 @@ Default contract values:
 set screw:                    M3 × 8 mm
 nut:                          M3
 shank/bore radius:            6.00 mm
-nut pocket inner radius:     10.65 mm
-bore-to-pocket material:      4.65 mm (2.00 mm minimum)
-nut outer radius:            13.05 mm
+nut pocket inner radius:      8.60 mm
+bore-to-pocket material:      2.60 mm (2.00 mm minimum)
+nut outer radius:            11.00 mm
 set-screw outer radius:      14.00 mm
 set-screw tip radius:         6.00 mm
+set-screw adjustment travel:  3.00 mm
 extra installation clearance: 10.00 mm toward -X
 ```
+
+### Recognizable screw drives
+
+Bought-part display models now include deliberately simplified drive recesses:
+
+- Set/grub screws: hex socket.
+- Pan-head screws: straight screwdriver slot.
+- Countersunk/cone-headed screws: Phillips-style cross. The generic countersunk `Bolt` cone was also corrected so its wide driven face is opposite the shaft, matching the already-correct `WoodScrew` orientation.
+- External hex-head bolts remain recognizable from their head shape and do not receive an extra recess.
+
+These are visual-identification features, not manufacturing-detail models. They preserve nominal fastener envelopes and BOM identity.
 
 ## Planned next work
 

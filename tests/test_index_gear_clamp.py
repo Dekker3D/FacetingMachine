@@ -79,10 +79,31 @@ class IndexGearClampTests(unittest.TestCase):
             quill.index_gear_clamp_nut_pocket_depth(),
         )
         self.assertAlmostEqual(gear.clamp_angle, quill.index_gear_clamp_angle())
-        self.assertAlmostEqual(quill.index_gear_clamp_nut_bore_wall(), 4.65)
+        self.assertAlmostEqual(
+            quill.index_gear_clamp_screw_adjustment_available(),
+            quill.index_gear_clamp_screw_adjustment_target,
+        )
+        self.assertAlmostEqual(quill.index_gear_clamp_nut_bore_wall(), 2.6)
         self.assertGreaterEqual(
             quill.index_gear_clamp_nut_bore_wall(),
             quill.index_gear_clamp_nut_bore_wall_min,
+        )
+
+    def test_nut_position_tracks_screw_length_and_adjustment_target(self) -> None:
+        class LongerClampScrewQuill(QuillAssemblyStandardMk1):
+            index_gear_clamp_screw_length = 9.0
+
+        default = QuillAssemblyStandardMk1(explode=False)
+        longer = LongerClampScrewQuill(explode=False)
+
+        self.assertAlmostEqual(
+            longer.index_gear_clamp_nut_inner_radius()
+            - default.index_gear_clamp_nut_inner_radius(),
+            1.0,
+        )
+        self.assertAlmostEqual(
+            longer.index_gear_clamp_screw_adjustment_available(),
+            longer.index_gear_clamp_screw_adjustment_target,
         )
 
     def test_clamp_hardware_fits_printed_cutouts_without_overlap(self) -> None:
@@ -108,19 +129,19 @@ class IndexGearClampTests(unittest.TestCase):
         )
         self.assertLess(shape_volume(screw_object.intersect(shank_envelope)), 0.001)
 
-    def test_rejects_clamp_screw_that_cannot_reach_shank(self) -> None:
+    def test_rejects_screw_too_short_for_adjustment_and_bore_wall(self) -> None:
         class ShortClampScrewQuill(QuillAssemblyStandardMk1):
             index_gear_clamp_screw_length = 6.0
 
-        with self.assertRaisesRegex(ValueError, "cannot reach the ER11 shank"):
+        with self.assertRaisesRegex(ValueError, "cannot provide the requested"):
             ShortClampScrewQuill(explode=False)
 
-    def test_rejects_nut_pocket_with_less_than_two_mm_bore_wall(self) -> None:
-        class ThinBoreWallQuill(QuillAssemblyStandardMk1):
-            index_gear_clamp_nut_inset = 13.0
+    def test_rejects_adjustment_target_that_would_break_bore_wall(self) -> None:
+        class ExcessiveAdjustmentQuill(QuillAssemblyStandardMk1):
+            index_gear_clamp_screw_adjustment_target = 4.0
 
-        with self.assertRaisesRegex(ValueError, "too little material"):
-            ThinBoreWallQuill(explode=False)
+        with self.assertRaisesRegex(ValueError, "minimum bore wall"):
+            ExcessiveAdjustmentQuill(explode=False)
 
     def test_rejects_number_layout_that_does_not_align_with_teeth(self) -> None:
         class MisalignedNumbersQuill(QuillAssemblyStandardMk1):

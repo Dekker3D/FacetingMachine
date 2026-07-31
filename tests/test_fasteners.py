@@ -21,6 +21,97 @@ class MetricFastenerDimensionTests(unittest.TestCase):
         self.assertAlmostEqual(bounds.ylen, 3.0)
         self.assertAlmostEqual(bounds.zlen, 8.0)
 
+        uncut_envelope = cq.Workplane("XY").cylinder(
+            screw.shaft_length(),
+            screw.diameter() / 2,
+            centered=(True, True, False),
+        )
+        removed = uncut_envelope.cut(screw.get_object())
+        removed_shape = removed.val()
+        self.assertIsInstance(removed_shape, cq.Shape)
+        assert isinstance(removed_shape, cq.Shape)
+        self.assertGreater(removed_shape.Volume(), 0.1)
+
+    def test_pan_head_has_visible_straight_slot(self) -> None:
+        screw = bb.Bolt.get(size=3.0, length=10.0, head="pan")
+        uncut = (
+            cq.Workplane("XY")
+            .cylinder(
+                screw.head_height(),
+                screw.head_diameter() / 2,
+                centered=(True, True, False),
+            )
+            .faces("<Z")
+            .workplane()
+            .cylinder(
+                screw.shaft_length(),
+                screw.diameter() / 2,
+                centered=(True, True, False),
+            )
+        )
+        removed_shape = uncut.cut(screw.get_object()).val()
+        self.assertIsInstance(removed_shape, cq.Shape)
+        assert isinstance(removed_shape, cq.Shape)
+        self.assertGreater(removed_shape.Volume(), 0.1)
+
+    def test_countersunk_head_has_visible_phillips_recess(self) -> None:
+        screw = bb.Bolt.get(size=3.0, length=10.0, head="countersunk")
+        head = (
+            cq.Workplane("XY")
+            .circle(screw.diameter() / 2)
+            .workplane(offset=screw.head_height())
+            .circle(screw.head_diameter() / 2)
+            .loft()
+        )
+        uncut = head.faces("<Z").workplane().cylinder(
+            screw.shaft_length(),
+            screw.diameter() / 2,
+            centered=(True, True, False),
+        )
+        removed_shape = uncut.cut(screw.get_object()).val()
+        self.assertIsInstance(removed_shape, cq.Shape)
+        assert isinstance(removed_shape, cq.Shape)
+        self.assertGreater(removed_shape.Volume(), 0.1)
+        self.assertLess(removed_shape.Volume(), 5.0)
+        self.assertGreater(
+            removed_shape.BoundingBox().zmin,
+            screw.head_height() / 3,
+        )
+
+    def test_wood_screw_heads_have_matching_drive_recesses(self) -> None:
+        for head in ("pan", "countersunk"):
+            with self.subTest(head=head):
+                screw = bb.WoodScrew.get(size=3.0, length=12.0, head=head)
+                if head == "pan":
+                    uncut_head = cq.Workplane("XY").cylinder(
+                        screw.head_height(),
+                        screw.head_diameter() / 2,
+                        centered=(True, True, False),
+                    )
+                else:
+                    uncut_head = (
+                        cq.Workplane("XY")
+                        .circle(screw.head_diameter() / 2)
+                        .workplane(offset=screw.head_height())
+                        .circle(screw.diameter() / 2)
+                        .loft()
+                    )
+                shaft = (
+                    cq.Workplane("XY")
+                    .cylinder(
+                        screw.shaft_length(),
+                        screw.diameter() / 2,
+                        centered=(True, True, False),
+                    )
+                    .translate((0.0, 0.0, screw.head_height()))
+                )
+                removed_shape = uncut_head.union(shaft).cut(
+                    screw.get_object()
+                ).val()
+                self.assertIsInstance(removed_shape, cq.Shape)
+                assert isinstance(removed_shape, cq.Shape)
+                self.assertGreater(removed_shape.Volume(), 0.1)
+
     def test_m2_5_hex_fasteners_use_exact_standard_dimensions(self) -> None:
         bolt = bb.Bolt(size=2.5, length=10.0)
         nut = bb.Nut(size=2.5)

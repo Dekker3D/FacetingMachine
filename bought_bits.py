@@ -291,6 +291,50 @@ def _standard_fastener_dims(
         ) from error
 
 
+def _straight_drive_recess(
+    *,
+    head_diameter: float,
+    width: float,
+    depth: float,
+    start_z: float,
+) -> cq.Workplane:
+    """Simple screwdriver slot extending from ``start_z`` along local +Z."""
+    return (
+        cq.Workplane("XY")
+        .box(
+            head_diameter * 0.75,
+            width,
+            depth,
+            centered=(True, True, False),
+        )
+        .translate((0, 0, start_z))
+    )
+
+
+def _phillips_drive_recess(
+    *,
+    head_diameter: float,
+    width: float,
+    depth: float,
+    start_z: float,
+) -> cq.Workplane:
+    """Recognizable cross recess extending from ``start_z`` along local +Z."""
+    arm_length = head_diameter * 0.6
+    vertical = cq.Workplane("XY").box(
+        arm_length,
+        width,
+        depth,
+        centered=(True, True, False),
+    )
+    horizontal = cq.Workplane("XY").box(
+        width,
+        arm_length,
+        depth,
+        centered=(True, True, False),
+    )
+    return vertical.union(horizontal).translate((0, 0, start_z))
+
+
 # ── Bolt / screw ─────────────────────────────────────────────────────
 
 
@@ -366,9 +410,9 @@ class Bolt(BoughtPartWithModel):
         elif self.head == "countersunk":
             head_shape = (
                 cq.Workplane("XY")
-                .circle(self._head_dia / 2)
-                .workplane(offset=self._head_h)
                 .circle(self.size / 2)
+                .workplane(offset=self._head_h)
+                .circle(self._head_dia / 2)
                 .loft()
             )
         else:  # pan
@@ -377,10 +421,29 @@ class Bolt(BoughtPartWithModel):
                 .cylinder(self._head_h, self._head_dia / 2,
                           centered=(True, True, False))
             )
-        return head_shape.faces("<Z").workplane().cylinder(
+        fastener = head_shape.faces("<Z").workplane().cylinder(
             self.length, self.size / 2,
             centered=(True, True, False),
         )
+        if self.head == "pan":
+            slot_depth = self._head_h * 0.35
+            slot = _straight_drive_recess(
+                head_diameter=self._head_dia,
+                width=max(0.5, self.size * 0.22),
+                depth=slot_depth,
+                start_z=self._head_h - slot_depth,
+            )
+            return fastener.cut(slot)
+        if self.head == "countersunk":
+            phillips_depth = self._head_h * 0.65
+            phillips = _phillips_drive_recess(
+                head_diameter=self._head_dia,
+                width=max(0.5, self.size * 0.2),
+                depth=phillips_depth,
+                start_z=self._head_h - phillips_depth,
+            )
+            return fastener.cut(phillips)
+        return fastener
 
 
 class SetScrew(BoughtPartWithModel):
@@ -409,11 +472,18 @@ class SetScrew(BoughtPartWithModel):
         return self.length
 
     def _create_object(self) -> cq.Workplane:
-        return cq.Workplane("XY").cylinder(
+        screw = cq.Workplane("XY").cylinder(
             self.length,
             self.size / 2,
             centered=(True, True, False),
         )
+        socket_depth = min(self.length * 0.25, self.size * 0.5)
+        hex_socket = (
+            cq.Workplane("XY")
+            .polygon(6, self.size * 0.5, circumscribed=True)
+            .extrude(socket_depth)
+        )
+        return screw.cut(hex_socket)
 
 
 class WoodScrew(Bolt):
@@ -463,7 +533,22 @@ class WoodScrew(Bolt):
             )
             .translate((0.0, 0.0, self._head_h))
         )
-        return head_shape.union(shaft)
+        fastener = head_shape.union(shaft)
+        if self.head == "pan":
+            slot = _straight_drive_recess(
+                head_diameter=self._head_dia,
+                width=max(0.5, self.size * 0.22),
+                depth=self._head_h * 0.35,
+                start_z=0.0,
+            )
+            return fastener.cut(slot)
+        phillips = _phillips_drive_recess(
+            head_diameter=self._head_dia,
+            width=max(0.5, self.size * 0.2),
+            depth=self._head_h * 0.65,
+            start_z=0.0,
+        )
+        return fastener.cut(phillips)
 
 
 # ── Nut ──────────────────────────────────────────────────────────────

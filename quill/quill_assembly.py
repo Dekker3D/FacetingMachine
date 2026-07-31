@@ -92,7 +92,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     index_gear_clamp_screw_clearance: float = 0.2
     index_gear_clamp_nut_clearance: float = 0.3
     index_gear_clamp_nut_depth_clearance: float = 0.6
-    index_gear_clamp_nut_inset: float = 10.0
+    index_gear_clamp_screw_adjustment_target: float = 3.0
     index_gear_clamp_nut_bore_wall_min: float = 2.0
 
     # ── Cheater bearing top ─────────────────────────────────────
@@ -200,7 +200,18 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         return tooth_pitch * self.index_gear_number_interval_teeth / 2
 
     def index_gear_clamp_nut_inner_radius(self) -> float:
-        return self.index_gear_od / 2 - self.index_gear_clamp_nut_inset
+        return (
+            self.index_gear_clamp_screw_outer_radius()
+            - self.index_gear_clamp_nut().height()
+            - self.index_gear_clamp_screw_adjustment_target
+        )
+
+    def index_gear_clamp_screw_adjustment_available(self) -> float:
+        return (
+            self.index_gear_clamp_screw_outer_radius()
+            - self.index_gear_clamp_nut_inner_radius()
+            - self.index_gear_clamp_nut().height()
+        )
 
     def index_gear_clamp_nut_bore_wall(self) -> float:
         return (
@@ -274,6 +285,19 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             )
 
         screw = self.index_gear_clamp_screw()
+        minimum_screw_length = (
+            self.index_gear_clamp_nut_bore_wall_min
+            + self.index_gear_clamp_nut().height()
+            + self.index_gear_clamp_screw_adjustment_target
+        )
+        if screw.shaft_length() < minimum_screw_length:
+            raise ValueError(
+                "Index-gear clamp set screw cannot provide the requested "
+                f"{self.index_gear_clamp_screw_adjustment_target:g} mm adjustment "
+                "while retaining the minimum bore wall; "
+                f"M{screw.size:g}×{screw.shaft_length():g} mm is shorter than "
+                f"the required {minimum_screw_length:g} mm"
+            )
         nut_pocket_width = self.index_gear_clamp_nut_pocket_width()
         nut_pocket_depth = self.index_gear_clamp_nut_pocket_depth()
         finite_positive = {
@@ -284,7 +308,9 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             "index_gear_clamp_nut_depth_clearance": (
                 self.index_gear_clamp_nut_depth_clearance
             ),
-            "index_gear_clamp_nut_inset": self.index_gear_clamp_nut_inset,
+            "index_gear_clamp_screw_adjustment_target": (
+                self.index_gear_clamp_screw_adjustment_target
+            ),
             "index_gear_clamp_nut_bore_wall_min": (
                 self.index_gear_clamp_nut_bore_wall_min
             ),
