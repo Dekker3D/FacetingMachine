@@ -228,16 +228,18 @@ class QuillJointAli(QuillJointBase):
 
 
     def _make_indicator_screw_pilots(self) -> cq.Workplane:
-        """Blind 2.2 mm pilot holes for nominal 3 mm wood screws."""
-        away_inner_y = -self.shoulder_gap / 2 + self.shoulder_thickness
+        """Blind 2.2 mm pilot holes, 8 mm deep from the indicator interface."""
+        indicator_inner_y = -self.shoulder_gap / 2 + self.angle_indicator_thickness
         pilots = cq.Workplane("XZ")
         for x, z in self._indicator_mount_centers():
             pilots = pilots.union(
                 cq.Workplane("XZ")
                 .center(x, z)
                 .circle(2.2 / 2)
+                # XZ's negative extrusion direction is +Y, inward from the
+                # indicator/body interface into the solid support block.
                 .extrude(-8.0)
-                .translate((0, away_inner_y, 0))
+                .translate((0, indicator_inner_y, 0))
             )
         return pilots
 

@@ -118,6 +118,12 @@ Bought-part display models now include deliberately simplified drive recesses:
 
 These are visual-identification features, not manufacturing-detail models. They preserve nominal fastener envelopes and BOM identity.
 
+### Angle-indicator pilot-hole correction
+
+The two 2.2 mm wood-screw pilots in the printable quill body are now 8.0 mm deep from the actual indicator/body interface. They previously started from the 3 mm shoulder's inner face instead of the 10 mm indicator interface, so only about 1 mm of each nominal 8 mm cut reached the finished body after the indicator cavity was removed.
+
+For the default M3×16 countersunk wood screws, the corrected stack gives approximately 7.5 mm of threaded shaft inside the body and 0.5 mm clearance before the blind pilot bottom. A regression test checks both complete pilot paths and confirms solid material remains immediately beyond 8 mm.
+
 ## Planned next work
 
 Continue as separate, reviewable checkpoints in this order. Do not combine all of these into one refactor.
