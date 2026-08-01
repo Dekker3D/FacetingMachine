@@ -93,7 +93,8 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     body_screw_clearance: float = 0.2
     holder_screw_clearance: float = 0.4
 
-    index_gear_od: float = 41.3
+    # Pitch diameter is the circle through the centres of the triangular teeth.
+    index_gear_pitch_diameter: float = 40.0
     index_gear_teeth_width: float = 5.0
     index_gear_numbers_width: float = 8.0
     index_gear_spacer_width: float = 2.0
@@ -309,6 +310,14 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 "index_gear_number_interval_teeth must be divisible by "
                 "index_gear_tick_interval_teeth"
             )
+        midpoint_teeth = self.index_gear_number_interval_teeth // 2
+        if (
+            self.index_gear_number_interval_teeth % 2 != 0
+            or midpoint_teeth % self.index_gear_tick_interval_teeth != 0
+        ):
+            raise ValueError(
+                "index_gear_number_interval_teeth midpoint must align with a tick"
+            )
 
         screw = self.index_gear_clamp_screw()
         minimum_screw_length = (
@@ -360,7 +369,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 f"the shank bore ({nut_bore_wall:g} mm available, "
                 f"{self.index_gear_clamp_nut_bore_wall_min:g} mm required)"
             )
-        if nut_inner_radius + nut_pocket_depth >= self.index_gear_od / 2:
+        if nut_inner_radius + nut_pocket_depth >= self.index_gear_tip_radius():
             raise ValueError(
                 "Index-gear clamp nut pocket must leave material at the gear rim"
             )
@@ -373,7 +382,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 f"M{screw.size:g}×{screw.shaft_length():g} mm is "
                 f"{nut_outer_radius - screw_outer_radius:g} mm too short"
             )
-        if screw_outer_radius >= self.index_gear_od / 2:
+        if screw_outer_radius >= self.index_gear_tip_radius():
             raise ValueError(
                 "Index-gear clamp set screw would protrude beyond the gear rim "
                 "when tightened against the ER11 shank"
@@ -420,7 +429,11 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         return shank_bottom_z - 1.0
 
     def index_gear_tip_radius(self) -> float:
-        return self.index_gear_od / 2 + self.index_gear_tooth_depth
+        return self.index_gear_pitch_radius() + self.index_gear_tooth_depth / 2
+
+    def index_gear_mechanical_outer_diameter(self) -> float:
+        """Mechanical diameter across tooth tips, derived from the pitch diameter."""
+        return self.index_gear_pitch_diameter + self.index_gear_tooth_depth
 
     def body_index_gear_clearance_radius(self) -> float:
         return self.index_gear_tip_radius() + self.body_index_gear_radial_clearance
@@ -596,7 +609,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
 
     def index_gear_pitch_radius(self) -> float:
         """Middle radius of the index gear's triangular tooth profile."""
-        return self.index_gear_od / 2 + self.index_gear_tooth_depth / 2
+        return self.index_gear_pitch_diameter / 2
 
     def cheater_gear_section_pitch_radius(self) -> float:
         """Middle radius of the matching cheater tooth profile."""
@@ -629,7 +642,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         )
 
     def cheater_gear_section_tooth_pitch(self) -> float:
-        return math.pi * self.index_gear_od / self.index_gear_num_teeth
+        return math.pi * self.index_gear_pitch_diameter / self.index_gear_num_teeth
 
     def cheater_gear_section_tooth_count(self) -> int:
         count = max(
@@ -1143,7 +1156,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             grip_notch_count=self.cheater_wheel_grip_notch_count,
         )
         gear = IndexGearStandardMk1.create(
-            od=self.index_gear_od,
+            pitch_diameter=self.index_gear_pitch_diameter,
             bore_dia=self.index_gear_bore_dia(),
             teeth_width=self.index_gear_teeth_width,
             tooth_depth=self.index_gear_tooth_depth,
@@ -3055,7 +3068,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
     @classmethod
     def create(
         cls,
-        od: float,
+        pitch_diameter: float,
         bore_dia: float,
         teeth_width: float,
         tooth_depth: float,
@@ -3074,7 +3087,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         tooth_root_relief_radial_depth: float,
     ) -> IndexGearStandardMk1:
         return cls.get(
-            od=od,
+            pitch_diameter=pitch_diameter,
             bore_dia=bore_dia,
             teeth_width=teeth_width,
             tooth_depth=tooth_depth,
@@ -3095,7 +3108,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
 
     def __init__(
         self,
-        od: float,
+        pitch_diameter: float,
         bore_dia: float,
         teeth_width: float,
         tooth_depth: float,
@@ -3113,7 +3126,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         tooth_root_relief_tangential_width: float,
         tooth_root_relief_radial_depth: float,
     ) -> None:
-        self.od = od
+        self.pitch_diameter = pitch_diameter
         self.bore_dia = bore_dia
         self.teeth_width = teeth_width
         self.tooth_depth = tooth_depth
@@ -3132,14 +3145,14 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         self.tooth_root_relief_radial_depth = tooth_root_relief_radial_depth
         # Local +Z becomes assembled +X. Keep the numbered band inboard and
         # the tick-slot band immediately before the teeth.
-        self.number_engraving_z = self.numbers_width / 3
+        self.number_engraving_z = self.numbers_width / 3 + 1.0
         self.tick_band_start_z = self.numbers_width - 4.0
         self.tick_band_end_z = self.numbers_width
         super().__init__(name="Index Gear")
         # Build geometry once
         obj = cq.Workplane("XY").cylinder(
             self.teeth_width + self.numbers_width,
-            self.od / 2,
+            self.marking_band_radius(),
             centered=(True, True, False),
         )
         obj = obj.faces(">Z").workplane().hole(self.bore_dia)
@@ -3167,7 +3180,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
     def _comparables(self) -> tuple[object, ...]:
         return (
             self.name,
-            self.od,
+            self.pitch_diameter,
             self.bore_dia,
             self.teeth_width,
             self.tooth_depth,
@@ -3186,13 +3199,50 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             self.tooth_root_relief_radial_depth,
         )
 
+    def pitch_radius(self) -> float:
+        """Radius of the circle through the middle of each triangular tooth."""
+        return self.pitch_diameter / 2
+
+    def tooth_root_radius(self) -> float:
+        return self.pitch_radius() - self.tooth_depth / 2
+
+    def tooth_tip_radius(self) -> float:
+        return self.pitch_radius() + self.tooth_depth / 2
+
+    def mechanical_outer_diameter(self) -> float:
+        """Mechanical diameter across tooth tips, derived from pitch geometry."""
+        return self.pitch_diameter + self.tooth_depth
+
+    def marking_band_radius(self) -> float:
+        """Number and tick band radius, inset 0.2 mm from the normal root."""
+        return self.tooth_root_radius() - 0.2
+
+    def small_tick_length(self) -> float:
+        return 2.5
+
+    def large_midpoint_tick_length(self) -> float:
+        return 4.0
+
+    def is_numbered_position(self, tooth_index: int) -> bool:
+        return tooth_index % self.number_interval_teeth == 0
+
+    def is_large_midpoint_tick(self, tooth_index: int) -> bool:
+        midpoint_teeth = self.number_interval_teeth // 2
+        return tooth_index % self.number_interval_teeth == midpoint_teeth
+
+    def tick_mark_length(self, tooth_index: int) -> float:
+        """Large ticks occur only halfway between adjacent numbered indices."""
+        if self.is_large_midpoint_tick(tooth_index):
+            return self.large_midpoint_tick_length()
+        return self.small_tick_length()
+
     def _add_teeth(self, gear: cq.Workplane) -> cq.Workplane:
         angular_pitch = 2 * math.pi / self.num_teeth
         tooth_profile = gear_tooth_profile_polar_points(
             range(self.num_teeth),
             angular_pitch,
-            self.od / 2,
-            self.od / 2 + self.tooth_depth,
+            self.tooth_root_radius(),
+            self.tooth_tip_radius(),
             valley_angle_offset=0.0,
         )
         verts = [
@@ -3252,7 +3302,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         radial_screw_path = (
             cq.Workplane("YZ")
             .circle(self.clamp_screw_hole_dia / 2)
-            .extrude(self.od)
+            .extrude(self.mechanical_outer_diameter())
             .translate((0, 0, numbers_mid_z))
         )
         cutout = pocket.union(loading_channel).union(radial_screw_path).rotate(
@@ -3265,13 +3315,12 @@ class IndexGearStandardMk1(bpd.PrintedPart):
     def _add_tick_marks(self, gear: cq.Workplane) -> cq.Workplane:
         """Engrave ticks in the local +Z band immediately before the teeth."""
         angle_per_tooth = 360.0 / self.num_teeth
-        radius = self.od / 2
+        radius = self.marking_band_radius()
         mark_depth = 0.4
 
         for i in range(0, self.num_teeth, self.tick_interval_teeth):
             angle = angle_per_tooth * i
-            is_major = i % self.number_interval_teeth == 0
-            line_len = 4.0 if is_major else 2.5
+            line_len = self.tick_mark_length(i)
 
             mark = (
                 cq.Workplane("XY")
@@ -3281,7 +3330,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             )
             gear = gear.cut(mark)
 
-            if is_major:
+            if self.is_numbered_position(i):
                 num_mark = (
                     cq.Workplane("XY")
                     .add(offset(text(f"{((i - 1) % self.num_teeth) + 1}", 5), 2))
