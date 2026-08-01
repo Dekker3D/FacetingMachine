@@ -11,6 +11,22 @@ from quill.quill_joint import QuillAngleIndicator, QuillJointAli
 from cadquery.func import text, offset
 
 
+def gear_tooth_profile_polar_points(
+    tooth_indices: range,
+    angular_pitch: float,
+    root_radius: float,
+    tip_radius: float,
+    valley_angle_offset: float,
+) -> list[tuple[float, float]]:
+    """Return alternating valley/tip polar points for a triangular gear tooth profile."""
+    points: list[tuple[float, float]] = []
+    for tooth_index in tooth_indices:
+        valley_angle = (tooth_index + valley_angle_offset) * angular_pitch
+        points.append((valley_angle, root_radius))
+        points.append((valley_angle + angular_pitch / 2, tip_radius))
+    return points
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Assembly — owns all dimensions, injects into parts
 # ═══════════════════════════════════════════════════════════════════════
@@ -141,7 +157,16 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_gear_section_screw_clearance_dia: float = 3.4
     cheater_gear_section_screw_pilot_dia: float = 2.2
     cheater_gear_section_screw_spacing_y: float = 10.0
-    cheater_gear_section_neutral_clearance: float = 0.5
+    cheater_gear_section_neutral_clearance: float = 0.0
+    gear_tooth_root_relief_tangential_width: float = 0.5
+    gear_tooth_root_relief_radial_depth: float = 1.0
+    cheater_gear_section_negative_x_extension: float = 2.0
+    # Match the index gear's proven 5 mm text size.  Its 1 mm engraving is
+    # intentionally shallower than the index gear's 2 mm text because this
+    # removable section has only a 5 mm axial thickness.
+    cheater_gear_section_tooth_count_engraving_size: float = 5.0
+    cheater_gear_section_tooth_count_engraving_depth: float = 1.0
+    cheater_gear_section_tooth_count_engraving_margin_z: float = 0.5
 
     cheater_spring_wire_diameter: float = 0.5
     cheater_spring_outside_diameter: float = 8.0
@@ -1058,6 +1083,23 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             ),
             screw_head_diameter=gear_section_screw.head_diameter(),
             screw_head_height=gear_section_screw.head_height(),
+            tooth_root_relief_tangential_width=(
+                self.gear_tooth_root_relief_tangential_width
+            ),
+            tooth_root_relief_radial_depth=self.gear_tooth_root_relief_radial_depth,
+            negative_x_extension=self.cheater_gear_section_negative_x_extension,
+            mating_index_gear_tooth_count=self.index_gear_num_teeth,
+            tooth_count_engraving_size=(
+                self.cheater_gear_section_tooth_count_engraving_size
+            ),
+            tooth_count_engraving_depth=(
+                self.cheater_gear_section_tooth_count_engraving_depth
+            ),
+            tooth_count_engraving_z=(
+                self.cheater_gear_section_screw_z()
+                + self.cheater_gear_section_tooth_count_engraving_size / 2
+                + self.cheater_gear_section_tooth_count_engraving_margin_z
+            ),
         )
         cheater_spring = self.cheater_spring()
         pivot_bolt = self.cheater_pivot_bolt()
@@ -1095,6 +1137,10 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             clamp_nut_depth=self.index_gear_clamp_nut_pocket_depth(),
             clamp_nut_inner_radius=self.index_gear_clamp_nut_inner_radius(),
             clamp_angle=self.index_gear_clamp_angle(),
+            tooth_root_relief_tangential_width=(
+                self.gear_tooth_root_relief_tangential_width
+            ),
+            tooth_root_relief_radial_depth=self.gear_tooth_root_relief_radial_depth,
         )
         er11 = self.er11
 
@@ -2371,7 +2417,7 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
 
 
 class QuillCheaterGearSection(bpd.PrintedPart):
-    """Replaceable concave gear segment mounted to the rocker's -X face."""
+    """Replaceable convex gear arc mounted to the rocker's -X face."""
 
     @classmethod
     def create(
@@ -2391,6 +2437,13 @@ class QuillCheaterGearSection(bpd.PrintedPart):
         screw_clearance_diameter: float,
         screw_head_diameter: float,
         screw_head_height: float,
+        tooth_root_relief_tangential_width: float,
+        tooth_root_relief_radial_depth: float,
+        negative_x_extension: float,
+        mating_index_gear_tooth_count: int,
+        tooth_count_engraving_size: float,
+        tooth_count_engraving_depth: float,
+        tooth_count_engraving_z: float,
     ) -> QuillCheaterGearSection:
         return cls.get(
             negative_x=negative_x,
@@ -2408,6 +2461,13 @@ class QuillCheaterGearSection(bpd.PrintedPart):
             screw_clearance_diameter=screw_clearance_diameter,
             screw_head_diameter=screw_head_diameter,
             screw_head_height=screw_head_height,
+            tooth_root_relief_tangential_width=tooth_root_relief_tangential_width,
+            tooth_root_relief_radial_depth=tooth_root_relief_radial_depth,
+            negative_x_extension=negative_x_extension,
+            mating_index_gear_tooth_count=mating_index_gear_tooth_count,
+            tooth_count_engraving_size=tooth_count_engraving_size,
+            tooth_count_engraving_depth=tooth_count_engraving_depth,
+            tooth_count_engraving_z=tooth_count_engraving_z,
         )
 
     def __init__(
@@ -2427,6 +2487,13 @@ class QuillCheaterGearSection(bpd.PrintedPart):
         screw_clearance_diameter: float,
         screw_head_diameter: float,
         screw_head_height: float,
+        tooth_root_relief_tangential_width: float,
+        tooth_root_relief_radial_depth: float,
+        negative_x_extension: float,
+        mating_index_gear_tooth_count: int,
+        tooth_count_engraving_size: float,
+        tooth_count_engraving_depth: float,
+        tooth_count_engraving_z: float,
     ) -> None:
         self.negative_x = negative_x
         self.positive_x = positive_x
@@ -2443,28 +2510,30 @@ class QuillCheaterGearSection(bpd.PrintedPart):
         self.screw_clearance_diameter = screw_clearance_diameter
         self.screw_head_diameter = screw_head_diameter
         self.screw_head_height = screw_head_height
+        self.tooth_root_relief_tangential_width = tooth_root_relief_tangential_width
+        self.tooth_root_relief_radial_depth = tooth_root_relief_radial_depth
+        self.negative_x_extension = negative_x_extension
+        self.mating_index_gear_tooth_count = mating_index_gear_tooth_count
+        self.tooth_count_engraving_size = tooth_count_engraving_size
+        self.tooth_count_engraving_depth = tooth_count_engraving_depth
+        self.tooth_count_engraving_z = tooth_count_engraving_z
         super().__init__(name="Quill Cheater Gear Section")
 
         half_count = tooth_count // 2
         root_radius = curve_radius - tooth_depth
         curve_center_z = tooth_contact_z + curve_radius
         half_angle = (half_count + 0.5) * angular_pitch
-        profile: list[tuple[float, float]] = []
-        for index in range(-half_count, half_count + 1):
-            valley_angle = (index - 0.5) * angular_pitch
-            tip_angle = index * angular_pitch
-            profile.append(
-                (
-                    math.sin(valley_angle) * root_radius,
-                    curve_center_z - math.cos(valley_angle) * root_radius,
-                )
-            )
-            profile.append(
-                (
-                    math.sin(tip_angle) * curve_radius,
-                    curve_center_z - math.cos(tip_angle) * curve_radius,
-                )
-            )
+        tooth_profile = gear_tooth_profile_polar_points(
+            range(-half_count, half_count + 1),
+            angular_pitch,
+            root_radius,
+            curve_radius,
+            valley_angle_offset=-0.5,
+        )
+        profile = [
+            (math.sin(angle) * radius, curve_center_z - math.cos(angle) * radius)
+            for angle, radius in tooth_profile
+        ]
         edge_y = math.sin(half_angle) * root_radius
         profile.extend(
             (
@@ -2476,25 +2545,96 @@ class QuillCheaterGearSection(bpd.PrintedPart):
                 (-edge_y, backing_top_z),
             )
         )
+        # Extend the entire gear section toward -X, then restore the +Y half,
+        # all material above the screw centres, and each screw-head clearance.
+        extended_negative_x = negative_x - negative_x_extension
 
         toothed_section = (
             cq.Workplane("YZ")
             .polyline(profile)
             .close()
-            .extrude(positive_x - negative_x)
-            .translate((negative_x, 0.0, 0.0))
+            .extrude(positive_x - extended_negative_x)
+            .translate((extended_negative_x, 0.0, 0.0))
         )
         backing = (
             cq.Workplane("XY")
             .box(
-                positive_x - negative_x,
+                positive_x - extended_negative_x,
                 backing_width_y,
                 backing_top_z - backing_bottom_z,
                 centered=(False, True, False),
             )
-            .translate((negative_x, 0.0, backing_bottom_z))
+            .translate((extended_negative_x, 0.0, backing_bottom_z))
         )
         assembled = toothed_section.union(backing)
+        positive_y_extension_cut = (
+            cq.Workplane("XY")
+            .box(
+                negative_x_extension + 0.1,
+                backing_width_y / 2 + 0.1,
+                backing_top_z - backing_bottom_z + curve_radius * 2,
+                centered=(False, False, False),
+            )
+            .translate(
+                (
+                    extended_negative_x - 0.1,
+                    -0.1,
+                    backing_bottom_z - curve_radius,
+                )
+            )
+        )
+        assembled = assembled.cut(positive_y_extension_cut)
+        above_screw_extension_cut = (
+            cq.Workplane("XY")
+            .box(
+                negative_x_extension + 0.1,
+                backing_width_y + 0.2,
+                backing_top_z - screw_z + curve_radius * 2,
+                centered=(False, True, False),
+            )
+            .translate(
+                (
+                    extended_negative_x - 0.1,
+                    0.0,
+                    screw_z,
+                )
+            )
+        )
+        assembled = assembled.cut(above_screw_extension_cut)
+        screw_head_extension_clearance = cq.Workplane("YZ")
+        for y in (-screw_spacing_y / 2, screw_spacing_y / 2):
+            screw_head_extension_clearance = screw_head_extension_clearance.union(
+                cq.Workplane("YZ")
+                .center(y, screw_z)
+                .circle(screw_head_diameter / 2 + 1.0)
+                .extrude(negative_x_extension + 0.1)
+                .translate((extended_negative_x - 0.1, 0.0, 0.0))
+            )
+        assembled = assembled.cut(screw_head_extension_clearance)
+        root_relief = cq.Workplane("YZ")
+        for valley_angle, _radius in tooth_profile[::2]:
+            tangent_y = math.cos(valley_angle)
+            tangent_z = math.sin(valley_angle)
+            root_y = math.sin(valley_angle) * root_radius
+            root_z = curve_center_z - math.cos(valley_angle) * root_radius
+            inward_y = -math.sin(valley_angle)
+            inward_z = math.cos(valley_angle)
+            outward_y = math.sin(valley_angle)
+            outward_z = -math.cos(valley_angle)
+            half_width = tooth_root_relief_tangential_width / 2
+            depth = tooth_root_relief_radial_depth
+            slot = cq.Workplane("YZ").polyline(
+                [
+                    (root_y - tangent_y * half_width + outward_y * depth, root_z - tangent_z * half_width + outward_z * depth),
+                    (root_y + tangent_y * half_width + outward_y * depth, root_z + tangent_z * half_width + outward_z * depth),
+                    (root_y + tangent_y * half_width + inward_y * depth, root_z + tangent_z * half_width + inward_z * depth),
+                    (root_y - tangent_y * half_width + inward_y * depth, root_z - tangent_z * half_width + inward_z * depth),
+                ]
+            ).close().extrude(positive_x - extended_negative_x + 0.2).translate(
+                (extended_negative_x - 0.1, 0.0, 0.0)
+            )
+            root_relief = root_relief.union(slot)
+        assembled = assembled.cut(root_relief)
         clearance = cq.Workplane("YZ")
         for y in (-screw_spacing_y / 2, screw_spacing_y / 2):
             shaft = (
@@ -2515,6 +2655,18 @@ class QuillCheaterGearSection(bpd.PrintedPart):
             )
             clearance = clearance.union(shaft).union(countersink)
         assembled = assembled.cut(clearance)
+        engraving = (
+            cq.Workplane("YZ")
+            .center(0.0, tooth_count_engraving_z)
+            .text(
+                str(mating_index_gear_tooth_count),
+                tooth_count_engraving_size,
+                tooth_count_engraving_depth,
+            )
+            .mirror("XZ")
+            .translate((negative_x, 0.0, 0.0))
+        )
+        assembled = assembled.cut(engraving)
         self._assembled_object = assembled
 
         printable = assembled.rotate((0, 0, 0), (0, 1, 0), 90)
@@ -2546,6 +2698,13 @@ class QuillCheaterGearSection(bpd.PrintedPart):
             self.screw_clearance_diameter,
             self.screw_head_diameter,
             self.screw_head_height,
+            self.tooth_root_relief_tangential_width,
+            self.tooth_root_relief_radial_depth,
+            self.negative_x_extension,
+            self.mating_index_gear_tooth_count,
+            self.tooth_count_engraving_size,
+            self.tooth_count_engraving_depth,
+            self.tooth_count_engraving_z,
         )
 
 
@@ -2888,6 +3047,8 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         clamp_nut_depth: float,
         clamp_nut_inner_radius: float,
         clamp_angle: float,
+        tooth_root_relief_tangential_width: float,
+        tooth_root_relief_radial_depth: float,
     ) -> IndexGearStandardMk1:
         return cls.get(
             od=od,
@@ -2905,6 +3066,8 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             clamp_nut_depth=clamp_nut_depth,
             clamp_nut_inner_radius=clamp_nut_inner_radius,
             clamp_angle=clamp_angle,
+            tooth_root_relief_tangential_width=tooth_root_relief_tangential_width,
+            tooth_root_relief_radial_depth=tooth_root_relief_radial_depth,
         )
 
     def __init__(
@@ -2924,6 +3087,8 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         clamp_nut_depth: float,
         clamp_nut_inner_radius: float,
         clamp_angle: float,
+        tooth_root_relief_tangential_width: float,
+        tooth_root_relief_radial_depth: float,
     ) -> None:
         self.od = od
         self.bore_dia = bore_dia
@@ -2940,6 +3105,8 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         self.clamp_nut_depth = clamp_nut_depth
         self.clamp_nut_inner_radius = clamp_nut_inner_radius
         self.clamp_angle = clamp_angle
+        self.tooth_root_relief_tangential_width = tooth_root_relief_tangential_width
+        self.tooth_root_relief_radial_depth = tooth_root_relief_radial_depth
         super().__init__(name="Index Gear")
         # Build geometry once
         obj = cq.Workplane("XY").cylinder(
@@ -2987,17 +3154,46 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             self.clamp_nut_depth,
             self.clamp_nut_inner_radius,
             self.clamp_angle,
+            self.tooth_root_relief_tangential_width,
+            self.tooth_root_relief_radial_depth,
         )
 
     def _add_teeth(self, gear: cq.Workplane) -> cq.Workplane:
-        verts = []
-        for x in range(self.num_teeth * 2):
-            angle = math.radians(x * 360.0 / (self.num_teeth * 2))
-            dist = self.od / 2 + (x % 2) * self.tooth_depth
-            verts.append([math.sin(angle) * dist, math.cos(angle) * dist])
-
+        angular_pitch = 2 * math.pi / self.num_teeth
+        tooth_profile = gear_tooth_profile_polar_points(
+            range(self.num_teeth),
+            angular_pitch,
+            self.od / 2,
+            self.od / 2 + self.tooth_depth,
+            valley_angle_offset=0.0,
+        )
+        verts = [
+            (math.sin(angle) * radius, math.cos(angle) * radius)
+            for angle, radius in tooth_profile
+        ]
         teeth = cq.Workplane("XY").polyline(verts).close().extrude(self.teeth_width)
-        return gear.union(teeth.translate((0, 0, self.numbers_width)))
+        gear = gear.union(teeth.translate((0, 0, self.numbers_width)))
+
+        root_relief = cq.Workplane("XY")
+        for valley_angle, root_radius in tooth_profile[::2]:
+            tangent_x = math.cos(valley_angle)
+            tangent_y = -math.sin(valley_angle)
+            radial_x = math.sin(valley_angle)
+            radial_y = math.cos(valley_angle)
+            half_width = self.tooth_root_relief_tangential_width / 2
+            depth = self.tooth_root_relief_radial_depth
+            root_x = radial_x * root_radius
+            root_y = radial_y * root_radius
+            slot = cq.Workplane("XY").polyline(
+                [
+                    (root_x - tangent_x * half_width + radial_x * depth, root_y - tangent_y * half_width + radial_y * depth),
+                    (root_x + tangent_x * half_width + radial_x * depth, root_y + tangent_y * half_width + radial_y * depth),
+                    (root_x + tangent_x * half_width - radial_x * depth, root_y + tangent_y * half_width - radial_y * depth),
+                    (root_x - tangent_x * half_width - radial_x * depth, root_y - tangent_y * half_width - radial_y * depth),
+                ]
+            ).close().extrude(self.teeth_width).translate((0.0, 0.0, self.numbers_width))
+            root_relief = root_relief.union(slot)
+        return gear.cut(root_relief)
 
     def _add_nut_pocket(self, gear: cq.Workplane) -> cq.Workplane:
         """Captive-nut pocket, face-loading channel, and radial screw path."""

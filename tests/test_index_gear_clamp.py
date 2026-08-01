@@ -7,6 +7,8 @@ from quill.quill_assembly import (
     IndexGearStandardMk1,
     QuillAssemblyStandardMk1,
     QuillBody,
+    QuillCheaterGearSection,
+    gear_tooth_profile_polar_points,
 )
 
 
@@ -17,6 +19,105 @@ def shape_volume(workplane: cq.Workplane) -> float:
 
 
 class IndexGearClampTests(unittest.TestCase):
+    def test_shared_tooth_profile_alternates_valleys_and_tips(self) -> None:
+        profile = gear_tooth_profile_polar_points(
+            range(3),
+            angular_pitch=1.0,
+            root_radius=10.0,
+            tip_radius=11.0,
+            valley_angle_offset=-0.5,
+        )
+
+        self.assertEqual(
+            profile,
+            [(-0.5, 10.0), (0.0, 11.0), (0.5, 10.0), (1.0, 11.0), (1.5, 10.0), (2.0, 11.0)],
+        )
+
+    def test_mating_gears_receive_shared_relief_and_neutral_contact_values(self) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+        parts = [part for part, _quantity in quill.get_BOM().items()]
+        index_gear = next(part for part in parts if isinstance(part, IndexGearStandardMk1))
+        cheater_gear = next(part for part in parts if isinstance(part, QuillCheaterGearSection))
+
+        self.assertEqual(quill.cheater_gear_section_neutral_clearance, 0.0)
+        self.assertEqual(quill.gear_tooth_root_relief_tangential_width, 0.5)
+        self.assertEqual(quill.gear_tooth_root_relief_radial_depth, 1.0)
+        self.assertEqual(index_gear.tooth_root_relief_tangential_width, 0.5)
+        self.assertEqual(index_gear.tooth_root_relief_radial_depth, 1.0)
+        self.assertEqual(cheater_gear.tooth_root_relief_tangential_width, 0.5)
+        self.assertEqual(cheater_gear.tooth_root_relief_radial_depth, 1.0)
+
+    def test_cheater_gear_extension_stays_below_screws_with_head_clearances(self) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+        cheater_gear = next(
+            part
+            for part, _quantity in quill.get_BOM().items()
+            if isinstance(part, QuillCheaterGearSection)
+        )
+        shape = cheater_gear.get_assembled_object().val()
+        assert isinstance(shape, cq.Shape)
+        bounds = shape.BoundingBox()
+
+        self.assertAlmostEqual(bounds.ymax, quill.cheater_rocker_width_y / 2, places=6)
+        self.assertAlmostEqual(bounds.ymin, -quill.cheater_rocker_width_y / 2, places=6)
+        self.assertAlmostEqual(
+            bounds.xmin,
+            quill.cheater_gear_section_negative_x()
+            - quill.cheater_gear_section_negative_x_extension,
+            places=6,
+        )
+        extension_test_x = (
+            quill.cheater_gear_section_negative_x()
+            - quill.cheater_gear_section_negative_x_extension / 2
+        )
+        retained_extension_z = (
+            cheater_gear.backing_bottom_z + cheater_gear.screw_z
+        ) / 2
+        self.assertTrue(
+            shape.isInside(  # type: ignore[reportAttributeAccessIssue]
+                cq.Vector(
+                    extension_test_x,
+                    -0.5,
+                    retained_extension_z,
+                )
+            )
+        )
+        self.assertFalse(
+            shape.isInside(  # type: ignore[reportAttributeAccessIssue]
+                cq.Vector(
+                    extension_test_x,
+                    quill.cheater_rocker_width_y / 4,
+                    retained_extension_z,
+                )
+            )
+        )
+        self.assertFalse(
+            shape.isInside(  # type: ignore[reportAttributeAccessIssue]
+                cq.Vector(
+                    extension_test_x,
+                    -quill.cheater_rocker_width_y / 4,
+                    cheater_gear.screw_z + 1.0,
+                )
+            )
+        )
+        head_clearance_radius = cheater_gear.screw_head_diameter / 2 + 1.0
+        for screw_y in (-cheater_gear.screw_spacing_y / 2, cheater_gear.screw_spacing_y / 2):
+            self.assertFalse(
+                shape.isInside(  # type: ignore[reportAttributeAccessIssue]
+                    cq.Vector(
+                        extension_test_x,
+                        screw_y + head_clearance_radius - 0.25,
+                        cheater_gear.screw_z,
+                    )
+                )
+            )
+        self.assertEqual(cheater_gear.tooth_count, quill.cheater_gear_section_tooth_count())
+        self.assertEqual(
+            cheater_gear.mating_index_gear_tooth_count,
+            quill.index_gear_num_teeth,
+        )
+        self.assertGreater(cheater_gear.tooth_count_engraving_z, cheater_gear.screw_z)
+
     def test_default_clamp_uses_selected_m3_hardware(self) -> None:
         quill = QuillAssemblyStandardMk1(explode=False)
 
