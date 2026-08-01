@@ -158,7 +158,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_gear_section_screw_pilot_dia: float = 2.2
     cheater_gear_section_screw_spacing_y: float = 10.0
     cheater_gear_section_neutral_clearance: float = 0.0
-    gear_tooth_root_relief_tangential_width: float = 0.5
+    gear_tooth_root_relief_tangential_width: float = 0.2
     gear_tooth_root_relief_radial_depth: float = 1.0
     cheater_gear_section_negative_x_extension: float = 2.0
     # Match the index gear's proven 5 mm text size.  Its 1 mm engraving is
@@ -582,8 +582,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         curve_radius = self.index_gear_tip_radius()
         curve_center_z = (
             self.block_center_z()
-            + self.cheater_gear_section_tooth_tip_radius()
-            + curve_radius
+            + self.cheater_gear_section_neutral_center_distance()
         )
         root_radius = curve_radius - self.index_gear_tooth_depth
         return curve_center_z - math.cos(half_angle) * root_radius
@@ -593,6 +592,33 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         return (
             self.index_gear_tip_radius()
             + self.cheater_gear_section_neutral_clearance
+        )
+
+    def index_gear_pitch_radius(self) -> float:
+        """Middle radius of the index gear's triangular tooth profile."""
+        return self.index_gear_od / 2 + self.index_gear_tooth_depth / 2
+
+    def cheater_gear_section_pitch_radius(self) -> float:
+        """Middle radius of the matching cheater tooth profile."""
+        root_radius = (
+            self.cheater_gear_section_tooth_tip_radius()
+            - self.index_gear_tooth_depth
+        )
+        return root_radius + self.index_gear_tooth_depth / 2
+
+    def cheater_gear_section_neutral_center_distance(self) -> float:
+        """Centre distance for neutral pitch-circle meshing of the two gears."""
+        return (
+            self.index_gear_pitch_radius()
+            + self.cheater_gear_section_pitch_radius()
+        )
+
+    def cheater_gear_section_tooth_contact_z(self) -> float:
+        """Cheater tip's low point derived from the neutral centre distance."""
+        return (
+            self.block_center_z()
+            + self.cheater_gear_section_neutral_center_distance()
+            - self.cheater_gear_section_tooth_tip_radius()
         )
 
     def cheater_gear_section_screw(self) -> bb.WoodScrew:
@@ -1065,10 +1091,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         cheater_gear_section = QuillCheaterGearSection.create(
             negative_x=self.cheater_gear_section_negative_x(),
             positive_x=self.index_teeth_positive_x(),
-            tooth_contact_z=(
-                self.block_center_z()
-                + self.cheater_gear_section_tooth_tip_radius()
-            ),
+            tooth_contact_z=self.cheater_gear_section_tooth_contact_z(),
             curve_radius=self.index_gear_tip_radius(),
             tooth_depth=self.index_gear_tooth_depth,
             backing_width_y=self.cheater_rocker_width_y,
@@ -3107,6 +3130,11 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         self.clamp_angle = clamp_angle
         self.tooth_root_relief_tangential_width = tooth_root_relief_tangential_width
         self.tooth_root_relief_radial_depth = tooth_root_relief_radial_depth
+        # Local +Z becomes assembled +X. Keep the numbered band inboard and
+        # the tick-slot band immediately before the teeth.
+        self.number_engraving_z = self.numbers_width / 3
+        self.tick_band_start_z = self.numbers_width - 4.0
+        self.tick_band_end_z = self.numbers_width
         super().__init__(name="Index Gear")
         # Build geometry once
         obj = cq.Workplane("XY").cylinder(
@@ -3235,7 +3263,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
         return gear.cut(cutout)
 
     def _add_tick_marks(self, gear: cq.Workplane) -> cq.Workplane:
-        """Engraved tick marks on the bottom face."""
+        """Engrave ticks in the local +Z band immediately before the teeth."""
         angle_per_tooth = 360.0 / self.num_teeth
         radius = self.od / 2
         mark_depth = 0.4
@@ -3248,7 +3276,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
             mark = (
                 cq.Workplane("XY")
                 .box(mark_depth * 2, 0.6, line_len, centered=(True, True, False))
-                .translate((radius - mark_depth, 0, 0))
+                .translate((radius - mark_depth, 0, self.numbers_width - line_len))
                 .rotate((0, 0, 0), (0, 0, 1), angle)
             )
             gear = gear.cut(mark)
@@ -3258,7 +3286,7 @@ class IndexGearStandardMk1(bpd.PrintedPart):
                     cq.Workplane("XY")
                     .add(offset(text(f"{((i - 1) % self.num_teeth) + 1}", 5), 2))
                     .rotate((0, 0, 0), (0, 1, 0), 90)
-                    .translate((radius - mark_depth, 0, self.numbers_width * 2 / 3))
+                    .translate((radius - mark_depth, 0, self.number_engraving_z))
                     .rotate((0, 0, 0), (0, 0, 1), -angle)
                 )
                 gear = gear.cut(num_mark)

@@ -40,12 +40,51 @@ class IndexGearClampTests(unittest.TestCase):
         cheater_gear = next(part for part in parts if isinstance(part, QuillCheaterGearSection))
 
         self.assertEqual(quill.cheater_gear_section_neutral_clearance, 0.0)
-        self.assertEqual(quill.gear_tooth_root_relief_tangential_width, 0.5)
+        self.assertEqual(quill.gear_tooth_root_relief_tangential_width, 0.2)
         self.assertEqual(quill.gear_tooth_root_relief_radial_depth, 1.0)
-        self.assertEqual(index_gear.tooth_root_relief_tangential_width, 0.5)
+        self.assertEqual(index_gear.tooth_root_relief_tangential_width, 0.2)
         self.assertEqual(index_gear.tooth_root_relief_radial_depth, 1.0)
-        self.assertEqual(cheater_gear.tooth_root_relief_tangential_width, 0.5)
+        self.assertEqual(cheater_gear.tooth_root_relief_tangential_width, 0.2)
         self.assertEqual(cheater_gear.tooth_root_relief_radial_depth, 1.0)
+
+    def test_neutral_meshing_uses_pitch_circle_center_distance(self) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+
+        index_pitch_radius = quill.index_gear_pitch_radius()
+        cheater_pitch_radius = quill.cheater_gear_section_pitch_radius()
+        tip_circle_center_distance = (
+            quill.index_gear_tip_radius()
+            + quill.cheater_gear_section_tooth_tip_radius()
+        )
+
+        self.assertAlmostEqual(
+            quill.cheater_gear_section_neutral_center_distance(),
+            index_pitch_radius + cheater_pitch_radius,
+        )
+        self.assertAlmostEqual(
+            tip_circle_center_distance
+            - quill.cheater_gear_section_neutral_center_distance(),
+            quill.index_gear_tooth_depth,
+        )
+        self.assertAlmostEqual(
+            quill.cheater_gear_section_tooth_contact_z(),
+            quill.block_center_z()
+            + quill.cheater_gear_section_neutral_center_distance()
+            - quill.cheater_gear_section_tooth_tip_radius(),
+        )
+
+    def test_markings_use_separate_axial_number_and_tick_bands(self) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+        gear = next(
+            part
+            for part, _quantity in quill.get_BOM().items()
+            if isinstance(part, IndexGearStandardMk1)
+        )
+
+        self.assertLess(gear.number_engraving_z, gear.tick_band_start_z)
+        self.assertGreater(gear.tick_band_start_z, 0.0)
+        self.assertAlmostEqual(gear.tick_band_end_z, gear.numbers_width)
+        self.assertLessEqual(gear.tick_band_end_z, gear.numbers_width)
 
     def test_cheater_gear_extension_stays_below_screws_with_head_clearances(self) -> None:
         quill = QuillAssemblyStandardMk1(explode=False)
