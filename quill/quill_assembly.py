@@ -144,6 +144,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_pivot_bolt_thread_protrusion: float = 4.0
     cheater_wheel_hex_clearance: float = 0.2
     cheater_wheel_head_depth_clearance: float = 0.2
+    cheater_wheel_material_beneath_head: float = 3.0
     cheater_wheel_grip_notch_radius: float = 1.5
     cheater_wheel_grip_notch_count: int = 12
     cheater_positive_y_shelf_edge_bevel: float = 2.0
@@ -808,6 +809,13 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             + self.cheater_wheel_outboard_extension
         )
 
+    def cheater_wheel_hex_pocket_depth(self) -> float:
+        """Keep the captured pivot-head pocket 3 mm shy of the inner wheel face."""
+        return (
+            self.cheater_wheel_width()
+            - self.cheater_wheel_material_beneath_head
+        )
+
     def cheater_positive_y_shelf_top_z(self) -> float:
         """Highest shelf that keeps both pan heads 2 mm from the wheel."""
         bolt = self.removable_top_bolt()
@@ -1294,10 +1302,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 pivot_bolt.head_diameter()
                 + self.cheater_wheel_hex_clearance * 2
             ),
-            hex_depth=(
-                pivot_bolt.head_height()
-                + self.cheater_wheel_head_depth_clearance
-            ),
+            hex_depth=self.cheater_wheel_hex_pocket_depth(),
             shaft_hole_diameter=self.cheater_axle_hole_dia(),
             grip_notch_radius=self.cheater_wheel_grip_notch_radius,
             grip_notch_count=self.cheater_wheel_grip_notch_count,

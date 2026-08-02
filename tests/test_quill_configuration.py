@@ -8,6 +8,7 @@ import bom_part_data as bpd
 import bought_bits as bb
 from quill.quill_assembly import (
     QuillAssemblyStandardMk1,
+    QuillCheaterAdjustmentWheel,
     QuillCheaterBearingTop,
     QuillCheaterRocker,
 )
@@ -56,6 +57,29 @@ class CompressionSpringTests(unittest.TestCase):
 
 
 class QuillSpringConfigurationTests(unittest.TestCase):
+    def test_cheater_wheel_hex_pocket_preserves_inner_material_floor(self) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+        wheel = next(
+            part
+            for part, _quantity in quill.get_BOM().items()
+            if isinstance(part, QuillCheaterAdjustmentWheel)
+        )
+
+        self.assertAlmostEqual(wheel.outside_diameter, 30.0)
+        self.assertAlmostEqual(wheel.width, quill.cheater_wheel_width())
+        self.assertAlmostEqual(wheel.width, 14.5)
+        self.assertAlmostEqual(quill.cheater_wheel_material_beneath_head, 3.0)
+        self.assertAlmostEqual(
+            wheel.hex_depth,
+            quill.cheater_wheel_hex_pocket_depth(),
+        )
+        self.assertAlmostEqual(wheel.hex_depth, 11.5)
+        self.assertAlmostEqual(
+            wheel.width - wheel.hex_depth,
+            quill.cheater_wheel_material_beneath_head,
+        )
+        self.assertLess(wheel.hex_depth, wheel.width)
+
     def test_selected_spring_and_seat_contract(self) -> None:
         quill = QuillAssemblyStandardMk1(explode=False)
         spring = quill.cheater_spring()
