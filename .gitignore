@@ -1,5 +1,8 @@
 /venv
 /*.stl
 /export
+# Local tooling/cache directories; never source artifacts.
+.ruff_cache/
+.worktrees/
 __pycache__/
 venv
