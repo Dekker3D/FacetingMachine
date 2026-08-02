@@ -6,7 +6,11 @@ import unittest
 import cadquery as cq
 import bom_part_data as bpd
 import bought_bits as bb
-from quill.quill_assembly import QuillAssemblyStandardMk1, QuillCheaterBearingTop
+from quill.quill_assembly import (
+    QuillAssemblyStandardMk1,
+    QuillCheaterBearingTop,
+    QuillCheaterRocker,
+)
 
 
 def _solid_contains(shape: cq.Solid, point: cq.Vector) -> bool:
@@ -52,6 +56,53 @@ class CompressionSpringTests(unittest.TestCase):
 
 
 class QuillSpringConfigurationTests(unittest.TestCase):
+    def test_selected_spring_and_seat_contract(self) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+        spring = quill.cheater_spring()
+
+        self.assertAlmostEqual(spring.outside_diameter, 6.0)
+        self.assertAlmostEqual(spring.free_length, 20.0)
+        self.assertAlmostEqual(spring.wire_diameter, 1.0)
+        self.assertEqual(spring.coil_count, 8)
+        self.assertAlmostEqual(quill.cheater_spring_preload_compression, 1.0)
+        self.assertAlmostEqual(quill.cheater_spring_installed_length(), 19.0)
+        self.assertGreaterEqual(
+            quill.cheater_spring_installed_length(),
+            (spring.coil_count + 1) * spring.wire_diameter,
+        )
+        self.assertAlmostEqual(
+            quill.cheater_spring_center_x(),
+            quill.cheater_pivot_x() + quill.cheater_spring_center_from_pivot_x,
+        )
+
+        parts = [part for part, _quantity in quill.get_BOM().items()]
+        top = next(part for part in parts if isinstance(part, QuillCheaterBearingTop))
+        rocker = next(part for part in parts if isinstance(part, QuillCheaterRocker))
+        self.assertAlmostEqual(rocker.spring_pocket_depth, 3.0)
+        self.assertAlmostEqual(
+            top.spring_pocket_floor_z + top.spring_pocket_lip_height,
+            quill.cheater_spring_top_pocket_lip_top_z(),
+        )
+        self.assertAlmostEqual(top.spring_pocket_lip_height, 3.0)
+        self.assertFalse(top.spring_pocket_needs_boss)
+        self.assertFalse(quill.cheater_spring_top_pocket_needs_boss())
+        self.assertAlmostEqual(top.spring_pocket_boss_outer_diameter, 10.5)
+        self.assertGreaterEqual(
+            quill.cheater_spring_center_x() - quill.cheater_spring_pocket_diameter() / 2,
+            quill.cheater_top_start_x() + quill.cheater_rocker_stop_width_x,
+        )
+
+        class BossRequiredQuill(QuillAssemblyStandardMk1):
+            cheater_spring_preload_compression = 5.0
+
+        boss_required = BossRequiredQuill(explode=False)
+        self.assertTrue(boss_required.cheater_spring_top_pocket_needs_boss())
+        self.assertAlmostEqual(
+            boss_required.cheater_spring_top_pocket_lip_top_z(),
+            boss_required.cheater_spring_top_pocket_floor_z()
+            + boss_required.cheater_spring_top_pocket_lip_height,
+        )
+
     def test_cheater_pivot_leverage_and_rocker_stop_contract(self) -> None:
         quill = QuillAssemblyStandardMk1(explode=False)
 
@@ -60,9 +111,9 @@ class QuillSpringConfigurationTests(unittest.TestCase):
             quill.cheater_pivot_x(),
             old_pivot_x - 10.0,
         )
+        self.assertAlmostEqual(quill.cheater_spring_lever_arm_x(), 20.0)
         self.assertAlmostEqual(
-            quill.cheater_spring_lever_arm_x(),
-            (quill.cheater_spring_center_x() - old_pivot_x) + 10.0,
+            quill.cheater_spring_center_x(), quill.cheater_pivot_x() + 20.0
         )
         self.assertAlmostEqual(quill.cheater_rocker_stop_width_x, 3.0)
         self.assertAlmostEqual(
@@ -303,7 +354,7 @@ class QuillSpringConfigurationTests(unittest.TestCase):
         class ShortSpringQuill(QuillAssemblyStandardMk1):
             cheater_spring_free_length = 8.0
 
-        with self.assertRaisesRegex(ValueError, "provide preload"):
+        with self.assertRaisesRegex(ValueError, "installed length"):
             ShortSpringQuill(explode=False)
 
     def test_rejects_lip_that_blocks_index_gear_spacer(self) -> None:

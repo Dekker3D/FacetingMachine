@@ -176,16 +176,17 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_gear_section_tooth_count_engraving_depth: float = 1.0
     cheater_gear_section_tooth_count_engraving_margin_z: float = 0.5
 
-    cheater_spring_wire_diameter: float = 0.5
-    cheater_spring_outside_diameter: float = 8.0
-    cheater_spring_free_length: float = 15.0
+    cheater_spring_wire_diameter: float = 1.0
+    cheater_spring_outside_diameter: float = 6.0
+    cheater_spring_free_length: float = 20.0
     cheater_spring_coil_count: int = 8
+    cheater_spring_preload_compression: float = 1.0
+    cheater_spring_center_from_pivot_x: float = 20.0
     cheater_spring_pocket_diameter_clearance: float = 0.5
-    cheater_spring_pocket_depth_top: float = 1.5
-    cheater_spring_pocket_depth_rocker: float = 1.5
+    cheater_spring_rocker_pocket_depth: float = 3.0
+    cheater_spring_top_pocket_lip_height: float = 3.0
+    cheater_spring_top_pocket_boss_radial_wall: float = 2.0
     cheater_spring_edge_clearance_x: float = 1.0
-    # Retain the established spring seat while the pivot moves 10 mm -X.
-    cheater_spring_target_from_pivot_x: float = 26.0
 
     def index_gear_width(self) -> float:
         """Axial width outside the block; excludes spacer reach into the lip."""
@@ -855,28 +856,42 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
         )
 
     def cheater_spring_center_x(self) -> float:
-        maximum_center_x = (
-            self.cheater_top_start_x()
-            + self.cheater_top_length_x()
-            - self.cheater_spring_pocket_diameter() / 2
-            - self.cheater_spring_edge_clearance_x
-        )
-        # Retain the existing fixed seat at the +X end of the cheater top as
-        # the pivot moves -X; this is the intended increase in spring leverage.
-        return min(
-            self.cheater_pivot_x() + self.cheater_spring_target_from_pivot_x,
-            maximum_center_x,
-        )
+        """Spring centre: the selected +X lever arm is assembly-owned."""
+        return self.cheater_pivot_x() + self.cheater_spring_center_from_pivot_x
 
     def cheater_spring_installed_length(self) -> float:
-        lower_seat_z = (
-            self.block_height_z() - self.cheater_spring_pocket_depth_top
+        """Loaded spring length; never an independently displayed dimension."""
+        return (
+            self.cheater_spring_free_length
+            - self.cheater_spring_preload_compression
         )
-        upper_seat_z = (
-            self.cheater_pivot_z()
-            + self.cheater_spring_pocket_depth_rocker
+
+    def cheater_spring_rocker_pocket_floor_z(self) -> float:
+        """Neutral rocker-side seat floor, cut upward from its underside."""
+        return self.cheater_pivot_z() + self.cheater_spring_rocker_pocket_depth
+
+    def cheater_spring_top_pocket_floor_z(self) -> float:
+        """Fixed-seat floor below the rocker floor by the loaded spring length."""
+        return (
+            self.cheater_spring_rocker_pocket_floor_z()
+            - self.cheater_spring_installed_length()
         )
-        return upper_seat_z - lower_seat_z
+
+    def cheater_spring_top_pocket_boss_outer_diameter(self) -> float:
+        return (
+            self.cheater_spring_pocket_diameter()
+            + 2 * self.cheater_spring_top_pocket_boss_radial_wall
+        )
+
+    def cheater_spring_top_pocket_lip_top_z(self) -> float:
+        return (
+            self.cheater_spring_top_pocket_floor_z()
+            + self.cheater_spring_top_pocket_lip_height
+        )
+
+    def cheater_spring_top_pocket_needs_boss(self) -> bool:
+        """A boss is only needed when the required lip rises above the top."""
+        return self.cheater_spring_top_pocket_lip_top_z() > self.block_height_z()
 
     def _validate_spring_configuration(self) -> None:
         """Reject spring choices that cannot work in the current mechanism."""
@@ -890,6 +905,11 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             "outside diameter": outside_diameter,
             "free length": self.cheater_spring_free_length,
             "installed length": installed_length,
+            "preload compression": self.cheater_spring_preload_compression,
+            "center from pivot X": self.cheater_spring_center_from_pivot_x,
+            "rocker pocket depth": self.cheater_spring_rocker_pocket_depth,
+            "top pocket lip height": self.cheater_spring_top_pocket_lip_height,
+            "top pocket boss radial wall": self.cheater_spring_top_pocket_boss_radial_wall,
             "pocket diameter": pocket_diameter,
             "pocket center X": spring_center_x,
             "pocket diameter clearance": (
@@ -918,20 +938,21 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             )
         if self.cheater_spring_edge_clearance_x < 0:
             raise ValueError("Cheater spring X-edge clearance cannot be negative")
-        if not 0 < self.cheater_spring_pocket_depth_top < (
-            self.block_height_z() - self.block_center_z()
-        ):
-            raise ValueError(
-                "Cheater top spring-pocket depth must be positive and shallower "
-                "than the removable top"
-            )
-        if not 0 < self.cheater_spring_pocket_depth_rocker < (
+        if not 0 < self.cheater_spring_rocker_pocket_depth < (
             self.cheater_rocker_arm_thickness_z
         ):
             raise ValueError(
                 "Cheater rocker spring-pocket depth must be positive and shallower "
                 "than the rocker arm"
             )
+        if self.cheater_spring_preload_compression <= 0:
+            raise ValueError("Cheater spring preload compression must be greater than 0 mm")
+        if self.cheater_spring_center_from_pivot_x <= 0:
+            raise ValueError("Cheater spring center must be a positive +X distance from the pivot")
+        if self.cheater_spring_top_pocket_lip_height <= 0:
+            raise ValueError("Cheater top spring-pocket lip height must be greater than 0 mm")
+        if self.cheater_spring_top_pocket_boss_radial_wall <= 0:
+            raise ValueError("Cheater top spring-pocket boss radial wall must be greater than 0 mm")
         modeled_solid_length = (
             self.cheater_spring_coil_count + 1
         ) * wire_diameter
@@ -988,6 +1009,12 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             raise ValueError(
                 "Cheater spring center must be on the +X side of the rocker pivot "
                 "so it presses the gear section toward the index gear"
+            )
+        stop_right_x = self.cheater_top_start_x() + self.cheater_rocker_stop_width_x
+        if pocket_left_x < stop_right_x:
+            raise ValueError(
+                "Cheater spring pocket overlaps the fixed rocker stop; increase "
+                "cheater_spring_center_from_pivot_x"
             )
 
     def removable_top_bolt(self) -> bb.Bolt:
@@ -1187,7 +1214,12 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             negative_x_profile_base_z=self.block_height_z(),
             spring_center_x=self.cheater_spring_center_x(),
             spring_pocket_diameter=self.cheater_spring_pocket_diameter(),
-            spring_pocket_depth=self.cheater_spring_pocket_depth_top,
+            spring_pocket_floor_z=self.cheater_spring_top_pocket_floor_z(),
+            spring_pocket_lip_height=self.cheater_spring_top_pocket_lip_height,
+            spring_pocket_boss_outer_diameter=(
+                self.cheater_spring_top_pocket_boss_outer_diameter()
+            ),
+            spring_pocket_needs_boss=self.cheater_spring_top_pocket_needs_boss(),
             rocker_stop_width_x=self.cheater_rocker_stop_width_x,
             rocker_stop_width_y=self.cheater_rocker_stop_width_y(),
             rocker_stop_top_z=self.cheater_rocker_stop_contact_top_z(),
@@ -1213,7 +1245,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             ),
             spring_center_x=self.cheater_spring_center_x(),
             spring_pocket_diameter=self.cheater_spring_pocket_diameter(),
-            spring_pocket_depth=self.cheater_spring_pocket_depth_rocker,
+            spring_pocket_depth=self.cheater_spring_rocker_pocket_depth,
         )
         gear_section_screw = self.cheater_gear_section_screw()
         cheater_gear_section = QuillCheaterGearSection.create(
@@ -1444,9 +1476,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
                 name=f"cheater_gear_section_screw_{index}",
                 color="gray",
             )
-        spring_lower_seat_z = (
-            self.block_height_z() - self.cheater_spring_pocket_depth_top
-        )
+        spring_lower_seat_z = self.cheater_spring_top_pocket_floor_z()
         spring_obj = cheater_spring.object_at_length(
             self.cheater_spring_installed_length()
         ).translate(
@@ -2206,7 +2236,10 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         negative_x_profile_base_z: float,
         spring_center_x: float,
         spring_pocket_diameter: float,
-        spring_pocket_depth: float,
+        spring_pocket_floor_z: float,
+        spring_pocket_lip_height: float,
+        spring_pocket_boss_outer_diameter: float,
+        spring_pocket_needs_boss: bool,
         rocker_stop_width_x: float,
         rocker_stop_width_y: float,
         rocker_stop_top_z: float,
@@ -2234,7 +2267,10 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             negative_x_profile_base_z=negative_x_profile_base_z,
             spring_center_x=spring_center_x,
             spring_pocket_diameter=spring_pocket_diameter,
-            spring_pocket_depth=spring_pocket_depth,
+            spring_pocket_floor_z=spring_pocket_floor_z,
+            spring_pocket_lip_height=spring_pocket_lip_height,
+            spring_pocket_boss_outer_diameter=spring_pocket_boss_outer_diameter,
+            spring_pocket_needs_boss=spring_pocket_needs_boss,
             rocker_stop_width_x=rocker_stop_width_x,
             rocker_stop_width_y=rocker_stop_width_y,
             rocker_stop_top_z=rocker_stop_top_z,
@@ -2264,7 +2300,10 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         negative_x_profile_base_z: float,
         spring_center_x: float,
         spring_pocket_diameter: float,
-        spring_pocket_depth: float,
+        spring_pocket_floor_z: float,
+        spring_pocket_lip_height: float,
+        spring_pocket_boss_outer_diameter: float,
+        spring_pocket_needs_boss: bool,
         rocker_stop_width_x: float,
         rocker_stop_width_y: float,
         rocker_stop_top_z: float,
@@ -2295,7 +2334,10 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         self.negative_x_profile_base_z = negative_x_profile_base_z
         self.spring_center_x = spring_center_x
         self.spring_pocket_diameter = spring_pocket_diameter
-        self.spring_pocket_depth = spring_pocket_depth
+        self.spring_pocket_floor_z = spring_pocket_floor_z
+        self.spring_pocket_lip_height = spring_pocket_lip_height
+        self.spring_pocket_boss_outer_diameter = spring_pocket_boss_outer_diameter
+        self.spring_pocket_needs_boss = spring_pocket_needs_boss
         self.rocker_stop_width_x = rocker_stop_width_x
         self.rocker_stop_width_y = rocker_stop_width_y
         self.rocker_stop_top_z = rocker_stop_top_z
@@ -2309,6 +2351,8 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         assembled = assembled.cut(self._make_wheel_clearance_cut(quill_block))
         assembled = self._fillet_wheel_shelf_edges(assembled, quill_block)
         assembled = assembled.union(self._make_rocker_stop(quill_block))
+        if self.spring_pocket_needs_boss:
+            assembled = assembled.union(self._make_spring_pocket_boss(quill_block))
         assembled = assembled.cut(self._make_spring_pocket(quill_block))
         assembled = assembled.cut(self._make_bearing_pockets())
         assembled = assembled.cut(self._make_axle_hole())
@@ -2364,11 +2408,30 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         self,
         quill_block: QuillMainBlock,
     ) -> cq.Workplane:
+        """Cut from the calculated floor through the existing top or added boss."""
+        pocket_top_z = max(
+            quill_block.height,
+            self.spring_pocket_floor_z + self.spring_pocket_lip_height,
+        )
         return (
             cq.Workplane("XY")
             .center(self.spring_center_x, 0)
             .circle(self.spring_pocket_diameter / 2)
-            .extrude(-self.spring_pocket_depth)
+            .extrude(pocket_top_z - self.spring_pocket_floor_z)
+            .translate((0, 0, self.spring_pocket_floor_z))
+        )
+
+    def _make_spring_pocket_boss(
+        self,
+        quill_block: QuillMainBlock,
+    ) -> cq.Workplane:
+        """Raise only enough material to keep the requested lip above the floor."""
+        boss_top_z = self.spring_pocket_floor_z + self.spring_pocket_lip_height
+        return (
+            cq.Workplane("XY")
+            .center(self.spring_center_x, 0)
+            .circle(self.spring_pocket_boss_outer_diameter / 2)
+            .extrude(boss_top_z - quill_block.height)
             .translate((0, 0, quill_block.height))
         )
 
@@ -2570,7 +2633,10 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             self.negative_x_profile_base_z,
             self.spring_center_x,
             self.spring_pocket_diameter,
-            self.spring_pocket_depth,
+            self.spring_pocket_floor_z,
+            self.spring_pocket_lip_height,
+            self.spring_pocket_boss_outer_diameter,
+            self.spring_pocket_needs_boss,
             self.rocker_stop_width_x,
             self.rocker_stop_width_y,
             self.rocker_stop_top_z,
