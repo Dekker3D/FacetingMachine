@@ -816,6 +816,18 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             - self.cheater_wheel_material_beneath_head
         )
 
+    def cheater_wheel_hex_pocket_inner_floor_y(self) -> float:
+        """Assembly +Y location of the pocket floor under the captured bolt head."""
+        return (
+            self.cheater_wall_outer_y()
+            + self.cheater_wheel_width()
+            - self.cheater_wheel_hex_pocket_depth()
+        )
+
+    def cheater_pivot_bolt_head_base_y(self) -> float:
+        """Assembly +Y location of the captured pivot bolt head's inner face."""
+        return self.cheater_wheel_hex_pocket_inner_floor_y()
+
     def cheater_positive_y_shelf_top_z(self) -> float:
         """Highest shelf that keeps both pan heads 2 mm from the wheel."""
         bolt = self.removable_top_bolt()
@@ -1511,9 +1523,7 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             .translate(
                 (
                     pivot_location[0],
-                    cheater_wall_outer_y
-                    + self.cheater_wheel_width()
-                    - pivot_bolt.head_height(),
+                    self.cheater_pivot_bolt_head_base_y(),
                     pivot_location[2],
                 )
             )

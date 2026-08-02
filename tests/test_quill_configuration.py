@@ -80,6 +80,32 @@ class QuillSpringConfigurationTests(unittest.TestCase):
         )
         self.assertLess(wheel.hex_depth, wheel.width)
 
+    def test_cheater_pivot_bolt_head_base_is_captured_at_hex_pocket_inner_floor(
+        self,
+    ) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+
+        self.assertAlmostEqual(
+            quill.cheater_pivot_bolt_head_base_y(),
+            quill.cheater_wheel_hex_pocket_inner_floor_y(),
+        )
+        self.assertAlmostEqual(
+            quill.cheater_wheel_hex_pocket_inner_floor_y()
+            - quill.cheater_wall_outer_y(),
+            quill.cheater_wheel_material_beneath_head,
+        )
+        self.assertAlmostEqual(
+            quill.cheater_wall_outer_y()
+            + quill.cheater_wheel_width()
+            - quill.cheater_pivot_bolt_head_base_y(),
+            quill.cheater_wheel_hex_pocket_depth(),
+        )
+        self.assertLessEqual(
+            quill.cheater_pivot_bolt_head_base_y()
+            + quill.cheater_pivot_bolt().head_height(),
+            quill.cheater_wall_outer_y() + quill.cheater_wheel_width(),
+        )
+
     def test_selected_spring_and_seat_contract(self) -> None:
         quill = QuillAssemblyStandardMk1(explode=False)
         spring = quill.cheater_spring()
