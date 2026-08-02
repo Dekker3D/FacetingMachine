@@ -6,7 +6,7 @@ import unittest
 import cadquery as cq
 import bom_part_data as bpd
 import bought_bits as bb
-from quill.quill_assembly import QuillAssemblyStandardMk1
+from quill.quill_assembly import QuillAssemblyStandardMk1, QuillCheaterBearingTop
 
 
 def _solid_contains(shape: cq.Solid, point: cq.Vector) -> bool:
@@ -52,6 +52,155 @@ class CompressionSpringTests(unittest.TestCase):
 
 
 class QuillSpringConfigurationTests(unittest.TestCase):
+    def test_cheater_pivot_leverage_and_rocker_stop_contract(self) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+
+        old_pivot_x = quill.index_teeth_positive_x() + 40.0
+        self.assertAlmostEqual(
+            quill.cheater_pivot_x(),
+            old_pivot_x - 10.0,
+        )
+        self.assertAlmostEqual(
+            quill.cheater_spring_lever_arm_x(),
+            (quill.cheater_spring_center_x() - old_pivot_x) + 10.0,
+        )
+        self.assertAlmostEqual(quill.cheater_rocker_stop_width_x, 3.0)
+        self.assertAlmostEqual(
+            quill.cheater_rocker_extra_gear_side_down_travel,
+            2.0,
+        )
+        self.assertAlmostEqual(
+            quill.cheater_rocker_stop_width_y(), quill.cheater_rocker_width_y
+        )
+
+        limit_angle = quill.cheater_rocker_stop_limit_angle()
+        gear_side_radius = quill.cheater_rocker_gear_side_radius_x()
+        self.assertAlmostEqual(
+            gear_side_radius * math.sin(limit_angle),
+            quill.cheater_rocker_extra_gear_side_down_travel,
+        )
+        expected_contact_top_z = (
+            quill.cheater_rocker_neutral_underside_z()
+            - quill.cheater_rocker_stop_contact_radius_x()
+            * math.sin(limit_angle)
+        )
+        limited_contact_x = (
+            quill.cheater_pivot_x()
+            - quill.cheater_rocker_stop_contact_radius_x() * math.cos(limit_angle)
+        )
+        self.assertAlmostEqual(
+            quill.cheater_rocker_stop_contact_top_z(), expected_contact_top_z
+        )
+        self.assertGreaterEqual(limited_contact_x, quill.cheater_top_start_x())
+        self.assertLessEqual(
+            limited_contact_x,
+            quill.cheater_top_start_x() + quill.cheater_rocker_stop_width_x,
+        )
+
+    def test_cheater_bearing_wall_profile_keeps_pivot_and_45_degree_print_face(
+        self,
+    ) -> None:
+        quill = QuillAssemblyStandardMk1(explode=False)
+        cheater_top = next(
+            part
+            for part, _quantity in quill.get_BOM().items()
+            if part.name == "Quill Cheater Bearing Top"
+        )
+        self.assertIsInstance(cheater_top, QuillCheaterBearingTop)
+        assert isinstance(cheater_top, QuillCheaterBearingTop)
+
+        self.assertAlmostEqual(cheater_top.pivot_x, quill.cheater_pivot_x())
+        self.assertAlmostEqual(cheater_top.pivot_z, quill.cheater_pivot_z())
+        self.assertAlmostEqual(
+            cheater_top.outer_arc_center_x,
+            quill.cheater_pivot_x(),
+        )
+        self.assertAlmostEqual(
+            cheater_top.outer_arc_center_z,
+            quill.cheater_pivot_z(),
+        )
+        self.assertAlmostEqual(
+            cheater_top.outer_arc_radius,
+            quill.cheater_wall_outer_radius(),
+        )
+        for tangent_x, tangent_z in (
+            (
+                cheater_top.negative_x_profile_tangent_x,
+                cheater_top.negative_x_profile_tangent_z,
+            ),
+            (
+                cheater_top.positive_x_profile_tangent_x,
+                cheater_top.positive_x_profile_tangent_z,
+            ),
+        ):
+            self.assertAlmostEqual(
+                math.hypot(
+                    tangent_x - cheater_top.outer_arc_center_x,
+                    tangent_z - cheater_top.outer_arc_center_z,
+                ),
+                cheater_top.outer_arc_radius,
+            )
+        self.assertAlmostEqual(
+            cheater_top.negative_x_profile_base_x,
+            cheater_top.negative_x_profile_tangent_x,
+        )
+        self.assertAlmostEqual(
+            cheater_top.negative_x_profile_base_z,
+            quill.block_height_z(),
+        )
+        # A vertical -X support and the +X direct support are both tangent to
+        # the same circle: each support direction is perpendicular to radius.
+        negative_radius = (
+            cheater_top.negative_x_profile_tangent_x
+            - cheater_top.outer_arc_center_x,
+            cheater_top.negative_x_profile_tangent_z
+            - cheater_top.outer_arc_center_z,
+        )
+        negative_support = (
+            cheater_top.negative_x_profile_base_x
+            - cheater_top.negative_x_profile_tangent_x,
+            cheater_top.negative_x_profile_base_z
+            - cheater_top.negative_x_profile_tangent_z,
+        )
+        positive_radius = (
+            cheater_top.positive_x_profile_tangent_x
+            - cheater_top.outer_arc_center_x,
+            cheater_top.positive_x_profile_tangent_z
+            - cheater_top.outer_arc_center_z,
+        )
+        positive_support = (
+            cheater_top.positive_x_profile_endpoint_x
+            - cheater_top.positive_x_profile_tangent_x,
+            cheater_top.positive_x_profile_endpoint_z
+            - cheater_top.positive_x_profile_tangent_z,
+        )
+        self.assertAlmostEqual(
+            negative_radius[0] * negative_support[0]
+            + negative_radius[1] * negative_support[1],
+            0.0,
+        )
+        self.assertAlmostEqual(
+            positive_radius[0] * positive_support[0]
+            + positive_radius[1] * positive_support[1],
+            0.0,
+        )
+        self.assertAlmostEqual(
+            cheater_top.positive_x_profile_endpoint_x,
+            quill.cheater_wall_positive_x_endpoint_x(),
+        )
+        self.assertAlmostEqual(
+            cheater_top.positive_x_profile_endpoint_z,
+            quill.block_height_z(),
+        )
+        self.assertAlmostEqual(
+            cheater_top.positive_x_profile_slope_angle(),
+            45.0,
+        )
+        self.assertLessEqual(
+            cheater_top.positive_x_profile_slope_angle(),
+            quill.cheater_wall_max_print_angle,
+        )
+
     def test_default_configuration_builds_valid_printed_parts(self) -> None:
         quill = QuillAssemblyStandardMk1(explode=False)
 

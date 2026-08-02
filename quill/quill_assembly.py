@@ -121,7 +121,9 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_rocker_width_y: float = 20.0
     cheater_rocker_side_clearance_y: float = 4.0
     cheater_pivot_above_block: float = 10.0
-    cheater_pivot_from_tooth_face_x: float = 40.0
+    # Measured from the index gear tooth face, so moving the pivot preserves
+    # its relationship to the meshing gear rather than introducing a raw X.
+    cheater_pivot_from_tooth_face_x: float = 30.0
     cheater_top_screw_x_margin: float = 8.0
     cheater_screwdriver_shaft_diameter: float = 6.0
     cheater_screwdriver_radial_clearance: float = 0.5
@@ -151,6 +153,11 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_rocker_pivot_outer_diameter: float = 12.0
     cheater_rocker_pivot_pilot_diameter: float = 3.4
     cheater_rocker_gear_mount_positive_x: float = 10.0
+    # Fixed printed stop limits the gear-side rocker travel after the normal
+    # pitch-circle engagement position. These are assembly-owned dimensions;
+    # the removable cheater top only receives the resulting geometry.
+    cheater_rocker_stop_width_x: float = 3.0
+    cheater_rocker_extra_gear_side_down_travel: float = 2.0
 
     cheater_gear_section_screw_size: float = 3.0
     cheater_gear_section_screw_length: float = 12.0
@@ -177,7 +184,8 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     cheater_spring_pocket_depth_top: float = 1.5
     cheater_spring_pocket_depth_rocker: float = 1.5
     cheater_spring_edge_clearance_x: float = 1.0
-    cheater_spring_target_from_pivot_x: float = 16.0
+    # Retain the established spring seat while the pivot moves 10 mm -X.
+    cheater_spring_target_from_pivot_x: float = 26.0
 
     def index_gear_width(self) -> float:
         """Axial width outside the block; excludes spacer reach into the lip."""
@@ -673,11 +681,96 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
     def cheater_pivot_z(self) -> float:
         return self.block_height_z() + self.cheater_pivot_above_block
 
+    def cheater_spring_lever_arm_x(self) -> float:
+        """Horizontal +X spring lever from the pivot to its fixed top seat."""
+        return self.cheater_spring_center_x() - self.cheater_pivot_x()
+
+    def cheater_rocker_stop_width_y(self) -> float:
+        """The stop spans the complete rocker width without duplicating it."""
+        return self.cheater_rocker_width_y
+
+    def cheater_rocker_gear_side_measurement_x(self) -> float:
+        """-X arm edge at the index tooth face, at neutral pitch engagement."""
+        return self.index_teeth_positive_x()
+
+    def cheater_rocker_gear_side_radius_x(self) -> float:
+        """Pivot-to-gear-side measurement distance used for the 2 mm limit."""
+        return self.cheater_pivot_x() - self.cheater_rocker_gear_side_measurement_x()
+
+    def cheater_rocker_stop_limit_angle(self) -> float:
+        """Rotation from neutral that lowers the declared gear-side point by 2 mm."""
+        return math.asin(
+            self.cheater_rocker_extra_gear_side_down_travel
+            / self.cheater_rocker_gear_side_radius_x()
+        )
+
+    def cheater_rocker_stop_contact_x(self) -> float:
+        """Neutral X midpoint of the broad underside directly above the stop."""
+        return self.cheater_top_start_x() + self.cheater_rocker_stop_width_x / 2
+
+    def cheater_rocker_stop_contact_radius_x(self) -> float:
+        """Pivot-to-stop underside contact distance, positive toward the gear side."""
+        return self.cheater_pivot_x() - self.cheater_rocker_stop_contact_x()
+
+    def cheater_rocker_neutral_underside_z(self) -> float:
+        """Neutral broad rocker-arm underside at the stop contact midpoint."""
+        return self.cheater_pivot_z()
+
+    def cheater_rocker_stop_contact_top_z(self) -> float:
+        """Stop top under the arm underside after the declared gear-side rotation.
+
+        The arm begins horizontal at neutral pitch-circle engagement. Rotating
+        its -X side down by ``cheater_rocker_stop_limit_angle`` lowers this
+        broad underside contact point by radius * sin(angle).
+        """
+        return (
+            self.cheater_rocker_neutral_underside_z()
+            - self.cheater_rocker_stop_contact_radius_x()
+            * math.sin(self.cheater_rocker_stop_limit_angle())
+        )
+
     def cheater_wall_outer_radius(self) -> float:
         return (
             self.cheater_bearing_pocket_dia() / 2
             + self.cheater_bearing_radial_material
         )
+
+    def cheater_wall_boss_top_z(self) -> float:
+        """Top of the 624-bearing boss outer contour in the XZ profile."""
+        return self.cheater_pivot_z() + self.cheater_wall_outer_radius()
+
+    def cheater_wall_positive_x_tangent_x(self) -> float:
+        """+X upper tangent point of the circular boss and 45° support."""
+        return self.cheater_pivot_x() + self.cheater_wall_outer_radius() / math.sqrt(2)
+
+    def cheater_wall_positive_x_tangent_z(self) -> float:
+        """+X upper tangent point of the circular boss and 45° support."""
+        return self.cheater_pivot_z() + self.cheater_wall_outer_radius() / math.sqrt(2)
+
+    def cheater_wall_positive_x_endpoint_x(self) -> float:
+        """+X end of the tangent printable face, on the central top surface."""
+        rise = self.cheater_wall_positive_x_tangent_z() - self.block_height_z()
+        return self.cheater_wall_positive_x_tangent_x() + rise / math.tan(
+            math.radians(self.cheater_wall_max_print_angle)
+        )
+
+    def cheater_wall_positive_x_slope_angle(self) -> float:
+        """Actual +X tangent-face descent angle from horizontal, in degrees."""
+        return math.degrees(
+            math.atan2(
+                self.cheater_wall_positive_x_tangent_z() - self.block_height_z(),
+                self.cheater_wall_positive_x_endpoint_x()
+                - self.cheater_wall_positive_x_tangent_x(),
+            )
+        )
+
+    def cheater_wall_negative_x_tangent_x(self) -> float:
+        """-X side tangent point for the intentional vertical boss support."""
+        return self.cheater_pivot_x() - self.cheater_wall_outer_radius()
+
+    def cheater_wall_negative_x_tangent_z(self) -> float:
+        """-X side tangent point for the intentional vertical boss support."""
+        return self.cheater_pivot_z()
 
     def cheater_axle_hole_dia(self) -> float:
         return self.cheater_bearing_type.ID + self.cheater_axle_clearance
@@ -768,6 +861,8 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             - self.cheater_spring_pocket_diameter() / 2
             - self.cheater_spring_edge_clearance_x
         )
+        # Retain the existing fixed seat at the +X end of the cheater top as
+        # the pivot moves -X; this is the intended increase in spring leverage.
         return min(
             self.cheater_pivot_x() + self.cheater_spring_target_from_pivot_x,
             maximum_center_x,
@@ -1072,10 +1167,30 @@ class QuillAssemblyStandardMk1(quill_abstract.QuillAssemblyBase):
             positive_y_shelf_edge_bevel=(
                 self.cheater_positive_y_shelf_edge_bevel
             ),
-            max_print_angle=self.cheater_wall_max_print_angle,
+            positive_x_profile_tangent_x=(
+                self.cheater_wall_positive_x_tangent_x()
+            ),
+            positive_x_profile_tangent_z=(
+                self.cheater_wall_positive_x_tangent_z()
+            ),
+            positive_x_profile_endpoint_x=(
+                self.cheater_wall_positive_x_endpoint_x()
+            ),
+            positive_x_profile_endpoint_z=self.block_height_z(),
+            negative_x_profile_tangent_x=(
+                self.cheater_wall_negative_x_tangent_x()
+            ),
+            negative_x_profile_tangent_z=(
+                self.cheater_wall_negative_x_tangent_z()
+            ),
+            negative_x_profile_base_x=self.cheater_wall_negative_x_tangent_x(),
+            negative_x_profile_base_z=self.block_height_z(),
             spring_center_x=self.cheater_spring_center_x(),
             spring_pocket_diameter=self.cheater_spring_pocket_diameter(),
             spring_pocket_depth=self.cheater_spring_pocket_depth_top,
+            rocker_stop_width_x=self.cheater_rocker_stop_width_x,
+            rocker_stop_width_y=self.cheater_rocker_stop_width_y(),
+            rocker_stop_top_z=self.cheater_rocker_stop_contact_top_z(),
         )
         cheater_rocker = QuillCheaterRocker.create(
             negative_x=self.index_teeth_positive_x(),
@@ -2081,10 +2196,20 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         positive_y_shelf_top_z: float,
         wheel_clearance_radius: float,
         positive_y_shelf_edge_bevel: float,
-        max_print_angle: float,
+        positive_x_profile_tangent_x: float,
+        positive_x_profile_tangent_z: float,
+        positive_x_profile_endpoint_x: float,
+        positive_x_profile_endpoint_z: float,
+        negative_x_profile_tangent_x: float,
+        negative_x_profile_tangent_z: float,
+        negative_x_profile_base_x: float,
+        negative_x_profile_base_z: float,
         spring_center_x: float,
         spring_pocket_diameter: float,
         spring_pocket_depth: float,
+        rocker_stop_width_x: float,
+        rocker_stop_width_y: float,
+        rocker_stop_top_z: float,
     ) -> QuillCheaterBearingTop:
         return cls.get(
             quill_block=quill_block,
@@ -2099,10 +2224,20 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             positive_y_shelf_top_z=positive_y_shelf_top_z,
             wheel_clearance_radius=wheel_clearance_radius,
             positive_y_shelf_edge_bevel=positive_y_shelf_edge_bevel,
-            max_print_angle=max_print_angle,
+            positive_x_profile_tangent_x=positive_x_profile_tangent_x,
+            positive_x_profile_tangent_z=positive_x_profile_tangent_z,
+            positive_x_profile_endpoint_x=positive_x_profile_endpoint_x,
+            positive_x_profile_endpoint_z=positive_x_profile_endpoint_z,
+            negative_x_profile_tangent_x=negative_x_profile_tangent_x,
+            negative_x_profile_tangent_z=negative_x_profile_tangent_z,
+            negative_x_profile_base_x=negative_x_profile_base_x,
+            negative_x_profile_base_z=negative_x_profile_base_z,
             spring_center_x=spring_center_x,
             spring_pocket_diameter=spring_pocket_diameter,
             spring_pocket_depth=spring_pocket_depth,
+            rocker_stop_width_x=rocker_stop_width_x,
+            rocker_stop_width_y=rocker_stop_width_y,
+            rocker_stop_top_z=rocker_stop_top_z,
         )
 
     def __init__(
@@ -2119,10 +2254,20 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         positive_y_shelf_top_z: float,
         wheel_clearance_radius: float,
         positive_y_shelf_edge_bevel: float,
-        max_print_angle: float,
+        positive_x_profile_tangent_x: float,
+        positive_x_profile_tangent_z: float,
+        positive_x_profile_endpoint_x: float,
+        positive_x_profile_endpoint_z: float,
+        negative_x_profile_tangent_x: float,
+        negative_x_profile_tangent_z: float,
+        negative_x_profile_base_x: float,
+        negative_x_profile_base_z: float,
         spring_center_x: float,
         spring_pocket_diameter: float,
         spring_pocket_depth: float,
+        rocker_stop_width_x: float,
+        rocker_stop_width_y: float,
+        rocker_stop_top_z: float,
     ) -> None:
         self.quill_block_dimensions = quill_block.dimensions()
         self.pivot_x = pivot_x
@@ -2136,22 +2281,34 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
         self.positive_y_shelf_top_z = positive_y_shelf_top_z
         self.wheel_clearance_radius = wheel_clearance_radius
         self.positive_y_shelf_edge_bevel = positive_y_shelf_edge_bevel
-        self.max_print_angle = max_print_angle
+        # The outer arc is exactly the bearing-boss circle at the pivot.
+        self.outer_arc_center_x = pivot_x
+        self.outer_arc_center_z = pivot_z
+        self.outer_arc_radius = wall_outer_radius
+        self.positive_x_profile_tangent_x = positive_x_profile_tangent_x
+        self.positive_x_profile_tangent_z = positive_x_profile_tangent_z
+        self.positive_x_profile_endpoint_x = positive_x_profile_endpoint_x
+        self.positive_x_profile_endpoint_z = positive_x_profile_endpoint_z
+        self.negative_x_profile_tangent_x = negative_x_profile_tangent_x
+        self.negative_x_profile_tangent_z = negative_x_profile_tangent_z
+        self.negative_x_profile_base_x = negative_x_profile_base_x
+        self.negative_x_profile_base_z = negative_x_profile_base_z
         self.spring_center_x = spring_center_x
         self.spring_pocket_diameter = spring_pocket_diameter
         self.spring_pocket_depth = spring_pocket_depth
+        self.rocker_stop_width_x = rocker_stop_width_x
+        self.rocker_stop_width_y = rocker_stop_width_y
+        self.rocker_stop_top_z = rocker_stop_top_z
         super().__init__(name="Quill Cheater Bearing Top")
 
         assembled = quill_block.get_cheater_top_base_shape().cut(
             self._make_positive_y_shelf_cut(quill_block)
         )
-        assembled = assembled.union(self._make_wall_rails(quill_block))
         wall = self._make_positive_y_wall(quill_block)
-        assembled = assembled.union(wall).union(
-            wall.mirror("XZ")
-        )
+        assembled = assembled.union(wall).union(wall.mirror("XZ"))
         assembled = assembled.cut(self._make_wheel_clearance_cut(quill_block))
         assembled = self._fillet_wheel_shelf_edges(assembled, quill_block)
+        assembled = assembled.union(self._make_rocker_stop(quill_block))
         assembled = assembled.cut(self._make_spring_pocket(quill_block))
         assembled = assembled.cut(self._make_bearing_pockets())
         assembled = assembled.cut(self._make_axle_hole())
@@ -2213,6 +2370,19 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             .circle(self.spring_pocket_diameter / 2)
             .extrude(-self.spring_pocket_depth)
             .translate((0, 0, quill_block.height))
+        )
+
+    def _make_rocker_stop(self, quill_block: QuillMainBlock) -> cq.Workplane:
+        """Integral stop under the rocker's broad -X arm underside at its limit."""
+        return (
+            cq.Workplane("XY")
+            .box(
+                self.rocker_stop_width_x,
+                self.rocker_stop_width_y,
+                self.rocker_stop_top_z - quill_block.height,
+                centered=(False, True, False),
+            )
+            .translate((quill_block.holder_length_x, 0, quill_block.height))
         )
 
     def _fillet_wheel_shelf_edges(
@@ -2302,108 +2472,50 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             self.positive_y_shelf_edge_bevel
         )
 
-    def _wall_root_z(self, quill_block: QuillMainBlock) -> float:
-        """Rail height required to keep both tangent slopes printable."""
-        angle = math.radians(self.max_print_angle)
-        tangent = math.tan(angle)
-        secant = 1.0 / math.cos(angle)
-        root_x_positions = (
-            quill_block.holder_length_x,
-            quill_block.length - quill_block.holder_length_x,
-        )
-        required_roots = tuple(
-            self.pivot_z
-            - tangent * abs(root_x - self.pivot_x)
-            + self.wall_outer_radius * secant
-            for root_x in root_x_positions
-        )
-        return max(quill_block.height, *required_roots)
-
-    def _make_wall_rails(
-        self,
-        quill_block: QuillMainBlock,
-    ) -> cq.Workplane:
-        start_x = quill_block.holder_length_x
-        end_x = quill_block.length - quill_block.holder_length_x
-        root_z = self._wall_root_z(quill_block)
-        rail_height = root_z - quill_block.height
-        if rail_height <= 0:
-            return cq.Workplane("XY")
-
-        positive_rail = (
-            cq.Workplane("XY")
-            .box(
-                end_x - start_x,
-                self.wall_thickness_y,
-                rail_height,
-                centered=(False, False, False),
-            )
-            .translate((start_x, self.wall_inner_y, quill_block.height))
-        )
-        return positive_rail.union(positive_rail.mirror("XZ"))
-
     def _make_positive_y_wall(
         self,
         quill_block: QuillMainBlock,
     ) -> cq.Workplane:
-        top_start_x = quill_block.holder_length_x
-        top_end_x = quill_block.length - quill_block.holder_length_x
-        root_z = self._wall_root_z(quill_block)
-        left_tangent = self._upper_tangent_point(
-            top_start_x,
-            root_z,
-        )
-        right_tangent = self._upper_tangent_point(
-            top_end_x,
-            root_z,
-        )
-        # XZ's negative extrusion points toward +Y.
-        wall = (
+        """Asymmetric XZ profile with a true outer circular bearing-boss arc."""
+        # Start at the central top plane, rise vertically along the deliberate
+        # -X support to its left-circle tangent, sweep the exact boss circle
+        # through its apex, then leave the right-circle tangent at 45 degrees.
+        return (
             cq.Workplane("XZ")
-            .moveTo(top_start_x, root_z)
-            .lineTo(*left_tangent)
-            .threePointArc(
-                (self.pivot_x, self.pivot_z + self.wall_outer_radius),
-                right_tangent,
+            .moveTo(self.negative_x_profile_base_x, self.negative_x_profile_base_z)
+            .lineTo(
+                self.negative_x_profile_tangent_x,
+                self.negative_x_profile_tangent_z,
             )
-            .lineTo(top_end_x, root_z)
+            .threePointArc(
+                (
+                    self.outer_arc_center_x,
+                    self.outer_arc_center_z + self.outer_arc_radius,
+                ),
+                (
+                    self.positive_x_profile_tangent_x,
+                    self.positive_x_profile_tangent_z,
+                ),
+            )
+            .lineTo(
+                self.positive_x_profile_endpoint_x,
+                self.positive_x_profile_endpoint_z,
+            )
             .close()
             .extrude(-self.wall_thickness_y)
             .translate((0, self.wall_inner_y, 0))
         )
-        return wall
 
-    def _upper_tangent_point(
-        self,
-        root_x: float,
-        root_z: float,
-    ) -> tuple[float, float]:
-        """Upper external tangent from a wall root to the bearing boss."""
-        dx = root_x - self.pivot_x
-        dz = root_z - self.pivot_z
-        distance_squared = dx * dx + dz * dz
-        radius_squared = self.wall_outer_radius * self.wall_outer_radius
-        if distance_squared <= radius_squared:
-            raise ValueError("Wall root must lie outside the bearing boss")
-
-        base_x = self.pivot_x + radius_squared * dx / distance_squared
-        base_z = self.pivot_z + radius_squared * dz / distance_squared
-        factor = (
-            self.wall_outer_radius
-            * math.sqrt(distance_squared - radius_squared)
-            / distance_squared
+    def positive_x_profile_slope_angle(self) -> float:
+        """Angle of the direct +X tangent support measured from horizontal."""
+        return math.degrees(
+            math.atan2(
+                self.positive_x_profile_tangent_z
+                - self.positive_x_profile_endpoint_z,
+                self.positive_x_profile_endpoint_x
+                - self.positive_x_profile_tangent_x,
+            )
         )
-        perpendicular_x = -dz
-        perpendicular_z = dx
-        first = (
-            base_x + factor * perpendicular_x,
-            base_z + factor * perpendicular_z,
-        )
-        second = (
-            base_x - factor * perpendicular_x,
-            base_z - factor * perpendicular_z,
-        )
-        return first if first[1] > second[1] else second
 
     def _make_bearing_pockets(self) -> cq.Workplane:
         outside_y = self.wall_inner_y + self.wall_thickness_y
@@ -2445,10 +2557,23 @@ class QuillCheaterBearingTop(bpd.PrintedPart):
             self.positive_y_shelf_top_z,
             self.wheel_clearance_radius,
             self.positive_y_shelf_edge_bevel,
-            self.max_print_angle,
+            self.outer_arc_center_x,
+            self.outer_arc_center_z,
+            self.outer_arc_radius,
+            self.positive_x_profile_tangent_x,
+            self.positive_x_profile_tangent_z,
+            self.positive_x_profile_endpoint_x,
+            self.positive_x_profile_endpoint_z,
+            self.negative_x_profile_tangent_x,
+            self.negative_x_profile_tangent_z,
+            self.negative_x_profile_base_x,
+            self.negative_x_profile_base_z,
             self.spring_center_x,
             self.spring_pocket_diameter,
             self.spring_pocket_depth,
+            self.rocker_stop_width_x,
+            self.rocker_stop_width_y,
+            self.rocker_stop_top_z,
         )
 
 
